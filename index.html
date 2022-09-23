@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<meta charset='utf-8'/>
+<html>
+  <head>
+    <title>werm</title>
+<style>
+
+html {
+  height: 100%;
+}
+body {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  margin: 0px;
+  padding: 0px;
+}
+</style>
+
+  </head>
+  <body>
+    <div id="terminal"
+         style="position:relative; width:100%; height:100%"></div>
+    <script src="hterm_all.js"></script>
+    <script>
+var t, sock;
+
+sock = new WebSocket('ws://localhost:8001');
+
+function term_init()
+{
+	t = new hterm.Terminal();
+
+	t.onTerminalReady = function() {
+		const io = this.io.push();
+		console.log("onTerminalReady");
+		io.sendString = function(str) {
+			console.log("io.sendString: " + str);
+		};
+		io.onTerminalResize = function(c, r) {
+			console.log("io.onTerminalResize: " + c + '.' + r);
+		};
+		io.onVTKeystroke = function(s) {
+			console.log("keystroke: " + JSON.stringify(s));
+		};
+		setTimeout(function() {
+			console.log("printing terminal data");
+			t.io.print('this is ');
+			t.io.println('terminal data');
+		},
+		2000);
+	};
+
+	t.decorate(document.querySelector('#terminal'));
+	t.installKeyboard();
+}
+
+window.onload = function() {
+  lib.init().then( function() { term_init(); } );
+};
+    </script>
+  </body>
+</html>

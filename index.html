@@ -24,36 +24,58 @@ body {
          style="position:relative; width:100%; height:100%"></div>
     <script src="hterm_all.js"></script>
     <script>
-var t, sock;
-
-sock = new WebSocket('ws://localhost:8001');
+var t, sock, ready, io, pending = '', term_ready = false;
 
 function term_init()
 {
-	t = new hterm.Terminal();
+	sock = new WebSocket('ws://localhost:8090');
+	sock.onconnect = function()
+	{
+		t = new hterm.Terminal();
 
-	t.onTerminalReady = function() {
-		const io = this.io.push();
-		console.log("onTerminalReady");
-		io.sendString = function(str) {
-			console.log("io.sendString: " + str);
+		function signal(s)
+		{
+			s = s.replaceAll('\\', '\\\\').replaceAll('\n', '\\n');
+			sock.send(s + '\n');
+		}
+
+		t.onTerminalReady = function()
+		{
+			io = t.io.push();
+			console.log("onTerminalReady");
+			io.sendString = signal;
+			io.onTerminalResize = function(c, r) {
+				console.log("io.onTerminalResize: " + c + '.' + r);
+			};
+			io.onVTKeystroke = function(s) {
+				signal(s);
+				console.log("keystroke: " + JSON.stringify(s));
+			};
+			setTimeout(function() {
+				console.log("printing terminal data");
+				t.io.print('this is ');
+				t.io.println('terminal data');
+			},
+			2000);
+
+			if (pending) {
+				t.io.print(pending);
+				pending = '';
+			}
+			term_ready = true;
 		};
-		io.onTerminalResize = function(c, r) {
-			console.log("io.onTerminalResize: " + c + '.' + r);
-		};
-		io.onVTKeystroke = function(s) {
-			console.log("keystroke: " + JSON.stringify(s));
-		};
-		setTimeout(function() {
-			console.log("printing terminal data");
-			t.io.print('this is ');
-			t.io.println('terminal data');
-		},
-		2000);
+
+		t.decorate(document.querySelector('#terminal'));
+		t.installKeyboard();
 	};
-
-	t.decorate(document.querySelector('#terminal'));
-	t.installKeyboard();
+	sock.onmessage = function(e)
+	{
+		// var s = e.data.replaceAll('\\\\', '\\').replaceAll('\\n', '\n');
+		if (!term_ready)
+			pending += e.data;
+		else
+			t.io.print(e.data);
+	};
 }
 
 window.onload = function() {

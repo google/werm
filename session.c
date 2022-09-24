@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -27,6 +28,7 @@ static char *extract_query_arg(const char **qs, const char *pref)
 	size_t preflen;
 	const char *end;
 	char *buf, *bufcur;
+	int byte, bcnt;
 
 	preflen = strlen(pref);
 	if (memcmp(*qs, pref, preflen)) return NULL;
@@ -36,7 +38,15 @@ static char *extract_query_arg(const char **qs, const char *pref)
 	bufcur = buf = malloc(end - *qs + 1);
 
 	while (*qs != end) {
-		*bufcur++ = *(*qs)++;
+		byte = *(*qs)++;
+
+		if (byte == '%') {
+			bcnt = 0;
+			if (sscanf(*qs, "%2x%n", &byte, &bcnt) && bcnt == 2)
+				*qs += 2;
+		}
+
+		*bufcur++ = byte;
 	}
 	*bufcur = 0;
 
@@ -64,28 +74,16 @@ int xasprintf(char **strp, const char *format, ...)
 	return res;
 }
 
-static _Noreturn void do_exec()
+static char *dtach_sock = NULL, *log = NULL, *pream = NULL;
+
+static void parse_query(void)
 {
-	char *slave_name;
 	const char *qs;
-	int slave;
-	char *val, *dtach_sock = NULL, *log = NULL;
-
-	slave_name = ptsname(master);
-	if (!slave_name) err(1, "ptsname");
-	slave = open(slave_name, O_RDWR);
-
-	close(master);
-	if (-1 == dup2(slave, 0) ||
-	    -1 == dup2(slave, 1) ||
-	    -1 == dup2(slave, 2))
-		err(1, "dup2");
-
-	if (-1 == setsid()) warn("setsid");
-	if (-1 == ioctl(0, TIOCSCTTY, 1)) warn("ioctl");
+	char *val;
 
 	qs = getenv("QUERY_STRING");
-	if (!qs) qs = "";
+	if (!qs) return;
+
 	val = NULL;
 	while (1) {
 		if (val) {
@@ -108,20 +106,40 @@ static _Noreturn void do_exec()
 			continue;
 		}
 
-		val = extract_query_arg(&qs, "cd=");
+		val = extract_query_arg(&qs, "pream=");
 		if (val) {
-			if (-1 == chdir(val)) warn("chdir to '%s'", val);
+			free(pream);
+			pream = val;
+			val = NULL;
 			continue;
 		}
 
 		/* Unrecognized query arg */
 		qs = strchrnul(qs, '&');
 	}
+}
+
+static _Noreturn void do_exec()
+{
+	char *slave_name;
+	int slave;
+
+	slave_name = ptsname(master);
+	if (!slave_name) err(1, "ptsname");
+	slave = open(slave_name, O_RDWR);
+
+	close(master);
+	if (-1 == dup2(slave, 0) ||
+	    -1 == dup2(slave, 1) ||
+	    -1 == dup2(slave, 2))
+		err(1, "dup2");
+
+	if (-1 == setsid()) warn("setsid");
+	if (-1 == ioctl(0, TIOCSCTTY, 1)) warn("ioctl");
 
 	setenv("TERM", "xterm-256color", 1);
-	setenv("SHELL", "/bin/zsh", 1);
 
-	if (!dtach_sock) execl("/bin/zsh", "-zsh", NULL);
+	if (!dtach_sock) execl(getenv("SHELL"), getenv("SHELL"), NULL);
 	else execl("/bin/dtach", "/bin/dtach", "-A", dtach_sock,
 		   "script", "-fa", log, NULL);
 
@@ -166,6 +184,11 @@ static _Noreturn void write_to_subproc(void)
 
 	subprocf = fdopen(master, "w");
 	if (!subprocf) err(1, "fdopen master");
+
+	if (pream && EOF == fputs(pream, subprocf))
+		warn("could not write preamble to pty: %s", pream);
+	free(pream);
+	pream = NULL;
 
 	/* '0': reading raw characters
 	 * '1': next char is escaped
@@ -252,6 +275,14 @@ int main(int argc, char **argv)
 
 	child = fork();
 	if (-1 == child) err(1, "fork");
+
+	parse_query();
+
+	struct stat sock_stat;
+	if (!stat(dtach_sock, &sock_stat)) {
+		free(pream);
+		pream = NULL;
+	}
 
 	if (!child) do_exec();
 

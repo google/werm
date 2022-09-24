@@ -28,6 +28,7 @@ static _Noreturn void do_exec()
 	if (-1 == setsid()) warn("setsid");
 	if (-1 == ioctl(0, TIOCSCTTY, 1)) warn("ioctl");
 
+	setenv("TERM", "xterm-256color", 1);
 	execl("/bin/zsh", "-zsh", NULL);
 	err(1, "exec");
 }

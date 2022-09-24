@@ -24,62 +24,104 @@ body {
          style="position:relative; width:100%; height:100%"></div>
     <script src="hterm_all.js"></script>
     <script>
-var t, sock, ready, io, pending = '', term_ready = false;
+var t, sock, sock_ready = false, ready, io, pend_display = '', pend_send = '',
+	term_ready = false;
 
 function term_init()
 {
-	sock = new WebSocket('ws://localhost:8090');
-	sock.onconnect = function()
+	function signal(s)
 	{
-		t = new hterm.Terminal();
+		var to_send = [], c, ci;
 
-		function signal(s)
-		{
-			s = s.replaceAll('\\', '\\\\').replaceAll('\n', '\\n');
-			sock.send(s + '\n');
+		if (!sock_ready) {
+			pend_send += s;
+			return;
+		}
+		s = pend_send + s;
+		pend_send = '';
+
+		for (ci = 0; ci < s.length; ci++) {
+			c = s.charAt(ci);
+			if (c === '\\') to_send.push('\\\\');
+			else if (c === '\n') to_send.push('\\n');
+			else to_send.push(c);
 		}
 
-		t.onTerminalReady = function()
-		{
-			io = t.io.push();
-			console.log("onTerminalReady");
-			io.sendString = signal;
-			io.onTerminalResize = function(c, r) {
-				console.log("io.onTerminalResize: " + c + '.' + r);
-			};
-			io.onVTKeystroke = function(s) {
-				signal(s);
-				console.log("keystroke: " + JSON.stringify(s));
-			};
-			setTimeout(function() {
-				console.log("printing terminal data");
-				t.io.print('this is ');
-				t.io.println('terminal data');
-			},
-			2000);
+		to_send = to_send.join('');
 
-			if (pending) {
-				t.io.print(pending);
-				pending = '';
+		sock.send(to_send);
+	}
+
+	sock = new WebSocket('ws://localhost:8090');
+	sock.onopen = function()
+	{
+		sock_ready = true;
+
+		if (!pend_send) return;
+
+		signal(pend_send);
+		pend_send = '';
+	};
+
+	function display(s)
+	{
+		if (!term_ready) {
+			pend_display += s;
+			return;
+		}
+
+		var next_esc;
+		while (true) {
+			next_esc = s.indexOf('\\');
+			if (next_esc === -1) next_esc = s.length;
+			if (next_esc > 0) {
+				t.io.print(s.substr(0, next_esc));
+				s = s.substr(next_esc);
 			}
-			term_ready = true;
+
+			if (!s) break;
+
+			if (s.length === 1) {
+				// Escape \ at end of message, send it later.
+				pend_display = s;
+				break;
+			}
+
+			if (s.charAt(1) === 'n') t.io.print('\n');
+			else if (s.charAt(1) === '\\') t.io.print('\\');
+			else t.io.print(s.charAt(1));
+
+			s = s.substr(2);
+		}
+	};
+	sock.onmessage = function(e) { display(e.data); };
+
+	t = new hterm.Terminal();
+
+	t.onTerminalReady = function()
+	{
+		io = t.io.push();
+
+		io.sendString = signal;
+		io.onVTKeystroke = signal;
+		io.onTerminalResize = function(c, r) {
+			console.log("io.onTerminalResize: " + c + '.' + r);
 		};
 
-		t.decorate(document.querySelector('#terminal'));
-		t.installKeyboard();
+		if (pend_display) {
+			signal(pend_display);
+			pend_display = '';
+		}
+		term_ready = true;
 	};
-	sock.onmessage = function(e)
-	{
-		// var s = e.data.replaceAll('\\\\', '\\').replaceAll('\\n', '\n');
-		if (!term_ready)
-			pending += e.data;
-		else
-			t.io.print(e.data);
-	};
+
+	t.decorate(document.querySelector('#terminal'));
+	t.installKeyboard();
 }
 
-window.onload = function() {
-  lib.init().then( function() { term_init(); } );
+window.onload = function()
+{
+	lib.init().then(term_init);
 };
     </script>
   </body>

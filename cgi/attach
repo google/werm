@@ -4,9 +4,11 @@ cat <<EOF
 Content-type: text/html
 
 
+<!DOCTYPE html>
+<meta charset='utf-8'/>
 <html>
 <head>
-	<title>再接続</title>
+	<title>Attach</title>
 </head>
 <body>
 <big>Active sessions</big>

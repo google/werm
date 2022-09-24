@@ -40,7 +40,7 @@ function term_init()
 		}
 	}
 
-	sock = new WebSocket('ws://localhost:8090/' + window.location.search);
+	sock = new WebSocket('ws://' + location.host + '/' + location.search);
 	sock.onopen = function()
 	{
 		sock_ready = true;

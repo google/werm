@@ -10,6 +10,16 @@
 
 static int master;
 
+static void send_sigwinch(int row, int col)
+{
+	struct winsize ws = {
+		.ws_row = (unsigned short) row,
+		.ws_col = (unsigned short) col,
+	};
+
+	if (-1 == ioctl(master, TIOCSWINSZ, &ws)) warn("ioctl for winsz");
+}
+
 static _Noreturn void do_exec()
 {
 	char *slave_name;
@@ -66,12 +76,17 @@ static _Noreturn void write_to_subproc(void)
 	unsigned char read_buf[512], *curs;
 	ssize_t b;
 	FILE *subprocf;
-	_Bool escape;
-	int byte;
+	char escape, winsize[8];
+	int byte, wsi, col, row;
 
 	subprocf = fdopen(master, "w");
 	if (!subprocf) err(1, "fdopen master");
 
+	/* '0': reading raw characters
+	 * '1': next char is escaped
+	 * 'w': reading window size
+	 */
+	escape = '0';
 	while (1) {
 		b = read(0, read_buf, sizeof(512));
 		if (!b) exit(0);
@@ -80,24 +95,54 @@ static _Noreturn void write_to_subproc(void)
 		curs = read_buf;
 		do {
 			byte = *curs++;
-			if (byte == '\n') continue;
-			if (byte == '\\') {
-				escape = 1;
-				continue;
-			}
 
-			if (escape) {
+			if (byte == '\n') break;
+
+			switch (escape) {
+			case '0':
+				if (byte == '\\')
+					escape = '1';
+				else
+					fputc(byte, subprocf);
+				break;
+
+			case '1':
 				switch (byte) {
-				case 'n': byte = '\n'; break;
-				case '\\': byte = '\\'; break;
-				default:
-					fprintf(stderr, "unknown escape: %d\n",
-						byte);
-				}
-				escape = 0;
-			}
+				case 'n':
+					fputc('\n', subprocf);
+					escape = '0';
+					break;
 
-			fputc(byte, subprocf);
+				case '\\':
+					fputc('\\', subprocf);
+					escape = '0';
+					break;
+
+				case 'w':
+					wsi = 0;
+					escape = 'w';
+					break;
+
+				default:
+					escape = '0';
+					warnx("unknown escape: %d\n", byte);
+				}
+				break;
+
+			case 'w':
+				winsize[wsi++] = byte;
+				if (wsi != sizeof(winsize)) break;
+
+				if (2 != sscanf(winsize, "%4d%4d", &row, &col))
+					warn("invalid winsize");
+				else
+					send_sigwinch(row, col);
+				escape = '0';
+
+				break;
+
+			default: warnx("unknown escape: %d", escape);
+			}
 		} while (--b);
 
 		fflush(subprocf);

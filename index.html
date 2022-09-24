@@ -31,25 +31,13 @@ function term_init()
 {
 	function signal(s)
 	{
-		var to_send = [], c, ci;
-
 		if (!sock_ready) {
 			pend_send += s;
-			return;
 		}
-		s = pend_send + s;
-		pend_send = '';
-
-		for (ci = 0; ci < s.length; ci++) {
-			c = s.charAt(ci);
-			if (c === '\\') to_send.push('\\\\');
-			else if (c === '\n') to_send.push('\\n');
-			else to_send.push(c);
+		else {
+			sock.send(pend_send + s);
+			pend_send = '';
 		}
-
-		to_send = to_send.join('');
-
-		sock.send(to_send);
 	}
 
 	sock = new WebSocket('ws://localhost:8090');
@@ -59,7 +47,7 @@ function term_init()
 
 		if (!pend_send) return;
 
-		signal(pend_send);
+		sock.send(pend_send);
 		pend_send = '';
 	};
 
@@ -69,6 +57,9 @@ function term_init()
 			pend_display += s;
 			return;
 		}
+
+		s = pend_display + s;
+		pend_display = '';
 
 		var next_esc;
 		while (true) {
@@ -98,21 +89,35 @@ function term_init()
 
 	t = new hterm.Terminal();
 
+	function escape(s)
+	{
+		var e = [], c, ci;
+
+		for (ci = 0; ci < s.length; ci++) {
+			c = s.charAt(ci);
+			if (c === '\\') e.push('\\\\');
+			else if (c === '\n') e.push('\\n');
+			else e.push(c);
+		}
+
+		return e.join('');
+
+	}
+
 	t.onTerminalReady = function()
 	{
 		io = t.io.push();
 
-		io.sendString = signal;
-		io.onVTKeystroke = signal;
+		io.sendString = function(s) { signal(escape(s)); };
+		io.onVTKeystroke = function(s) { signal(escape(s)); };
 		io.onTerminalResize = function(c, r) {
+			signal('\\w' + (10000 + r + '').substr(1)
+				     + (10000 + c + '').substr(1));
 			console.log("io.onTerminalResize: " + c + '.' + r);
 		};
 
-		if (pend_display) {
-			signal(pend_display);
-			pend_display = '';
-		}
 		term_ready = true;
+		display('');
 	};
 
 	t.decorate(document.querySelector('#terminal'));

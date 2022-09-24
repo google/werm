@@ -1,0 +1,10 @@
+#!/bin/sh
+
+cd `dirname $0`
+
+websocketd --passenv=HOME \
+	--cgidir=cgi \
+	--staticdir=. \
+	--port=8090 \
+	--address=localhost \
+	./session

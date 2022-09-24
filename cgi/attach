@@ -1,0 +1,27 @@
+#!/bin/sh
+
+cat <<EOF
+Content-type: text/html
+
+
+<html>
+<head>
+	<title>再接続</title>
+</head>
+<body>
+<big>Active sessions</big>
+<ul>
+EOF
+
+ls /tmp/dtach.* | sed 's/^.*[.]//' |
+while read sess
+do
+	printf '<li><a href="/?termid=%s">%s</a>\n' \
+		$sess \
+		"`cat /tmp/title.$sess`"
+done
+
+cat <<EOF
+</ul>
+</body>
+EOF

@@ -1,6 +1,8 @@
 #define _XOPEN_SOURCE 600
+#define _GNU_SOURCE
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -20,10 +22,54 @@ static void send_sigwinch(int row, int col)
 	if (-1 == ioctl(master, TIOCSWINSZ, &ws)) warn("ioctl for winsz");
 }
 
+static char *extract_query_arg(const char **qs, const char *pref)
+{
+	size_t preflen;
+	const char *end;
+	char *buf, *bufcur;
+
+	preflen = strlen(pref);
+	if (memcmp(*qs, pref, preflen)) return NULL;
+	*qs += preflen;
+
+	end = strchrnul(*qs, '&');
+	bufcur = buf = malloc(end - *qs + 1);
+
+	while (*qs != end) {
+		*bufcur++ = *(*qs)++;
+	}
+	*bufcur = 0;
+
+	return buf;
+}
+
+int xasprintf(char **strp, const char *format, ...)
+{
+	int res;
+
+	va_list argp;
+
+	va_start(argp, format);
+	res = vsnprintf(NULL, 0, format, argp);
+	va_end(argp);
+	if (res < 0) errx(1, "vsnprintf: サイズの計算に失敗した");
+
+	*strp = malloc(res+1);
+
+	va_start(argp, format);
+	res = vsnprintf(*strp, res+1, format, argp);
+	va_end(argp);
+	if (res < 0) errx(1, "vsnprintf");
+
+	return res;
+}
+
 static _Noreturn void do_exec()
 {
 	char *slave_name;
+	const char *qs;
 	int slave;
+	char *val, *dtach_sock = NULL, *log = NULL;
 
 	slave_name = ptsname(master);
 	if (!slave_name) err(1, "ptsname");
@@ -38,8 +84,47 @@ static _Noreturn void do_exec()
 	if (-1 == setsid()) warn("setsid");
 	if (-1 == ioctl(0, TIOCSCTTY, 1)) warn("ioctl");
 
+	qs = getenv("QUERY_STRING");
+	if (!qs) qs = "";
+	val = NULL;
+	while (1) {
+		if (val) {
+			free(val);
+			val = NULL;
+		}
+		if (*qs == '&') qs++;
+		if (!*qs) break;
+
+		val = extract_query_arg(&qs, "termid=");
+		if (val) {
+			setenv("LC_TERMID", val, 1);
+
+			free(dtach_sock);
+			xasprintf(&dtach_sock, "/tmp/dtach.%s", val);
+
+			free(log);
+			xasprintf(&log, "/tmp/log.%s", val);
+
+			continue;
+		}
+
+		val = extract_query_arg(&qs, "cd=");
+		if (val) {
+			if (-1 == chdir(val)) warn("chdir to '%s'", val);
+			continue;
+		}
+
+		/* Unrecognized query arg */
+		qs = strchrnul(qs, '&');
+	}
+
 	setenv("TERM", "xterm-256color", 1);
-	execl("/bin/zsh", "-zsh", NULL);
+	setenv("SHELL", "/bin/zsh", 1);
+
+	if (!dtach_sock) execl("/bin/zsh", "-zsh", NULL);
+	else execl("/bin/dtach", "/bin/dtach", "-A", dtach_sock,
+		   "script", "-fa", log, NULL);
+
 	err(1, "exec");
 }
 
@@ -152,6 +237,13 @@ static _Noreturn void write_to_subproc(void)
 int main(int argc, char **argv)
 {
 	pid_t child;
+	const char *home;
+
+	home = getenv("HOME");
+	if (!home)
+		warnx("HOME is not set");
+	else if (-1 == chdir(home))
+		warn("chdir to home: '%s'", home);
 
 	master = posix_openpt(O_RDWR);
 	if (-1 == master) err(1, "posix_openpt");

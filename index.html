@@ -40,7 +40,7 @@ function term_init()
 		}
 	}
 
-	sock = new WebSocket('ws://localhost:8090');
+	sock = new WebSocket('ws://localhost:8090/' + window.location.search);
 	sock.onopen = function()
 	{
 		sock_ready = true;
@@ -101,7 +101,6 @@ function term_init()
 		}
 
 		return e.join('');
-
 	}
 
 	t.onTerminalReady = function()
@@ -113,7 +112,6 @@ function term_init()
 		io.onTerminalResize = function(c, r) {
 			signal('\\w' + (10000 + r + '').substr(1)
 				     + (10000 + c + '').substr(1));
-			console.log("io.onTerminalResize: " + c + '.' + r);
 		};
 
 		term_ready = true;

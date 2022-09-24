@@ -35,6 +35,8 @@
  * $ export LD_LIBRARY_PATH=../lib/.libs
  * $ ./a.out 9000
  */
+#define _POSIX_C_SOURCE 200112L
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>

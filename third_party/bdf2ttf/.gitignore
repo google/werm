@@ -1,0 +1,10 @@
+/tags
+/test.d*/
+/tmp/
+
+*.exe
+*.ilk
+*.o
+*.obj
+*.orig
+*.pdb

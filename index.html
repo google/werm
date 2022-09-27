@@ -58,6 +58,16 @@ function term_init()
 
 	function display(s)
 	{
+		var next_esc;
+
+		function hex_val(i)
+		{
+			var c = s.charAt(i);
+			if (c >= '0' && c <= '9') return s.charCodeAt(i) - 48;
+			if (c >= 'a' && c <= 'f') return s.charCodeAt(i) - 87;
+			throw `invalid hex at ${i} in ${s}: ${c}`
+		}
+
 		if (!term_ready) {
 			pend_display += s;
 			return;
@@ -66,7 +76,6 @@ function term_init()
 		s = pend_display + s;
 		pend_display = '';
 
-		var next_esc;
 		while (true) {
 			next_esc = s.indexOf('\\');
 			if (next_esc === -1) next_esc = s.length;
@@ -77,17 +86,17 @@ function term_init()
 
 			if (!s) break;
 
-			if (s.length === 1) {
-				// Escape \ at end of message, send it later.
+			if (s.length < 3) {
+				// Escape is incomplete, so send it later.
 				pend_display = s;
 				break;
 			}
 
-			if (s.charAt(1) === 'n') t.io.print('\n');
-			else if (s.charAt(1) === '\\') t.io.print('\\');
-			else t.io.print(s.charAt(1));
+			t.io.print(
+				String.fromCharCode(hex_val(1) * 16 +
+						    hex_val(2)));
 
-			s = s.substr(2);
+			s = s.substr(3);
 		}
 	};
 	sock.onmessage = function(e) { display(e.data); };

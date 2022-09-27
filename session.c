@@ -146,6 +146,15 @@ static _Noreturn void do_exec()
 	err(1, "exec");
 }
 
+static _Bool send_byte(int b)
+{
+	if (b < 0) errx(1, "got negative byte: %d", b);
+
+	if (b == '\n' || b == '\\' || b < ' ') return 3 == printf("\\%02x", b);
+
+	return 0 <= putchar(b);
+}
+
 static _Noreturn void read_from_subproc(void)
 {
 	unsigned char read_buf[512], *curs;
@@ -159,14 +168,7 @@ static _Noreturn void read_from_subproc(void)
 
 		curs = read_buf;
 		do {
-			byte = *curs++;
-			switch (byte) {
-			case '\n': e = fputs("\\n", stdout); break;
-			case '\\': e = fputs("\\\\", stdout); break;
-			default: e = putchar(byte);
-			}
-
-			if (e == EOF) err(1, "putchar");
+			if (!send_byte(*curs++)) err(1, "send_byte");
 		} while (--b);
 
 		putchar('\n');

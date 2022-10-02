@@ -1,7 +1,0 @@
-cd `dirname $0`
-MAKE='make -f compile/Make_gcc.mak'
-export CCFLAGS=-fsanitize=address
-export LDFLAGS=$CCFLAGS
-export CPPFLAGS=$CCFLAGS
-$MAKE clean
-$MAKE

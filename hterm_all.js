@@ -10554,6 +10554,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'font-family': hterm.PreferenceManager.definePref_(
       'Text font family',
       hterm.PreferenceManager.Categories.Appearance,
+      'jfdot, ' +
       '"DejaVu Sans Mono", "Noto Sans Mono", "Everson Mono", FreeMono, ' +
       'Menlo, Terminal, monospace',
       'string',
@@ -10563,7 +10564,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'font-size': hterm.PreferenceManager.definePref_(
       'Text font size',
       hterm.PreferenceManager.Categories.Appearance,
-      15, 'int',
+      14, 'int',
       `The default font size in pixels.`,
   ),
 
@@ -10577,7 +10578,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'line-height-padding-size': hterm.PreferenceManager.definePref_(
       'Line height padding size',
       hterm.PreferenceManager.Categories.Appearance,
-      0, 'int',
+      -3, 'int',
       `The padding size in pixels between each row of the terminal screen.`,
   ),
 
@@ -12821,7 +12822,7 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
       color: rgb(var(--hterm-foreground-color));
       display: block;
       font-family: monospace;
-      font-size: 15px;
+      font-size: 14px;
       font-variant-ligatures: none;
       height: 100%;
       overflow-y: scroll; overflow-x: hidden;
@@ -16151,6 +16152,10 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
 
   const style = this.document_.createElement('style');
   style.textContent = `
+@font-face {
+  font-family: jfdot;
+  src: url(font.ttf);
+}
 .cursor-node[focus="false"] {
   box-sizing: border-box;
   background-color: transparent !important;

@@ -11,6 +11,23 @@ Content-type: text/html
 	<title>Attach</title>
 </head>
 <body>
+<big>Common</big>
+<ul>
+EOF
+
+termid=4201
+for dir in /s/cros2/src; do
+	for i in `seq 5`; do
+		printf '
+		<li><a href="/?termid=%s&pream=ow%%20%s%%0d">
+		%s (%d)</a href>
+		' $termid $dir $dir $i
+		termid=$(( termid + 1 ))
+	done
+done
+
+cat <<EOF
+</ul>
 <big>Active sessions</big>
 <ul>
 EOF

@@ -74,7 +74,7 @@ int xasprintf(char **strp, const char *format, ...)
 	return res;
 }
 
-static char *dtach_sock = NULL, *log = NULL, *pream = NULL;
+static char *dtach_check_cmd, *dtach_sock, *log, *pream;
 
 static void parse_query(void)
 {
@@ -96,6 +96,10 @@ static void parse_query(void)
 		val = extract_query_arg(&qs, "termid=");
 		if (val) {
 			setenv("LC_TERMID", val, 1);
+
+			free(dtach_check_cmd);
+			xasprintf(&dtach_check_cmd,
+				  "test -d /proc/`cat /tmp/pid.%s`", val);
 
 			free(dtach_sock);
 			xasprintf(&dtach_sock, "/tmp/dtach.%s", val);
@@ -280,8 +284,7 @@ int main(int argc, char **argv)
 
 	parse_query();
 
-	struct stat sock_stat;
-	if (!stat(dtach_sock, &sock_stat)) {
+	if (!system(dtach_check_cmd)) {
 		free(pream);
 		pream = NULL;
 	}

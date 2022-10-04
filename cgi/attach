@@ -19,7 +19,7 @@ termid=4201
 for dir in /s/cros2/src werm; do
 	for i in `seq 5`; do
 		printf '
-		<li><a href="/?termid=%s&pream=ow%%20%s%%0d">
+		<li><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d">
 		%s (%d)</a href>
 		' $termid $dir $dir $i
 		termid=$(( termid + 1 ))

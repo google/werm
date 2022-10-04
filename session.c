@@ -154,7 +154,7 @@ static _Bool send_byte(int b)
 {
 	if (b < 0) errx(1, "got negative byte: %d", b);
 
-	if (b == '\n' || b == '\\' || b < ' ') return 3 == printf("\\%02x", b);
+	if (b == '\\' || b < ' ' || b > '~') return 3 == printf("\\%02x", b);
 
 	return 0 <= putchar(b);
 }

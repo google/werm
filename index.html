@@ -29,7 +29,7 @@ body {
          style="position:relative; width:100%; height:100%"></div>
     <script src="hterm_all.js"></script>
     <script>
-var t, sock, sock_ready = false, ready, io, pend_display = '', pend_send = '',
+var t, sock, sock_ready = false, ready, io, pend_send = '',
 	term_ready = false;
 
 function term_init()
@@ -56,9 +56,18 @@ function term_init()
 		pend_send = '';
 	};
 
+	var pend_display = [];
+	var pend_escape = '';
 	function display(s)
 	{
-		var next_esc;
+		var next_esc, pend_i, c;
+
+		function pend(di) { return pend_display[pend_i + di]; }
+		function is_utf_trail(di) {
+			if (0x80 == (pend(di) & 0xc0)) return true;
+			t.io.print('?');
+			return false;
+		}
 
 		function hex_val(i)
 		{
@@ -68,19 +77,16 @@ function term_init()
 			throw `invalid hex at ${i} in ${s}: ${c}`
 		}
 
-		if (!term_ready) {
-			pend_display += s;
-			return;
+		if (pend_escape) {
+			s = pend_escape + s;
+			pend_escape = '';
 		}
-
-		s = pend_display + s;
-		pend_display = '';
 
 		while (true) {
 			next_esc = s.indexOf('\\');
 			if (next_esc === -1) next_esc = s.length;
 			if (next_esc > 0) {
-				t.io.print(s.substr(0, next_esc));
+				pend_display.push(s.substr(0, next_esc));
 				s = s.substr(next_esc);
 			}
 
@@ -88,17 +94,70 @@ function term_init()
 
 			if (s.length < 3) {
 				// Escape is incomplete, so send it later.
-				pend_display = s;
+				pend_escape = s;
 				break;
 			}
 
-			t.io.print(
-				String.fromCharCode(hex_val(1) * 16 +
-						    hex_val(2)));
+			pend_display.push(hex_val(1) * 16 + hex_val(2));
 
 			s = s.substr(3);
 		}
-	};
+
+		if (!term_ready) return;
+
+		for (pend_i = 0; pend_i < pend_display.length; pend_i++) {
+			if (typeof pend(0) === 'string') {
+				t.io.print(pend(0));
+				continue;
+			}
+
+			if (pend(0) < 0x80) {
+				t.io.print(String.fromCharCode(pend(0)));
+				continue;
+			}
+
+			c = 0;
+			if (pend_display.length < 2) break;
+			if (!is_utf_trail(1)) continue;
+			c += pend(1) & ~0xc0;
+
+			if (0xc0 == (pend(0) & 0xe0)) {
+				c += (pend(0) & ~0xe0) << 6;
+				t.io.print(String.fromCodePoint(c));
+				pend_i+=1;
+				continue;
+			}
+
+			c <<= 6;
+			if (pend_display.length < 3) break;
+			if (!is_utf_trail(2)) continue;
+			c += pend(2) & ~0xc0;
+
+			if (0xe0 == (pend(0) & 0xf0)) {
+				c += (pend(0) & ~0xf0) << 12;
+				t.io.print(String.fromCodePoint(c));
+				pend_i+=2;
+				continue;
+			}
+
+			c <<= 6;
+			if (pend_display.length < 4) break;
+			if (!is_utf_trail(3)) continue;
+			c += pend(3) & ~0xc0;
+
+			if (0xf0 == (pend(0) & 0xf8)) {
+				c += (pend(0) & ~0xf8) << 18;
+				t.io.print(String.fromCodePoint(c));
+				pend_i+=3;
+				continue;
+			}
+
+			t.io.print('?');
+		}
+
+		pend_display = pend_display.slice(pend_i);
+	}
+
 	sock.onmessage = function(e) { display(e.data); };
 
 	t = new hterm.Terminal();

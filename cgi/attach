@@ -16,7 +16,7 @@ Content-type: text/html
 EOF
 
 termid=4201
-for dir in /s/cros2/src; do
+for dir in /s/cros2/src werm; do
 	for i in `seq 5`; do
 		printf '
 		<li><a href="/?termid=%s&pream=ow%%20%s%%0d">

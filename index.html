@@ -29,35 +29,14 @@ body {
          style="position:relative; width:100%; height:100%"></div>
     <script src="hterm_all.js"></script>
     <script>
-var t, sock, sock_ready = false, ready, io, pend_send = '',
-	term_ready = false;
+
+var log_send = 0, log_display = 0;
 
 function term_init()
 {
-	function signal(s)
-	{
-		if (!sock_ready) {
-			pend_send += s;
-		}
-		else {
-			sock.send(pend_send + s);
-			pend_send = '';
-		}
-	}
+	var t, io, pend_send = '', term_ready = false, sock, pend_display = [],
+		pend_escape = '', ignore_disp = '';
 
-	sock = new WebSocket('ws://' + location.host + '/' + location.search);
-	sock.onopen = function()
-	{
-		sock_ready = true;
-
-		if (!pend_send) return;
-
-		sock.send(pend_send);
-		pend_send = '';
-	};
-
-	var pend_display = [];
-	var pend_escape = '';
 	function display(s)
 	{
 		var next_esc, pend_i, c;
@@ -75,6 +54,14 @@ function term_init()
 			if (c >= '0' && c <= '9') return s.charCodeAt(i) - 48;
 			if (c >= 'a' && c <= 'f') return s.charCodeAt(i) - 87;
 			throw `invalid hex at ${i} in ${s}: ${c}`
+		}
+
+		if (ignore_disp === s) s = '';
+		ignore_disp = '';
+
+		if (log_display) {
+			console.log('display: ' + JSON.stringify(s));
+			if (log_display > 1) console.trace();
 		}
 
 		if (pend_escape) {
@@ -158,7 +145,43 @@ function term_init()
 		pend_display = pend_display.slice(pend_i);
 	}
 
-	sock.onmessage = function(e) { display(e.data); };
+	function prepare_sock()
+	{
+		sock = new WebSocket(
+			'ws://' + location.host + '/' + location.search);
+		sock.onopen = function()
+		{
+			// Ignore any attempt to clear screen if it's the first
+			// message.
+			ignore_disp = "\\1b[H\\1b[J";
+
+			if (!pend_send) return;
+
+			sock.send(pend_send);
+			pend_send = '';
+		};
+
+		sock.onmessage = function(e) { display(e.data); };
+	}
+
+	prepare_sock();
+
+	function signal(s)
+	{
+		if (log_send) {
+			console.log('request send: ' + JSON.stringify(s));
+			if (log_send > 1) console.trace();
+		}
+
+		if (sock.readyState == WebSocket.OPEN) {
+			sock.send(pend_send + s);
+			pend_send = '';
+			return;
+		}
+
+		pend_send += s;
+		if (sock.readyState > WebSocket.OPEN) prepare_sock();
+	}
 
 	t = new hterm.Terminal();
 

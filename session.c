@@ -144,7 +144,7 @@ static _Noreturn void do_exec()
 	setenv("TERM", "xterm-256color", 1);
 
 	if (!dtach_sock) execl(getenv("SHELL"), getenv("SHELL"), NULL);
-	else execl("/bin/dtach", "/bin/dtach", "-A", dtach_sock,
+	else execl("/bin/dtach", "/bin/dtach", "-A", dtach_sock, "-r", "none",
 		   "script", "-fa", log, NULL);
 
 	err(1, "exec");
@@ -210,7 +210,7 @@ static _Noreturn void write_to_subproc(void)
 		do {
 			byte = *curs++;
 
-			if (byte == '\n') break;
+			if (byte == '\n') continue;
 
 			switch (escape) {
 			case '0':

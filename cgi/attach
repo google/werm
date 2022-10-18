@@ -10,7 +10,7 @@ Content-type: text/html
 <head>
 	<title>Attach</title>
 </head>
-<body>
+<body style="font-family: monospace">
 <big>Common</big>
 <ul>
 EOF
@@ -29,18 +29,22 @@ done
 cat <<EOF
 </ul>
 <big>Active sessions</big>
-<ul>
+<table>
 EOF
 
 ls /tmp/dtach.* | sed 's/^.*[.]//' |
 while read sess
 do
-	printf '<li><a href="/?termid=%s">%s</a>\n' \
+	printf '<tr>
+		<td style="padding-right:20pt">[<strong>%s</strong>]
+		<td><a href="/?termid=%s">%s</a>
+		</tr>\n' \
+		$sess \
 		$sess \
 		"`cat /tmp/title.$sess`"
 done
 
 cat <<EOF
-</ul>
+</table>
 </body>
 EOF

@@ -99,7 +99,7 @@ static void parse_query(void)
 
 			free(dtach_check_cmd);
 			xasprintf(&dtach_check_cmd,
-				  "test -d /proc/`cat /tmp/pid.%s`", val);
+				  "kill -0 `cat /tmp/pid.%s`", val);
 
 			free(dtach_sock);
 			xasprintf(&dtach_sock, "/tmp/dtach.%s", val);

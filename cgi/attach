@@ -15,18 +15,21 @@ Content-type: text/html
 <ul>
 EOF
 
-termid=4201
-for dir in /s/cros2/src werm; do
+termno=4201
+for dir in /s/chrom /s/cros2/src /s/master-arc-dev ~/gum/c/lib werm; do
 	for i in `seq 5`; do
+		termid=`echo $dir | tr / _`_$termno
 		printf '
 		<li><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d">
 		%s (%d)</a href>
 		' $termid $dir $dir $i
-		termid=$(( termid + 1 ))
+		termno=$(( termno + 1 ))
 	done
 done
 
 cat <<EOF
+
+<li><a href="/?termid=novnc&pream=exec /usr/share/novnc/utils/launch.sh%0d">novnc</a>
 </ul>
 <big>Active sessions</big>
 <table>

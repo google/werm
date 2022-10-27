@@ -184,6 +184,14 @@ function term_init()
 	}
 
 	t = new hterm.Terminal();
+	t.setWindowTitle = function(t)
+	{
+		var termid = (new URLSearchParams(window.location.search)).get('termid');
+		if (termid)
+			document.title = `[${termid}] ${t}`
+		else
+			document.title = t;
+	};
 
 	function escape(s)
 	{

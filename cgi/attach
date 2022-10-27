@@ -15,10 +15,10 @@ Content-type: text/html
 <ul>
 EOF
 
-termno=4201
-for dir in /s/chrom /s/cros2/src /s/master-arc-dev ~/gum/c/lib werm; do
+termno=1
+for dir in /s/chrom /s/cros2/src /s/master-arc-dev gum/c/lib werm; do
 	for i in `seq 5`; do
-		termid=`echo $dir | tr / _`_$termno
+		termid=cd_$termno
 		printf '
 		<li><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d">
 		%s (%d)</a href>

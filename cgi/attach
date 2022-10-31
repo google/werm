@@ -13,6 +13,7 @@ Content-type: text/html
 <body style="font-family: monospace">
 <big>Common</big>
 <ul>
+<li><a href="http://localhost:8090/?termid=grunt-arc-r-sdk&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20BOARD=grunt-arc-r%20USE='chrome_internal%20-cros-debug%20compilation_database'%0d">grunt-arc-r-sdk</a>
 EOF
 
 termno=1

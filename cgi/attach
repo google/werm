@@ -9,30 +9,55 @@ Content-type: text/html
 <html>
 <head>
 	<title>Attach</title>
+<style>
+td.loose {
+	padding-right:20pt;
+}
+h1 {
+	margin-top:20pt;
+	margin-bottom:0;
+	font-size:12pt;
+}
+</style>
 </head>
 <body style="font-family: monospace">
-<big>Common</big>
+<h1>Common</h1>
 <ul>
 <li><a href="http://localhost:8090/?termid=grunt-arc-r-sdk&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20BOARD=grunt-arc-r%20USE='chrome_internal%20-cros-debug%20compilation_database'%0d">grunt-arc-r-sdk</a>
+<li><a href="http://localhost:8090/?termid=grunt-arc-r-sdk&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20BOARD=hatch%20USE='chrome_internal%20-cros-debug%20compilation_database'%0d">grunt-arc-r-sdk</a>
+<li><a href="/?termid=novnc&pream=exec /usr/share/novnc/utils/launch.sh%0d">novnc</a>
+EOF
+for repeat in 1 2 3 4 5; do
+	cat <<EOF
+<li><a href="http://localhost:8090/?termid=cros-sdk-$repeat&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20USE=chrome_internal%5C%20-cros-debug%0d">cros-sdk ($repeat)</a>
+EOF
+done
+
+cat <<EOF
+</ul>
+
+<table>
 EOF
 
 termno=1
-for dir in /s/chrom /s/cros2/src /s/master-arc-dev gum/c/lib werm; do
+for dir in /s/chrom /s/cros2/src /s/master-arc-dev /s/rvc-arc gum/c/lib werm; do
+	printf '<tr>'
+
 	for i in `seq 5`; do
 		termid=cd_$termno
 		printf '
-		<li><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d">
-		%s (%d)</a href>
-		' $termid $dir $dir $i
+		<td class="loose"><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d"> [%s]</a href>
+		' $termid $dir $termid
 		termno=$(( termno + 1 ))
 	done
+
+	printf '<td>%s</tr>' $dir
 done
 
 cat <<EOF
 
-<li><a href="/?termid=novnc&pream=exec /usr/share/novnc/utils/launch.sh%0d">novnc</a>
-</ul>
-<big>Active sessions</big>
+</table>
+<h1>Active sessions</h1>
 <table>
 EOF
 
@@ -40,7 +65,7 @@ ls /tmp/dtach.* | sed 's/^.*[.]//' |
 while read sess
 do
 	printf '<tr>
-		<td style="padding-right:20pt">[<strong>%s</strong>]
+		<td class="loose">[<strong>%s</strong>]
 		<td><a href="/?termid=%s">%s</a>
 		</tr>\n' \
 		$sess \

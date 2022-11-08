@@ -25,8 +25,13 @@ h1 {
 <ul>
 <li><a href="http://localhost:8090/?termid=grunt-arc-r-sdk&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20BOARD=grunt-arc-r%20USE='chrome_internal%20-cros-debug%20compilation_database'%0d">grunt-arc-r-sdk</a>
 <li><a href="http://localhost:8090/?termid=grunt-arc-r-sdk&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20BOARD=hatch%20USE='chrome_internal%20-cros-debug%20compilation_database'%0d">grunt-arc-r-sdk</a>
-<li><a href="/?termid=novnc&pream=exec /usr/share/novnc/utils/launch.sh%0d">novnc</a>
 EOF
+
+for num in 0 1; do
+	printf '<li><a href="/?termid=novnc%d&pream=exec%%20/usr/share/novnc/utils/launch.sh%%20--listen%%20608%d%%20--vnc%%20localhost:590%d%%0d">novnc%d</a>' \
+					   $num								       $num			   $num         $num
+done
+
 for repeat in 1 2 3 4 5; do
 	cat <<EOF
 <li><a href="http://localhost:8090/?termid=cros-sdk-$repeat&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20USE=chrome_internal%5C%20-cros-debug%0d">cros-sdk ($repeat)</a>
@@ -40,7 +45,7 @@ cat <<EOF
 EOF
 
 termno=1
-for dir in /s/chrom /s/cros2/src /s/master-arc-dev /s/rvc-arc gum/c/lib werm; do
+for dir in /s/chrom /s/cros2/src /s/master-arc-dev /s/rvc-arc gum/c/lib werm /s/pi-arc; do
 	printf '<tr>'
 
 	for i in `seq 5`; do
@@ -61,7 +66,7 @@ cat <<EOF
 <table>
 EOF
 
-ls /tmp/dtach.* | sed 's/^.*[.]//' |
+ls /tmp/dtach.* | sed 's/^[^.]*[.]//' |
 while read sess
 do
 	printf '<tr>

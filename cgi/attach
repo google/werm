@@ -43,7 +43,7 @@ do
 	for i in `seq 5`; do
 		termid=$termpref-$i
 		printf '
-		<td class="loose"><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d"> [%d]</a href>
+		<td class="loose"><a href="/?termid=%s&pream=export%%20LC_TITLEPREF=;exec%%20ow%%20%s%%0d"> [%d]</a href>
 		' $termid $dir $i
 	done
 

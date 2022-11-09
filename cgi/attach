@@ -25,18 +25,7 @@ h1 {
 <ul>
 EOF
 
-for num in 0 1; do
-	printf '<li><a href="/?termid=novnc%d&pream=exec%%20/usr/share/novnc/utils/launch.sh%%20--listen%%20608%d%%20--vnc%%20localhost:590%d%%0d">novnc%d</a>' \
-					   $num								       $num			   $num         $num
-done
-
-for cnum in 1 2; do
-	for repeat in 1 2 3 4 5; do
-		cat <<EOF
-<li><a href="http://localhost:8090/?termid=cros$cnum-sdk-$repeat&pream=cd%20/s/cros$cnum%0dexec%20chromite/bin/cros_sdk%20USE=chrome_internal%5C%20-cros-debug%0d">cros$cnum-sdk ($repeat)</a>
-EOF
-	done
-done
+test -f ~/gum/attach_common && ~/gum/attach_common
 
 cat <<EOF
 </ul>

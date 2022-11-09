@@ -45,18 +45,17 @@ cat <<EOF
 EOF
 
 termno=1
-for dir in \
-	/s/chrom /s/cros2/src /s/master-arc-dev /s/rvc-arc gum/c/lib werm \
-	/s/pi-arc /s/cros1/src
+for dir in werm `sort ~/gum/attach_dirs 2>/dev/null`
 do
 	printf '<tr>'
 
+	termpref=`echo $dir | sed 's/^\///; s/\//-/g'`
+
 	for i in `seq 5`; do
-		termid=cd_$termno
+		termid=$termpref-$i
 		printf '
-		<td class="loose"><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d"> [%s]</a href>
-		' $termid $dir $termid
-		termno=$(( termno + 1 ))
+		<td class="loose"><a href="/?termid=%s&pream=exec%%20ow%%20%s%%0d"> [%d]</a href>
+		' $termid $dir $i
 	done
 
 	printf '<td>%s</tr>' $dir

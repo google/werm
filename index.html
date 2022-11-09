@@ -35,7 +35,7 @@ var log_send = 0, log_display = 0;
 function term_init()
 {
 	var t, io, pend_send = '', term_ready = false, sock, pend_display = [],
-		pend_escape = '', ignore_disp = '';
+		pend_escape = '', ignore_disp = '', termid, cached_title;
 
 	function display(s)
 	{
@@ -184,14 +184,19 @@ function term_init()
 	}
 
 	t = new hterm.Terminal();
+	termid = (new URLSearchParams(window.location.search)).get('termid');
+	cached_title = localStorage['title-' + termid] || '無名';
+
 	t.setWindowTitle = function(t)
 	{
-		var termid = (new URLSearchParams(window.location.search)).get('termid');
-		if (termid)
+		if (termid) {
+			localStorage['title-' + termid] = t;
 			document.title = `[${termid}] ${t}`
+		}
 		else
 			document.title = t;
 	};
+	t.setWindowTitle(cached_title);
 
 	function escape(s)
 	{

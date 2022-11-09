@@ -62,14 +62,30 @@ while read sess
 do
 	printf '<tr>
 		<td class="loose">[<strong>%s</strong>]
-		<td><a href="/?termid=%s">%s</a>
+		<td><a class='restore-link' href="/?termid=%s">%s</a>
 		</tr>\n' \
 		$sess \
 		$sess \
-		"`cat /tmp/title.$sess`"
+		$sess
 done
 
 cat <<EOF
 </table>
+
+<script>
+console.log('prep document onload');
+window.onload = function() {
+console.log('document onload');
+var es, title, i;
+
+es = document.getElementsByClassName('restore-link');
+
+for (i = 0; i < es.length; i++) {
+	title = localStorage.getItem('title-' + es[i].innerText);
+	if (title) es[i].innerText = title;
+}
+};
+</script>
 </body>
+</html>
 EOF

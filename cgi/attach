@@ -23,8 +23,6 @@ h1 {
 <body style="font-family: monospace">
 <h1>Common</h1>
 <ul>
-<li><a href="http://localhost:8090/?termid=grunt-arc-r-sdk&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20BOARD=grunt-arc-r%20USE='chrome_internal%20-cros-debug%20compilation_database'%0d">grunt-arc-r-sdk</a>
-<li><a href="http://localhost:8090/?termid=grunt-arc-r-sdk&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20BOARD=hatch%20USE='chrome_internal%20-cros-debug%20compilation_database'%0d">grunt-arc-r-sdk</a>
 EOF
 
 for num in 0 1; do
@@ -32,10 +30,12 @@ for num in 0 1; do
 					   $num								       $num			   $num         $num
 done
 
-for repeat in 1 2 3 4 5; do
-	cat <<EOF
-<li><a href="http://localhost:8090/?termid=cros-sdk-$repeat&pream=cd%20/s/cros2%0dexec%20chromite/bin/cros_sdk%20USE=chrome_internal%5C%20-cros-debug%0d">cros-sdk ($repeat)</a>
+for cnum in 1 2; do
+	for repeat in 1 2 3 4 5; do
+		cat <<EOF
+<li><a href="http://localhost:8090/?termid=cros$cnum-sdk-$repeat&pream=cd%20/s/cros$cnum%0dexec%20chromite/bin/cros_sdk%20USE=chrome_internal%5C%20-cros-debug%0d">cros$cnum-sdk ($repeat)</a>
 EOF
+	done
 done
 
 cat <<EOF
@@ -45,7 +45,10 @@ cat <<EOF
 EOF
 
 termno=1
-for dir in /s/chrom /s/cros2/src /s/master-arc-dev /s/rvc-arc gum/c/lib werm /s/pi-arc; do
+for dir in \
+	/s/chrom /s/cros2/src /s/master-arc-dev /s/rvc-arc gum/c/lib werm \
+	/s/pi-arc /s/cros1/src
+do
 	printf '<tr>'
 
 	for i in `seq 5`; do

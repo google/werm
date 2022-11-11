@@ -8498,7 +8498,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   add(68,  'dD',      DEFAULT, ctl('D'),                    DEFAULT, DEFAULT);
   add(70,  'fF', DEFAULT, sh(ctl('F'), c('onCtrlShiftF_')), DEFAULT, DEFAULT);
   add(71,  'gG',      DEFAULT, ctl('G'),                    DEFAULT, DEFAULT);
-  add(72,  'hH',      DEFAULT, ctl('H'),                    DEFAULT, DEFAULT);
+  add(72,  'hH',      DEFAULT, ctl('H'),                    DEFAULT, ctl('W'));
   add(74,  'jJ',      DEFAULT, sh(ctl('J'), PASS),          DEFAULT, DEFAULT);
   add(75,  'kK',      DEFAULT, sh(ctl('K'), c('onClear_')), DEFAULT, DEFAULT);
   add(76,  'lL',      DEFAULT, sh(ctl('L'), PASS),          DEFAULT, DEFAULT);

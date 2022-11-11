@@ -76,13 +76,15 @@ cat <<EOF
 console.log('prep document onload');
 window.onload = function() {
 console.log('document onload');
-var es, title, i;
+var es, title, pream, i;
 
 es = document.getElementsByClassName('restore-link');
 
 for (i = 0; i < es.length; i++) {
 	title = localStorage.getItem('title-' + es[i].innerText);
+	pream = localStorage.getItem('pream-' + es[i].innerText);
 	if (title) es[i].innerText = title;
+	if (pream) es[i].href += '&pream=' + encodeURIComponent(pream);
 }
 };
 </script>

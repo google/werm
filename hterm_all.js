@@ -8472,7 +8472,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   add(8,   '[BKSP]', bs('\x7f', '\b'), bs('\b', '\x7f'), DEFAULT,     DEFAULT);
 
   // Third row.
-  add(9,   '[TAB]', sh('\t', CSI + 'Z'), c('onCtrlTab_'), PASS, DEFAULT);
+  add(9,   '[TAB]', sh('\t', c('onShiftTab_')), c('onCtrlTab_'), PASS, DEFAULT);
   add(81,  'qQ',    DEFAULT,             ctl('Q'),  DEFAULT, DEFAULT);
   add(87,  'wW',    DEFAULT,         c('onCtrlW_'), DEFAULT, DEFAULT);
   add(69,  'eE',    DEFAULT,             ctl('E'),  DEFAULT, DEFAULT);

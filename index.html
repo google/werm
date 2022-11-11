@@ -35,7 +35,8 @@ var log_send = 0, log_display = 0;
 function term_init()
 {
 	var t, io, pend_send = '', term_ready = false, sock, pend_display = [],
-		pend_escape = '', ignore_disp = '', termid, cached_title;
+		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
+		params;
 
 	function display(s)
 	{
@@ -184,14 +185,19 @@ function term_init()
 	}
 
 	t = new hterm.Terminal();
-	termid = (new URLSearchParams(window.location.search)).get('termid');
+	params = new URLSearchParams(window.location.search);
+
+	termid = params.get('termid');
+	pream = params.get('pream');
+
 	cached_title = localStorage['title-' + termid] || '無名';
+	if (termid) localStorage['pream-' + termid] = pream || '';
 
 	t.setWindowTitle = function(t)
 	{
 		if (termid) {
 			localStorage['title-' + termid] = t;
-			document.title = `[${termid}] ${t}`
+			document.title = `[${termid}] ${t}`;
 		}
 		else
 			document.title = t;
@@ -230,6 +236,17 @@ function term_init()
 		{
 			return hterm.Keyboard.KeyActions.PASS;
 		};
+		t.keyboard.keyMap.onShiftTab_ = function(e)
+		{
+			var newid = (termid || '') + '.' + String.fromCharCode(Math.floor(Math.random() * 26) + 'a'.charCodeAt(0));
+			window.open(
+				'/?termid=' + encodeURIComponent(newid) +
+				'&pream=' + encodeURIComponent(pream || ''));
+			return hterm.Keyboard.KeyActions.CANCEL;
+		};
+
+		// This doesn't work in tab apparently:
+		// t.passCtrlW = true;
 	};
 
 	t.decorate(document.querySelector('#terminal'));

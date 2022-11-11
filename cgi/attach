@@ -10,49 +10,59 @@ Content-type: text/html
 <head>
 	<title>Attach</title>
 <style>
+@font-face {
+  font-family: jfdot;
+  src: url(font.ttf);
+}
+
 td.loose {
 	padding-right:20pt;
 }
 h1 {
-	margin-top:20pt;
-	margin-bottom:0;
-	font-size:12pt;
+	margin-top:0;
+	margin-bottom:8pt;
+}
+.column {
+	padding-top: 6pt;
+	padding-left: 24pt;
+	padding-right: 24pt;
+	border: 2px solid yellow;
+}
+.common-list {
+	margin-top: 0;
+	padding-left: 0;
+	list-style-type: none;
+}
+a {
+	color: white;
+	font-size: 14px;
 }
 </style>
 </head>
-<body style="font-family: monospace">
+<body style="font-family: monospace; font-size: 14px;  background-color: black; color: #8f8;">
+<div style="display: flex;">
+<div class=column>
 <h1>Common</h1>
-<ul>
+<ul class=common-list>
 EOF
 
 test -f ~/gum/attach_common && ~/gum/attach_common
 
-cat <<EOF
-</ul>
-
-<table>
-EOF
-
 termno=1
 for dir in werm `sort ~/gum/attach_dirs 2>/dev/null`
 do
-	printf '<tr>'
+	termid=`echo $dir | sed 's/^\///; s/\//-/g'`
 
-	termpref=`echo $dir | sed 's/^\///; s/\//-/g'`
-
-	for i in `seq 5`; do
-		termid=$termpref-$i
-		printf '
-		<td class="loose"><a href="/?termid=%s&pream=export%%20LC_TITLEPREF=;exec%%20ow%%20%s%%0d"> [%d]</a href>
-		' $termid $dir $i
-	done
-
-	printf '<td>%s</tr>' $dir
+	printf '
+	<li><a href="/?termid=%s&pream=export%%20LC_TITLEPREF=;exec%%20ow%%20%s%%0d">%s</a>
+	' $termid $dir $dir
 done
 
 cat <<EOF
 
-</table>
+</ul>
+</div>
+<div class=column>
 <h1>Active sessions</h1>
 <table>
 EOF
@@ -62,7 +72,7 @@ while read sess
 do
 	printf '<tr>
 		<td class="loose">[<strong>%s</strong>]
-		<td><a class='restore-link' href="/?termid=%s">%s</a>
+		<td><a style='font-size:14px' class='restore-link' href="/?termid=%s">%s</a>
 		</tr>\n' \
 		$sess \
 		$sess \
@@ -88,6 +98,8 @@ for (i = 0; i < es.length; i++) {
 }
 };
 </script>
+</div>
+</div>
 </body>
 </html>
 EOF

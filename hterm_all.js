@@ -7297,17 +7297,6 @@ hterm.Keyboard = function(terminal) {
   this.passMetaV = true;
 
   /**
-   * Controls how the alt key is handled.
-   *
-   *  escape....... Send an ESC prefix.
-   *  8-bit........ Add 128 to the unshifted character as in xterm.
-   *  browser-key.. Wait for the keypress event and see what the browser says.
-   *                (This won't work well on platforms where the browser
-   *                 performs a default action for some alt sequences.)
-   */
-  this.altSendsWhat = 'escape';
-
-  /**
    * If true, tries to detect DEL key events that are from alt-backspace on
    * ChromeOS vs from a true DEL key press.
    *
@@ -7333,13 +7322,6 @@ hterm.Keyboard = function(terminal) {
    * E.g. "Back" will be mapped to F1. If false, Chrome will handle the keys.
    */
   this.mediaKeysAreFKeys = false;
-
-  /**
-   * Holds the previous setting of altSendsWhat when DECSET 1039 is used. When
-   * DECRST 1039 is used, altSendsWhat is changed back to this and this is
-   * nulled out.
-   */
-  this.previousAltSendsWhat_ = null;
 };
 
 /**
@@ -7487,20 +7469,7 @@ hterm.Keyboard.prototype.onKeyPress_ = function(e) {
 
   /** @type {string} */
   let ch;
-  if (e.altKey && this.altSendsWhat == 'browser-key' && e.charCode == 0) {
-    // If we got here because we were expecting the browser to handle an
-    // alt sequence but it didn't do it, then we might be on an OS without
-    // an enabled IME system.  In that case we fall back to xterm-like
-    // behavior.
-    //
-    // This happens here only as a fallback.  Typically these platforms should
-    // set altSendsWhat to either 'escape' or '8-bit'.
-    ch = String.fromCharCode(e.keyCode);
-    if (!e.shiftKey) {
-      ch = ch.toLowerCase();
-    }
-
-  } else if (e.charCode >= 32) {
+  if (e.charCode >= 32) {
     ch = String.fromCharCode(e.charCode);
   }
 
@@ -7672,14 +7641,6 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
     action = action.call(this.keyMap, e, keyDef);
   }
 
-  if (alt && this.altSendsWhat == 'browser-key' && action == DEFAULT) {
-    // When altSendsWhat is 'browser-key', we wait for the keypress event.
-    // In keypress, the browser should have set the event.charCode to the
-    // appropriate character.
-    // TODO(rginda): Character compositions will need some black magic.
-    action = PASS;
-  }
-
   // If we are going to handle the key, we most likely want to hide the context
   // menu before doing so.  This way we hide it when pressing a printable key,
   // or navigate (arrow keys/etc...), or press Escape.  But we don't want to
@@ -7781,15 +7742,7 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
       }
     }
 
-    if (alt && this.altSendsWhat == '8-bit' && action.length == 1) {
-      const code = action.charCodeAt(0) + 128;
-      action = String.fromCharCode(code);
-    }
-
-    // We respect alt-sends-escape even if the keymap action was a literal
-    // string.  Otherwise, every overridden alt/meta action would have to
-    // check altSendsWhat.
-    if (alt && this.altSendsWhat == 'escape') {
+    if (alt) {
       action = '\x1b' + action;
     }
   }
@@ -10148,19 +10101,6 @@ hterm.PreferenceManager.defaultPreferences = {
       false, 'bool',
       `If set, undoes the ChromeOS Alt+Backspace->Delete remap, so that ` +
       `Alt+Backspace indeed is Alt+Backspace.`,
-  ),
-
-  'alt-sends-what': hterm.PreferenceManager.definePref_(
-      'Alt key modifier handling',
-      hterm.PreferenceManager.Categories.Keyboard,
-      'escape', ['escape', '8-bit', 'browser-key'],
-      `Controls how the Alt key is handled.\n` +
-      `\n` +
-      `  escape: Send an ESC prefix.\n` +
-      `  8-bit: Add 128 to the typed character as in xterm.\n` +
-      `  browser-key: Wait for the keypress event and see what the browser\n` +
-      `    says. (This won't work well on platforms where the browser\n` +
-      `    performs a default action for some Alt sequences.)`,
   ),
 
   'audible-bell-sound': hterm.PreferenceManager.definePref_(
@@ -14601,14 +14541,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'alt-backspace-is-meta-backspace': (v) => {
       this.keyboard.altBackspaceIsMetaBackspace = v;
-    },
-
-    'alt-sends-what': (v) => {
-      if (!/^(escape|8-bit|browser-key)$/.test(v)) {
-        v = 'escape';
-      }
-
-      this.keyboard.altSendsWhat = v;
     },
 
     'audible-bell-sound': (v) => {
@@ -20417,20 +20349,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
 
     case 1011:  // Scroll to bottom on key press
       this.terminal.scrollOnKeystroke = state;
-      break;
-
-    case 1039:  // Send ESC when Alt modifies a key
-      if (state) {
-        if (!this.terminal.keyboard.previousAltSendsWhat_) {
-          this.terminal.keyboard.previousAltSendsWhat_ =
-              this.terminal.keyboard.altSendsWhat;
-          this.terminal.keyboard.altSendsWhat = 'escape';
-        }
-      } else if (this.terminal.keyboard.previousAltSendsWhat_) {
-        this.terminal.keyboard.altSendsWhat =
-            this.terminal.keyboard.previousAltSendsWhat_;
-        this.terminal.keyboard.previousAltSendsWhat_ = null;
-      }
       break;
 
     case 47:  // Use Alternate Screen Buffer

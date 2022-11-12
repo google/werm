@@ -7309,19 +7309,8 @@ hterm.Keyboard = function(terminal) {
    *  browser-key.. Wait for the keypress event and see what the browser says.
    *                (This won't work well on platforms where the browser
    *                 performs a default action for some alt sequences.)
-   *
-   * This setting only matters when alt is distinct from meta (altIsMeta is
-   * false.)
    */
   this.altSendsWhat = 'escape';
-
-  /**
-   * Set whether the alt key acts as a meta key, instead of producing 8-bit
-   * characters.
-   *
-   * True to enable, false to disable, null to autodetect based on platform.
-   */
-  this.altIsMeta = false;
 
   /**
    * If true, tries to detect DEL key events that are from alt-backspace on
@@ -7606,8 +7595,8 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
 
   let control = e.ctrlKey;
   let shift = e.shiftKey;
-  let alt = this.altIsMeta ? false : e.altKey;
-  let meta = this.altIsMeta ? (e.altKey || e.metaKey) : e.metaKey;
+  let alt = e.altKey;
+  let meta = e.metaKey;
 
   // In the key-map, we surround the keyCap for non-printables in "[...]"
   const isPrintable = !(/^\[\w+\]$/.test(keyDef.keyCap));
@@ -10166,13 +10155,6 @@ hterm.PreferenceManager.defaultPreferences = {
       false, 'bool',
       `If set, undoes the ChromeOS Alt+Backspace->Delete remap, so that ` +
       `Alt+Backspace indeed is Alt+Backspace.`,
-  ),
-
-  'alt-is-meta': hterm.PreferenceManager.definePref_(
-      'Treat Alt key as Meta key',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Whether the Alt key acts as a Meta key or as a distinct Alt key.`,
   ),
 
   'alt-sends-what': hterm.PreferenceManager.definePref_(
@@ -14636,10 +14618,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'alt-backspace-is-meta-backspace': (v) => {
       this.keyboard.altBackspaceIsMetaBackspace = v;
-    },
-
-    'alt-is-meta': (v) => {
-      this.keyboard.altIsMeta = v;
     },
 
     'alt-sends-what': (v) => {
@@ -19748,7 +19726,7 @@ hterm.VT.prototype.onTerminalMouse_ = function(e) {
     if (e.shiftKey) {
       mod |= 4;
     }
-    if (e.metaKey || (this.terminal.keyboard.altIsMeta && e.altKey)) {
+    if (e.metaKey) {
       mod |= 8;
     }
     if (e.ctrlKey) {

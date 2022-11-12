@@ -7292,11 +7292,6 @@ hterm.Keyboard = function(terminal) {
   this.backspaceSendsBackspace = false;
 
   /**
-   * Set whether the meta key sends a leading escape or not.
-   */
-  this.metaSendsEscape = true;
-
-  /**
    * Set whether meta-V gets passed to host.
    */
   this.passMetaV = true;
@@ -7791,11 +7786,10 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
       action = String.fromCharCode(code);
     }
 
-    // We respect alt/metaSendsEscape even if the keymap action was a literal
+    // We respect alt-sends-escape even if the keymap action was a literal
     // string.  Otherwise, every overridden alt/meta action would have to
-    // check alt/metaSendsEscape.
-    if ((alt && this.altSendsWhat == 'escape') ||
-        (meta && this.metaSendsEscape)) {
+    // check altSendsWhat.
+    if (alt && this.altSendsWhat == 'escape') {
       action = '\x1b' + action;
     }
   }
@@ -8949,7 +8943,7 @@ hterm.Keyboard.KeyMap.prototype.onMetaN_ = function(e) {
  * copy command.
  *
  * If there is no selection, or if the user presses Meta+Shift+C, then we'll
- * transmit an '\x1b' (if metaSendsEscape is on) followed by 'c' or 'C'.
+ * transmit 'c' or 'C'.
  *
  * If there is a selection, we defer to the browser.  In this case we clear out
  * the selection so the user knows we heard them, and also to give them a
@@ -8963,8 +8957,7 @@ hterm.Keyboard.KeyMap.prototype.onMetaC_ = function(e, keyDef) {
   const document = this.keyboard.terminal.getDocument();
   if (e.shiftKey || document.getSelection().isCollapsed) {
     // If the shift key is being held, or there is no document selection, send
-    // a Meta+C.  The keyboard code will add the ESC if metaSendsEscape is true,
-    // we just have to decide between 'c' and 'C'.
+    // a Meta+C. We just have to decide between 'c' and 'C'.
     return keyDef.keyCap.substr(e.shiftKey ? 1 : 0, 1);
   }
 
@@ -10578,16 +10571,6 @@ hterm.PreferenceManager.defaultPreferences = {
       false, 'bool',
       `If true, convert media keys to their Fkey equivalent. If false, let ` +
       `the browser handle the keys.`,
-  ),
-
-  'meta-sends-escape': hterm.PreferenceManager.definePref_(
-      'Meta key modifier handling',
-      hterm.PreferenceManager.Categories.Keyboard,
-      true, 'bool',
-      `Send an ESC prefix when pressing a key while holding the Meta key.\n` +
-      `\n` +
-      `For example, when enabled, pressing Meta+K will send ^[k as if you ` +
-      `typed Escape then k. When disabled, only k will be sent.`,
   ),
 
   'mouse-right-click-paste': hterm.PreferenceManager.definePref_(
@@ -14871,10 +14854,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'media-keys-are-fkeys': (v) => {
       this.keyboard.mediaKeysAreFKeys = v;
-    },
-
-    'meta-sends-escape': (v) => {
-      this.keyboard.metaSendsEscape = v;
     },
 
     'mouse-right-click-paste': (v) => {
@@ -20438,10 +20417,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
 
     case 1011:  // Scroll to bottom on key press
       this.terminal.scrollOnKeystroke = state;
-      break;
-
-    case 1036:  // Send ESC when Meta modifies a key
-      this.terminal.keyboard.metaSendsEscape = state;
       break;
 
     case 1039:  // Send ESC when Alt modifies a key

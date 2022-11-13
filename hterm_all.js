@@ -7201,10 +7201,8 @@ hterm.Keyboard = function(terminal) {
   // The event handlers we are interested in, and their bound callbacks, saved
   // so they can be uninstalled with removeEventListener, when required.
   this.handlers_ = [
-      ['focusout', this.onFocusOut_.bind(this)],
       ['keydown', this.onKeyDown_.bind(this)],
       ['keypress', this.onKeyPress_.bind(this)],
-      ['keyup', this.onKeyUp_.bind(this)],
       ['textInput', this.onTextInput_.bind(this)],
   ];
 
@@ -7276,26 +7274,6 @@ hterm.Keyboard = function(terminal) {
    * Set whether meta-V gets passed to host.
    */
   this.passMetaV = true;
-
-  /**
-   * If true, tries to detect DEL key events that are from alt-backspace on
-   * ChromeOS vs from a true DEL key press.
-   *
-   * Background: At the time of writing, on ChromeOS, alt-backspace is mapped
-   * to DEL. Some users may be happy with this, but others may be frustrated
-   * that it's impossible to do meta-backspace. If the user enables this pref,
-   * we use a trick to tell a true DEL keypress from alt-backspace: on
-   * alt-backspace, we will see the alt key go down, then get a DEL keystroke
-   * that indicates that alt is not pressed. See https://crbug.com/174410 .
-   */
-  this.altBackspaceIsMetaBackspace = false;
-
-  /**
-   * Used to keep track of the current alt-key state, which is necessary for
-   * the altBackspaceIsMetaBackspace preference above.  This is a bitmap with
-   * where bit positions correspond to the "location" property of the key event.
-   */
-  this.altKeyPressed = 0;
 
   /**
    * If true, ChromeOS media keys will be mapped to their F-key equivalent.
@@ -7462,35 +7440,11 @@ hterm.Keyboard.prototype.onKeyPress_ = function(e) {
 };
 
 /**
- * Handle focusout events.
- *
- * @param {!FocusEvent} e The event to process.
- */
-hterm.Keyboard.prototype.onFocusOut_ = function(e) {
-  this.altKeyPressed = 0;
-};
-
-/**
- * Handle keyup events.
- *
- * @param {!KeyboardEvent} e The event to process.
- */
-hterm.Keyboard.prototype.onKeyUp_ = function(e) {
-  if (e.keyCode == 18) {
-    this.altKeyPressed = this.altKeyPressed & ~(1 << (e.location - 1));
-  }
-};
-
-/**
  * Handle keydown events.
  *
  * @param {!KeyboardEvent} e The event to process.
  */
 hterm.Keyboard.prototype.onKeyDown_ = function(e) {
-  if (e.keyCode == 18) {
-    this.altKeyPressed = this.altKeyPressed | (1 << (e.location - 1));
-  }
-
   let keyDef = this.keyMap.keyDefs[e.keyCode];
   if (!keyDef) {
     // If this key hasn't been explicitly registered, fall back to the unknown
@@ -8379,7 +8333,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   add(45,  '[INSERT]', c('onKeyInsert_'),   DEFAULT, DEFAULT, DEFAULT);
   add(36,  '[HOME]',   c('onKeyHome_'),     DEFAULT, DEFAULT, DEFAULT);
   add(33,  '[PGUP]',   c('onKeyPageUp_'),   DEFAULT, DEFAULT, DEFAULT);
-  add(46,  '[DEL]',    c('onKeyDel_'),      DEFAULT, DEFAULT, DEFAULT);
+  add(46,  '[DEL]',    '\x1b[3~',           DEFAULT, DEFAULT, DEFAULT);
   add(35,  '[END]',    c('onKeyEnd_'),      DEFAULT, DEFAULT, DEFAULT);
   add(34,  '[PGDOWN]', c('onKeyPageDown_'), DEFAULT, DEFAULT, DEFAULT);
 
@@ -8519,25 +8473,6 @@ hterm.Keyboard.KeyMap.prototype.onKeyPageUp_ = function(e) {
 
   this.keyboard.terminal.scrollPageUp();
   return hterm.Keyboard.KeyActions.CANCEL;
-};
-
-/**
- * Either send a true DEL, or sub in meta-backspace.
- *
- * On ChromeOS, if we know the alt key is down, but we get a DEL event that
- * claims that the alt key is not pressed, we know the DEL was a synthetic
- * one from a user that hit alt-backspace. Based on a user pref, we can sub
- * in meta-backspace in this case.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @return {symbol|string} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onKeyDel_ = function(e) {
-  if (this.keyboard.altBackspaceIsMetaBackspace &&
-      this.keyboard.altKeyPressed && !e.altKey) {
-    return '\x1b\x7f';
-  }
-  return '\x1b[3~';
 };
 
 /**
@@ -14460,10 +14395,6 @@ hterm.Terminal.prototype.setProfile = function(
   };
 
   this.prefs_.addObservers(null, {
-    'alt-backspace-is-meta-backspace': (v) => {
-      this.keyboard.altBackspaceIsMetaBackspace = v;
-    },
-
     'audible-bell-sound': (v) => {
       const ary = v.match(/^lib-resource:(\S+)/);
       if (ary) {

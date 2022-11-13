@@ -18178,15 +18178,6 @@ hterm.Terminal.IO.prototype.createFrame = function(url, options = undefined) {
 };
 
 /**
- * Change the preference profile for the terminal.
- *
- * @param {string} profileName The name of the preference profile to activate.
- */
-hterm.Terminal.IO.prototype.setTerminalProfile = function(profileName) {
-  this.terminal_.setProfile(profileName);
-};
-
-/**
  * Create a new hterm.Terminal.IO instance and make it active on the Terminal
  * object associated with this instance.
  *

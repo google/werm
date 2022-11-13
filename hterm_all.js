@@ -6606,9 +6606,6 @@ hterm.FindBar.prototype.onKeyDown_ = function(event) {
     event.stopPropagation();
     return;
   }
-  if (event.key == 'Escape') {
-    this.close();
-  }
   if (event.key == 'Enter') {
     if (event.shiftKey) {
       this.onPrevious_();
@@ -6616,18 +6613,10 @@ hterm.FindBar.prototype.onKeyDown_ = function(event) {
       this.onNext_();
     }
   }
-  // keyCode for G.
-  if (event.ctrlKey && event.keyCode == 71) {
-    if (event.shiftKey) {
-      this.onPrevious_();
-    } else {
-      this.onNext_();
-    }
-    event.preventDefault();
-  }
   // Stop Ctrl+F inside hterm find input opening browser find.
-  // keyCode for F.
+  // Instead, it closes hterm find.
   if (event.ctrlKey && event.keyCode == 70) {
+    this.close();
     event.preventDefault();
   }
   event.stopPropagation();
@@ -7227,14 +7216,6 @@ hterm.Keyboard = function(terminal) {
   this.bindings = new hterm.Keyboard.Bindings();
 
   /**
-   * none: Disable the AltGr emulation.
-   * ctrl-alt: Assume Ctrl+Alt means AltGr.
-   * left-alt: Assume left Alt means AltGr.
-   * right-alt: Assume right Alt means AltGr.
-   */
-  this.altGrMode = 'none';
-
-  /**
    * If true, Shift+Insert will fall through to the browser as a paste.
    * If false, the keystroke will be sent to the host.
    */
@@ -7311,9 +7292,8 @@ hterm.Keyboard = function(terminal) {
 
   /**
    * Used to keep track of the current alt-key state, which is necessary for
-   * the altBackspaceIsMetaBackspace preference above and for the altGrMode
-   * preference.  This is a bitmap with where bit positions correspond to the
-   * "location" property of the key event.
+   * the altBackspaceIsMetaBackspace preference above.  This is a bitmap with
+   * where bit positions correspond to the "location" property of the key event.
    */
   this.altKeyPressed = 0;
 
@@ -7564,31 +7544,6 @@ hterm.Keyboard.prototype.onKeyDown_ = function(e) {
 
   // In the key-map, we surround the keyCap for non-printables in "[...]"
   const isPrintable = !(/^\[\w+\]$/.test(keyDef.keyCap));
-
-  switch (this.altGrMode) {
-    case 'ctrl-alt':
-    if (isPrintable && control && alt) {
-      // ctrl-alt-printable means altGr.  We clear out the control and
-      // alt modifiers and wait to see the charCode in the keydown event.
-      control = false;
-      alt = false;
-    }
-    break;
-
-    case 'right-alt':
-    if (isPrintable && (this.terminal.keyboard.altKeyPressed & 2)) {
-      control = false;
-      alt = false;
-    }
-    break;
-
-    case 'left-alt':
-    if (isPrintable && (this.terminal.keyboard.altKeyPressed & 1)) {
-      control = false;
-      alt = false;
-    }
-    break;
-  }
 
   /** @type {!hterm.Keyboard.KeyDown} */
   const keyDown = {
@@ -10081,20 +10036,6 @@ hterm.PreferenceManager.definePref_ = function(
 };
 
 hterm.PreferenceManager.defaultPreferences = {
-  'alt-gr-mode': hterm.PreferenceManager.definePref_(
-      'AltGr key mode',
-      hterm.PreferenceManager.Categories.Keyboard,
-      null, [null, 'none', 'ctrl-alt', 'left-alt', 'right-alt'],
-      `Select an AltGr detection heuristic.\n` +
-      `\n` +
-      `'null': Autodetect based on navigator.language:\n` +
-      `      'en-us' => 'none', else => 'right-alt'\n` +
-      `'none': Disable any AltGr emulation.\n` +
-      `'ctrl-alt': Assume Ctrl+Alt means AltGr.\n` +
-      `'left-alt': Assume left Alt means AltGr.\n` +
-      `'right-alt': Assume right Alt means AltGr.`,
-  ),
-
   'alt-backspace-is-meta-backspace': hterm.PreferenceManager.definePref_(
       'Alt+Backspace is Meta+Backspace',
       hterm.PreferenceManager.Categories.Keyboard,
@@ -14519,26 +14460,6 @@ hterm.Terminal.prototype.setProfile = function(
   };
 
   this.prefs_.addObservers(null, {
-    'alt-gr-mode': (v) => {
-      if (v == null) {
-        if (navigator.language.toLowerCase() == 'en-us') {
-          v = 'none';
-        } else {
-          v = 'right-alt';
-        }
-      } else if (typeof v == 'string') {
-        v = v.toLowerCase();
-      } else {
-        v = 'none';
-      }
-
-      if (!/^(none|ctrl-alt|left-alt|right-alt)$/.test(v)) {
-        v = 'none';
-      }
-
-      this.keyboard.altGrMode = v;
-    },
-
     'alt-backspace-is-meta-backspace': (v) => {
       this.keyboard.altBackspaceIsMetaBackspace = v;
     },

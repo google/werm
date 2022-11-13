@@ -8249,15 +8249,15 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
 
   // Second row.
   add(192, '`~', DEFAULT, sh(ctl('@'), ctl('^')),     DEFAULT,           PASS);
-  add(49,  '1!', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(50,  '2@', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(51,  '3#', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(52,  '4$', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(53,  '5%', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(54,  '6^', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(55,  '7&', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(56,  '8*', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
-  add(57,  '9(', DEFAULT, c('onCtrlNum_'),    c('onAltNum_'), c('onMetaNum_'));
+  add(49,  '1!', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(50,  '2@', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(51,  '3#', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(52,  '4$', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(53,  '5%', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(54,  '6^', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(55,  '7&', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(56,  '8*', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
+  add(57,  '9(', DEFAULT, PASS,               c('onAltNum_'), c('onMetaNum_'));
   add(48,  '0)', DEFAULT, c('onZoom_'),       c('onAltNum_'), c('onZoom_'));
   add(keycapMU, '-_', DEFAULT, c('onZoom_'),  DEFAULT,        c('onZoom_'));
   add(keycapEP, '=+', DEFAULT, c('onZoom_'),  DEFAULT,        c('onZoom_'));
@@ -8265,12 +8265,12 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   add(8,   '[BKSP]', bs('\x7f', '\b'), bs('\b', '\x7f'), DEFAULT,     DEFAULT);
 
   // Third row.
-  add(9,   '[TAB]', sh('\t', c('onShiftTab_')), c('onCtrlTab_'), PASS, DEFAULT);
+  add(9,   '[TAB]', sh('\t', c('onShiftTab_')), PASS, PASS, DEFAULT);
   add(81,  'qQ',    DEFAULT,             ctl('Q'),  DEFAULT, DEFAULT);
-  add(87,  'wW',    DEFAULT,         c('onCtrlW_'), DEFAULT, DEFAULT);
+  add(87,  'wW',    DEFAULT,             ctl('W'),  DEFAULT, DEFAULT);
   add(69,  'eE',    DEFAULT,             ctl('E'),  DEFAULT, DEFAULT);
   add(82,  'rR',    DEFAULT,             ctl('R'),  DEFAULT, DEFAULT);
-  add(84,  'tT',    DEFAULT,         c('onCtrlT_'), DEFAULT, DEFAULT);
+  add(84,  'tT',    DEFAULT,             ctl('T'),  DEFAULT, DEFAULT);
   add(89,  'yY',    DEFAULT,             ctl('Y'),  DEFAULT, DEFAULT);
   add(85,  'uU',    DEFAULT,             ctl('U'),  DEFAULT, DEFAULT);
   add(73,  'iI',    DEFAULT,             ctl('I'),  DEFAULT, DEFAULT);
@@ -8286,7 +8286,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   // want to do that. Our behavior on Enter is what most other
   // modern emulators do.
   add(20,  '[CAPS]',  PASS,    PASS,                        PASS,    DEFAULT);
-  add(65,  'aA', DEFAULT, sh(ctl('A'), c('onCtrlShiftA_')), DEFAULT, DEFAULT);
+  add(65,  'aA',      DEFAULT, sh(ctl('A'), PASS),          DEFAULT, DEFAULT);
   add(83,  'sS',      DEFAULT, ctl('S'),                    DEFAULT, DEFAULT);
   add(68,  'dD',      DEFAULT, ctl('D'),                    DEFAULT, DEFAULT);
   add(70,  'fF', DEFAULT, sh(ctl('F'), c('onCtrlShiftF_')), DEFAULT, DEFAULT);
@@ -8310,7 +8310,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   add(67,  'cC',   DEFAULT, c('onCtrlC_'),         DEFAULT, c('onMetaC_'));
   add(86,  'vV',   DEFAULT, c('onCtrlV_'),         DEFAULT, c('onMetaV_'));
   add(66,  'bB',   DEFAULT, ctl('B'),              DEFAULT, DEFAULT);
-  add(78,  'nN',   DEFAULT, c('onCtrlN_'),         DEFAULT, c('onMetaN_'));
+  add(78,  'nN',   DEFAULT, ctl('N'),              DEFAULT, c('onMetaN_'));
   add(77,  'mM',   DEFAULT, ctl('M'),              DEFAULT, DEFAULT);
   add(188, ',<',   DEFAULT, alt(STRIP, PASS),      DEFAULT, DEFAULT);
   add(190, '.>',   DEFAULT, alt(STRIP, PASS),      DEFAULT, DEFAULT);
@@ -8553,39 +8553,6 @@ hterm.Keyboard.KeyMap.prototype.onF11_ = function(e) {
 };
 
 /**
- * Either pass Ctrl+1..9 to the browser or send them to the host.
- *
- * Note that Ctrl+1 and Ctrl+9 don't actually have special sequences mapped
- * to them in xterm or gnome-terminal.  The range is really Ctrl+2..8, but
- * we handle 1..9 since Chrome treats the whole range special.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @param {!hterm.Keyboard.KeyDef} keyDef Key definition.
- * @return {symbol|string} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onCtrlNum_ = function(e, keyDef) {
-  // Compute a control character for a given character.
-  function ctl(ch) { return String.fromCharCode(ch.charCodeAt(0) - 64); }
-
-  if (this.keyboard.terminal.passCtrlNumber && !e.shiftKey) {
-    return hterm.Keyboard.KeyActions.PASS;
-  }
-
-  switch (keyDef.keyCap.substr(0, 1)) {
-    case '1': return '1';
-    case '2': return ctl('@');
-    case '3': return ctl('[');
-    case '4': return ctl('\\');
-    case '5': return ctl(']');
-    case '6': return ctl('^');
-    case '7': return ctl('_');
-    case '8': return '\x7f';
-    case '9': return '9';
-  }
-  return hterm.Keyboard.KeyActions.PASS;
-};
-
-/**
  * Either pass Alt+1..9 to the browser or send them to the host.
  *
  * @param {!KeyboardEvent} e The event to process.
@@ -8611,60 +8578,6 @@ hterm.Keyboard.KeyMap.prototype.onMetaNum_ = function(e) {
   }
 
   return hterm.Keyboard.KeyActions.DEFAULT;
-};
-
-/**
- * Either pass ctrl+[shift]+tab to the browser or strip.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @return {symbol|string} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onCtrlTab_ = function(e) {
-  if (this.keyboard.terminal.passCtrlTab) {
-    return hterm.Keyboard.KeyActions.PASS;
-  }
-  return hterm.Keyboard.KeyActions.STRIP;
-};
-
-/**
- * Either pass Ctrl & Shift W (close tab/window) to the browser or send it to
- * the host.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @return {symbol|string} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onCtrlW_ = function(e) {
-  if (this.keyboard.terminal.passCtrlW) {
-    return hterm.Keyboard.KeyActions.PASS;
-  }
-  return '\x17';
-};
-
-/**
- * Either pass Ctrl & Shift T (new/reopen tab) to the browser or send it to the
- * host.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @return {symbol|string} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onCtrlT_ = function(e) {
-  if (this.keyboard.terminal.passCtrlT) {
-    return hterm.Keyboard.KeyActions.PASS;
-  }
-  return '\x14';
-};
-
-/**
- * Select all lines. Returns a function which selects all lines when invoked
- * rather than calling selectAll() directly so that users can override their own
- * key binding for 'Ctrl+Shift+A' if desired.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @return {symbol} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onCtrlShiftA_ = function(e) {
-  this.keyboard.terminal.getScrollPort().selectAll();
-  return hterm.Keyboard.KeyActions.CANCEL;
 };
 
 /**
@@ -8712,28 +8625,6 @@ hterm.Keyboard.KeyMap.prototype.onCtrlC_ = function(e) {
   }
 
   return '\x03';
-};
-
-/**
- * Either send a ^N or open a new window to the same location.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @return {symbol|string} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onCtrlN_ = function(e) {
-  if (this.keyboard.terminal.passCtrlN) {
-    return hterm.Keyboard.KeyActions.PASS;
-  }
-
-  if (e.shiftKey) {
-    lib.f.openWindow(document.location.href, '',
-                     'chrome=no,close=yes,resize=yes,scrollbars=yes,' +
-                     'minimizable=yes,width=' + window.innerWidth +
-                     ',height=' + window.innerHeight);
-    return hterm.Keyboard.KeyActions.CANCEL;
-  }
-
-  return '\x0e';
 };
 
 /**
@@ -10511,63 +10402,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `If true, Alt+1..9 will be handled by the browser. If false, Alt+1..9 ` +
       `will be sent to the host. If null, autodetect based on browser ` +
       `platform and window type.`,
-  ),
-
-  'pass-ctrl-number': hterm.PreferenceManager.definePref_(
-      'Ctrl+1..9 switch tab behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      null, 'tristate',
-      `Whether Ctrl+1..9 is passed to the browser.\n` +
-      `\n` +
-      `This is handy when running hterm in a browser tab, so that you don't ` +
-      `lose Chrome's "switch to tab" keyboard shortcuts. When not running ` +
-      `in a tab it's better to send these keys to the host so they can be ` +
-      `used in vim or emacs.\n` +
-      `\n` +
-      `If true, Ctrl+1..9 will be handled by the browser. If false, ` +
-      `Ctrl+1..9 will be sent to the host. If null, autodetect based on ` +
-      `browser platform and window type.`,
-  ),
-
-  'pass-ctrl-n': hterm.PreferenceManager.definePref_(
-      'Ctrl+N new window behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Whether Ctrl+N is passed to the browser.\n` +
-      `\n` +
-      `If true, Ctrl+N will be handled by the browser as the "new window" ` +
-      `keyboard shortcut. If false, Ctrl+N will be sent to the host.`,
-  ),
-
-  'pass-ctrl-t': hterm.PreferenceManager.definePref_(
-      'Ctrl+T new tab behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Whether Ctrl+T is passed to the browser.\n` +
-      `\n` +
-      `If true, Ctrl+T will be handled by the browser as the "new tab" ` +
-      `keyboard shortcut. If false, Ctrl+T will be sent to the host.`,
-  ),
-
-  'pass-ctrl-tab': hterm.PreferenceManager.definePref_(
-      'Ctrl+Tab switch tab behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Whether Ctrl+Tab and Ctrl+Shift+Tab are passed to the browser.\n` +
-      `\n` +
-      `If true, Ctrl+Tab and Ctrl+Shift+Tab will be handled by the browser ` +
-      `as the "next/previous tab" keyboard shortcut. If false, the Tab ` +
-      `key is sent to the host without Ctrl or Shift.`,
-  ),
-
-  'pass-ctrl-w': hterm.PreferenceManager.definePref_(
-      'Ctrl+W close tab behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Whether Ctrl+W is passed to the browser.\n` +
-      `\n` +
-      `If true, Ctrl+W will be handled by the browser as the "close tab" ` +
-      `keyboard shortcut. If false, Ctrl+W will be sent to the host.`,
   ),
 
   'pass-meta-number': hterm.PreferenceManager.definePref_(
@@ -14662,34 +14496,6 @@ hterm.Terminal.prototype.setProfile = function(
       }
 
       this.passAltNumber = v;
-    },
-
-    'pass-ctrl-number': (v) => {
-      if (v == null) {
-        // Let Ctrl+1..9 pass to the browser (to control tab switching) on
-        // non-OS X systems, or if hterm is not opened in an app window.
-        v = (hterm.os !== 'mac' &&
-             hterm.windowType !== 'popup' &&
-             hterm.windowType !== 'app');
-      }
-
-      this.passCtrlNumber = v;
-    },
-
-    'pass-ctrl-n': (v) => {
-      this.passCtrlN = v;
-    },
-
-    'pass-ctrl-t': (v) => {
-      this.passCtrlT = v;
-    },
-
-    'pass-ctrl-tab': (v) => {
-      this.passCtrlTab = v;
-    },
-
-    'pass-ctrl-w': (v) => {
-      this.passCtrlW = v;
     },
 
     'pass-meta-number': (v) => {

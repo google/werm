@@ -313,6 +313,7 @@ function term_init()
 			case 'Backspace':	signal(pref + '\x7f');		return true;
 			case 'Escape':		signal(pref + '\x1b');		return true;
 			case 'ContextMenu':	signal(pref + '_');		return true;
+			case 'Delete':		signal(pref + '\x1b[3~');	return true;
 			default:						return false;
 			}
 		}

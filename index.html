@@ -36,7 +36,7 @@ function term_init()
 {
 	var t, io, pend_send = '', term_ready = false, sock, pend_display = [],
 		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
-		params;
+		params, dead_key_hist;
 
 	function display(s)
 	{
@@ -218,6 +218,14 @@ function term_init()
 		return e.join('');
 	}
 
+	var on_shift_tab = function()
+	{
+		var newid = (termid || '') + '.' + String.fromCharCode(Math.floor(Math.random() * 26) + 'a'.charCodeAt(0));
+		window.open(
+			'/?termid=' + encodeURIComponent(newid) +
+			'&pream=' + encodeURIComponent(pream || ''));
+		return hterm.Keyboard.KeyActions.CANCEL;
+	};
 	t.onTerminalReady = function()
 	{
 		io = t.io.push();
@@ -231,25 +239,113 @@ function term_init()
 
 		term_ready = true;
 		display('');
-		t.keyboard.keyMap.onCtrlShiftA_ = function(e)
-		{
-			return hterm.Keyboard.KeyActions.PASS;
-		};
-		t.keyboard.keyMap.onShiftTab_ = function(e)
-		{
-			var newid = (termid || '') + '.' + String.fromCharCode(Math.floor(Math.random() * 26) + 'a'.charCodeAt(0));
-			window.open(
-				'/?termid=' + encodeURIComponent(newid) +
-				'&pream=' + encodeURIComponent(pream || ''));
-			return hterm.Keyboard.KeyActions.CANCEL;
-		};
+		// t.keyboard.keyMap.onCtrlShiftA_ = function(e)
+		// {
+		// 	return hterm.Keyboard.KeyActions.PASS;
+		// };
+		// t.keyboard.keyMap.onShiftTab_ = on_shift_tab;
 
 		// This doesn't work in tab apparently:
 		// t.passCtrlW = true;
+
+		// window.t = t;
 	};
 
 	t.decorate(document.querySelector('#terminal'));
-	t.installKeyboard();
+	// t.installKeyboard();
+
+	dead_key_hist = ['?', 'x', '?', 'x'];
+	function push_dead_key_hist(e)
+	{
+		switch (e.type) {
+		case 'keydown':	dead_key_hist.push('D'); break;
+		case 'keyup':	dead_key_hist.push('U'); break;
+		default:	dead_key_hist.push('?');
+		}
+
+		switch (e.code) {
+		case 'ShiftLeft':	dead_key_hist.push('LS'); break;
+		case 'ShiftRight':	dead_key_hist.push('RS'); break;
+		case 'ControlLeft':	dead_key_hist.push('LC'); break;
+		case 'ControlRight':	dead_key_hist.push('RC'); break;
+		default:		dead_key_hist.push('?');
+		}
+	}
+
+	function process_key_down(e)
+	{
+		var ch, pref;
+
+		if (e.altKey) return false;
+
+		if (e.shiftKey && e.ctrlKey) {
+			if (!e.metaKey && e.code === 'KeyF') {
+				t.findBar.display();
+				return true;
+			}
+			return false;
+		}
+
+		pref = e.metaKey ? '\x1b' : '';
+
+		if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.key == 'Tab') {
+			on_shift_tab();
+			return true;
+		}
+
+		if (e.key.length !== 1) {
+			if (e.ctrlKey) return false;
+
+			switch (e.key) {
+			case 'ArrowLeft':	signal(pref + '\x1b\x5b\x44');	return true;
+			case 'ArrowUp':		signal(pref + '\x1b\x5b\x41');	return true;
+			case 'ArrowRight':	signal(pref + '\x1b\x5b\x43');	return true;
+			case 'ArrowDown':	signal(pref + '\x1b\x5b\x42');	return true;
+			case 'Enter':		signal(pref + '\r');		return true;
+			case 'Backspace':	signal(pref + '\x7f');		return true;
+			case 'Escape':		signal(pref + '\x1b');		return true;
+			case 'ContextMenu':	signal(pref + '_');		return true;
+			default:						return false;
+			}
+		}
+
+		if (e.ctrlKey) {
+			ch = e.key.charCodeAt(0);
+			if (ch >= 0x7b || ch < 0x40) return;
+			if (ch >= 0x61) ch -= 0x20;
+			ch -= 0x40;
+
+			signal(escape(pref + String.fromCharCode(ch)));
+			return true;
+		}
+
+		signal(escape(pref + e.key));
+		return true;
+	}
+
+	t.getScrollPort().getDocument().body.onkeydown = function(e)
+	{
+		push_dead_key_hist(e);
+		dead_key_hist.splice(0, 2);
+
+		if (!process_key_down(e)) return;
+		e.stopPropagation();
+		e.preventDefault();
+	};
+
+	t.getScrollPort().getDocument().body.onkeyup = function(e)
+	{
+		var hist;
+
+		push_dead_key_hist(e);
+		hist = dead_key_hist.join('');
+		dead_key_hist.splice(0, 2);
+
+		if (hist.endsWith('DLSULS') || hist === 'DLSDRSULS' || hist === 'DLSURSULS') signal(')');
+		if (hist.endsWith('DRSURS') || hist === 'DRSULSURS' || hist === 'DRSDLSURS') signal('(');
+		if (hist.endsWith('DRCURC')) signal('$');
+		if (hist.endsWith('DLCULC')) signal('"');
+	};
 }
 
 window.onload = function()

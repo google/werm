@@ -294,7 +294,15 @@ function term_init()
 		}
 
 		if (e.key.length !== 1) {
-			if (e.ctrlKey) return false;
+			if (e.ctrlKey) {
+				if (e.key === 'Backspace') {
+					// Send Ctrl+W
+					signal(pref + '\x17');
+					return true;
+				}
+
+				return false;
+			}
 
 			switch (e.key) {
 			case 'ArrowLeft':	signal(pref + '\x1b\x5b\x44');	return true;

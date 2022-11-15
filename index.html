@@ -294,7 +294,7 @@ function term_init()
 		}
 
 		if (e.key.length !== 1) {
-			if (e.ctrlKey) {
+			if (e.ctrlKey && !e.shiftKey) {
 				if (e.key === 'Backspace') {
 					// Send Ctrl+W
 					signal(pref + '\x17');
@@ -303,7 +303,7 @@ function term_init()
 
 				return false;
 			}
-			if (e.shiftKey) {
+			if (e.shiftKey && !e.ctrlKey) {
 				switch (e.key) {
 				case 'PageDown':	t.scrollPageDown();	return true;
 				case 'PageUp':		t.scrollPageUp();	return true;
@@ -312,6 +312,8 @@ function term_init()
 				default:					return false;
 				}
 			}
+
+			if (e.shiftKey || e.ctrlKey) return false;
 
 			switch (e.key) {
 			case 'ArrowLeft':	signal(pref + '\x1b\x5b\x44');		return true;
@@ -328,6 +330,7 @@ function term_init()
 			case 'PageUp':		signal(pref + '\x1b\x5b\x35\x7e');	return true;
 			case 'Home':		signal(pref + '\x1b\x5b\x48');		return true;
 			case 'End':		signal(pref + '\x1b\x5b\x46');		return true;
+			case 'Insert':		signal(pref + '\x1b\x5b\x32\x7e');	return true;
 			default:							return false;
 			}
 		}

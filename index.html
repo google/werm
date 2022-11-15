@@ -303,18 +303,32 @@ function term_init()
 
 				return false;
 			}
+			if (e.shiftKey) {
+				switch (e.key) {
+				case 'PageDown':	t.scrollPageDown();	return true;
+				case 'PageUp':		t.scrollPageUp();	return true;
+				case 'Home':		t.scrollHome();		return true;
+				case 'End':		t.scrollEnd();		return true;
+				default:					return false;
+				}
+			}
 
 			switch (e.key) {
-			case 'ArrowLeft':	signal(pref + '\x1b\x5b\x44');	return true;
-			case 'ArrowUp':		signal(pref + '\x1b\x5b\x41');	return true;
-			case 'ArrowRight':	signal(pref + '\x1b\x5b\x43');	return true;
-			case 'ArrowDown':	signal(pref + '\x1b\x5b\x42');	return true;
-			case 'Enter':		signal(pref + '\r');		return true;
-			case 'Backspace':	signal(pref + '\x7f');		return true;
-			case 'Escape':		signal(pref + '\x1b');		return true;
-			case 'ContextMenu':	signal(pref + '_');		return true;
-			case 'Delete':		signal(pref + '\x1b[3~');	return true;
-			default:						return false;
+			case 'ArrowLeft':	signal(pref + '\x1b\x5b\x44');		return true;
+			case 'ArrowUp':		signal(pref + '\x1b\x5b\x41');		return true;
+			case 'ArrowRight':	signal(pref + '\x1b\x5b\x43');		return true;
+			case 'ArrowDown':	signal(pref + '\x1b\x5b\x42');		return true;
+			case 'Enter':		signal(pref + '\r');			return true;
+			case 'Backspace':	signal(pref + '\x7f');			return true;
+			case 'Escape':		signal(pref + '\x1b');			return true;
+			case 'ContextMenu':	signal(pref + '_');			return true;
+			case 'Delete':		signal(pref + '\x1b[3~');		return true;
+			case 'Tab':		signal(pref + '\t');			return true;
+			case 'PageDown':	signal(pref + '\x1b\x5b\x36\x7e');	return true;
+			case 'PageUp':		signal(pref + '\x1b\x5b\x35\x7e');	return true;
+			case 'Home':		signal(pref + '\x1b\x5b\x48');		return true;
+			case 'End':		signal(pref + '\x1b\x5b\x46');		return true;
+			default:							return false;
 			}
 		}
 

@@ -295,15 +295,13 @@ function term_init()
 
 		if (e.key.length !== 1) {
 			if (e.ctrlKey && !e.shiftKey) {
-				if (e.key === 'Backspace') {
-					// Send Ctrl+W
-					signal(pref + '\x17');
-					return true;
+				switch (e.key) {
+				case 'Backspace':	return true;	// Don't let browser interpret; it makes a mess.
+				default:		return false;
 				}
-
-				return false;
 			}
-			if (e.shiftKey && !e.ctrlKey) {
+
+			if (e.shiftKey) {
 				if (!pref) {
 					// These shortcuts cannot be preceded by Esc as they are not sent to I/O
 					switch (e.key) {
@@ -315,8 +313,9 @@ function term_init()
 				}
 
 				switch (e.key) {
-				case 'Enter':	signal(pref + '\x0e');	return true;
-				default:				return false;
+				case 'Backspace':	signal(pref + '\x17');	return true;	// C+N
+				case 'Enter':		signal(pref + '\x0e');	return true;	// C+W
+				default:					return false;
 				}
 			}
 

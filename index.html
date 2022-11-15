@@ -304,12 +304,19 @@ function term_init()
 				return false;
 			}
 			if (e.shiftKey && !e.ctrlKey) {
+				if (!pref) {
+					// These shortcuts cannot be preceded by Esc as they are not sent to I/O
+					switch (e.key) {
+					case 'PageDown':	t.scrollPageDown();	return true;
+					case 'PageUp':		t.scrollPageUp();	return true;
+					case 'Home':		t.scrollHome();		return true;
+					case 'End':		t.scrollEnd();		return true;
+					}
+				}
+
 				switch (e.key) {
-				case 'PageDown':	t.scrollPageDown();	return true;
-				case 'PageUp':		t.scrollPageUp();	return true;
-				case 'Home':		t.scrollHome();		return true;
-				case 'End':		t.scrollEnd();		return true;
-				default:					return false;
+				case 'Enter':	signal(pref + '\x0e');	return true;
+				default:				return false;
 				}
 			}
 

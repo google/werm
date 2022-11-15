@@ -6585,17 +6585,6 @@ hterm.Keyboard = function(terminal) {
   // The parent vt interpreter.
   this.terminal = terminal;
 
-  // The element we're currently capturing keyboard events for.
-  this.keyboardElement_ = null;
-
-  // The event handlers we are interested in, and their bound callbacks, saved
-  // so they can be uninstalled with removeEventListener, when required.
-  this.handlers_ = [
-      ['keydown', this.onKeyDown_.bind(this)],
-      ['keypress', this.onKeyPress_.bind(this)],
-      ['textInput', this.onTextInput_.bind(this)],
-  ];
-
   /**
    * The current key map.
    */
@@ -6730,47 +6719,6 @@ hterm.Keyboard.KeyActions = {
 
 /** @typedef {string|!hterm.Keyboard.KeyActions} */
 hterm.Keyboard.KeyAction;
-
-/**
- * Capture keyboard events sent to the associated element.
- *
- * This enables the keyboard.  Captured events are consumed by this class
- * and will not perform their default action or bubble to other elements.
- *
- * Passing a null element will uninstall the keyboard handlers.
- *
- * @param {?Element} element The element whose events should be captured, or
- *     null to disable the keyboard.
- */
-hterm.Keyboard.prototype.installKeyboard = function(element) {
-  if (element == this.keyboardElement_) {
-    return;
-  }
-
-  if (element && this.keyboardElement_) {
-    this.installKeyboard(null);
-  }
-
-  for (let i = 0; i < this.handlers_.length; i++) {
-    const handler = this.handlers_[i];
-    if (element) {
-      element.addEventListener(handler[0], handler[1]);
-    } else {
-      this.keyboardElement_.removeEventListener(handler[0], handler[1]);
-    }
-  }
-
-  this.keyboardElement_ = element;
-};
-
-/**
- * Disable keyboard event capture.
- *
- * This will allow the browser to process key events normally.
- */
-hterm.Keyboard.prototype.uninstallKeyboard = function() {
-  this.installKeyboard(null);
-};
 
 /**
  * Handle textInput events.
@@ -14128,23 +14076,6 @@ hterm.Terminal.prototype.getForegroundColor = function() {
  */
 hterm.Terminal.prototype.isPrimaryScreen = function() {
   return this.screen_ == this.primaryScreen_;
-};
-
-/**
- * Install the keyboard handler for this terminal.
- *
- * This will prevent the browser from seeing any keystrokes sent to the
- * terminal.
- */
-hterm.Terminal.prototype.installKeyboard = function() {
-  this.keyboard.installKeyboard(this.scrollPort_.getDocument().body);
-};
-
-/**
- * Uninstall the keyboard handler for this terminal.
- */
-hterm.Terminal.prototype.uninstallKeyboard = function() {
-  this.keyboard.installKeyboard(null);
 };
 
 /**

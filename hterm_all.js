@@ -9234,7 +9234,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'background-color': hterm.PreferenceManager.definePref_(
       'Background color',
       hterm.PreferenceManager.Categories.Appearance,
-      'rgb(16, 16, 16)', 'color',
+      'rgb(26, 26, 26)', 'color',
       `The background color for text with no other color attributes.`,
   ),
 
@@ -9430,7 +9430,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'enable-bold': hterm.PreferenceManager.definePref_(
       'Bold text behavior',
       hterm.PreferenceManager.Categories.Appearance,
-      null, 'tristate',
+      false, 'tristate',
       `If true, use bold weight font for text with the bold/bright ` +
       `attribute. False to use the normal weight font. Null to autodetect.`,
   ),
@@ -9553,7 +9553,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'foreground-color': hterm.PreferenceManager.definePref_(
       'Text color',
       hterm.PreferenceManager.Categories.Appearance,
-      'rgb(240, 240, 240)', 'color',
+      'rgb(230, 230, 230)', 'color',
       `The foreground color for text with no other color attributes.`,
   ),
 

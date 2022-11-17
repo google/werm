@@ -278,15 +278,19 @@ function term_init()
 
 		if (e.altKey) return false;
 
+		pref = e.metaKey ? '\x1b' : '';
+
 		if (e.shiftKey && e.ctrlKey) {
+			switch (e.code) {
+			case 'Digit2': signal(pref + '\x00'); return true;
+			case 'Digit6': signal(pref + '\x1e'); return true;
+			}
 			if (!e.metaKey && e.code === 'KeyF') {
 				t.findBar.display();
 				return true;
 			}
 			return false;
 		}
-
-		pref = e.metaKey ? '\x1b' : '';
 
 		if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.key == 'Tab') {
 			on_shift_tab();
@@ -296,7 +300,8 @@ function term_init()
 		if (e.key.length !== 1) {
 			if (e.ctrlKey && !e.shiftKey) {
 				switch (e.key) {
-				case 'Backspace':	return true;	// Don't let browser interpret; it makes a mess.
+				case 'Backspace':	/* consume or else it makes a mess */	return true;
+				case 'ContextMenu':	signal(pref + '\x1f');			return true;
 				default:		return false;
 				}
 			}

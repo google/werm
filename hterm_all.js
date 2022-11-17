@@ -166,28 +166,6 @@ if (typeof Blob.prototype.arrayBuffer != 'function') {
 lib.array = {};
 
 /**
- * Concatenate an arbitrary number of typed arrays of the same type into a new
- * typed array of this type.
- *
- * @template TYPED_ARRAY
- * @param {...!TYPED_ARRAY} arrays
- * @return {!TYPED_ARRAY}
- */
-lib.array.concatTyped = function(...arrays) {
-  let resultLength = 0;
-  for (const array of arrays) {
-    resultLength += array.length;
-  }
-  const result = new arrays[0].constructor(resultLength);
-  let pos = 0;
-  for (const array of arrays) {
-    result.set(array, pos);
-    pos += array.length;
-  }
-  return result;
-};
-
-/**
  * Compare two array-like objects entrywise.
  *
  * @template ARRAY_LIKE
@@ -2688,34 +2666,6 @@ lib.PreferenceManager.prototype.definePreferences = function(defaults) {
 };
 
 /**
- * Define an ordered list of child preferences.
- *
- * Child preferences are different from just storing an array of JSON objects
- * in that each child is an instance of a preference manager.  This means you
- * can observe changes to individual child preferences, and get some validation
- * that you're not reading or writing to an undefined child preference value.
- *
- * @param {string} listName A name for the list of children.  This must be
- *     unique in this preference manager.  The listName will become a
- *     preference on this PreferenceManager used to store the ordered list of
- *     child ids.  It is also used in get/add/remove operations to identify the
- *     list of children to operate on.
- * @param {function(!lib.PreferenceManager, string)} childFactory A function
- *     that will be used to generate instances of these children.  The factory
- *     function will receive the parent lib.PreferenceManager object and a
- *     unique id for the new child preferences.
- */
-lib.PreferenceManager.prototype.defineChildren = function(
-    listName, childFactory) {
-
-  // Define a preference to hold the ordered list of child ids.
-  this.definePreference(listName, [],
-                        this.onChildListChange_.bind(this, listName));
-  this.childFactories_[listName] = childFactory;
-  this.childLists_[listName] = {};
-};
-
-/**
  * Register a callback to be invoked when PreferenceManager prefix changes.
  *
  * @param {function(string, !lib.PreferenceManager)} observer The
@@ -2854,43 +2804,6 @@ lib.PreferenceManager.newRandomId = function(
 };
 
 /**
- * Create a new child PreferenceManager for the given child list.
- *
- * The optional hint parameter is an opaque prefix added to the auto-generated
- * unique id for this child.  Your child factory can parse out the prefix
- * and use it.
- *
- * @param {string} listName The child list to create the new instance from.
- * @param {?string=} prefix Optional prefix to include in the child id.
- * @param {string=} id Optional id to override the generated id.
- * @return {!lib.PreferenceManager} The new child preference manager.
- */
-lib.PreferenceManager.prototype.createChild = function(
-    listName, prefix = undefined, id = undefined) {
-  const ids = /** @type {!Array<string>} */ (this.get(listName));
-
-  if (id) {
-    if (ids.indexOf(id) != -1) {
-      throw new Error('Duplicate child: ' + listName + ': ' + id);
-    }
-
-  } else {
-    id = lib.PreferenceManager.newRandomId(ids, prefix);
-  }
-
-  const childManager = this.childFactories_[listName](this, id);
-  childManager.trace = this.trace;
-  childManager.resetAll();
-
-  this.childLists_[listName][id] = childManager;
-
-  ids.push(id);
-  this.set(listName, ids, undefined, !this.isImportingJson_);
-
-  return childManager;
-};
-
-/**
  * Remove a child preferences instance.
  *
  * Removes a child preference manager and clears any preferences stored in it.
@@ -2941,64 +2854,6 @@ lib.PreferenceManager.prototype.getChild = function(
   }
 
   return childList[id];
-};
-
-/**
- * Synchronize a list of child PreferenceManagers instances with the current
- * list stored in prefs.
- *
- * This will instantiate any missing managers and read current preference values
- * from storage.  Any active managers that no longer appear in preferences will
- * be deleted.
- *
- * @param {string} listName The child list to synchronize.
- * @param {function()=} callback Function to invoke when the sync finishes.
- */
-lib.PreferenceManager.prototype.syncChildList = function(
-    listName, callback = undefined) {
-  let pendingChildren = 0;
-  function onChildStorage() {
-    if (--pendingChildren == 0 && callback) {
-      callback();
-    }
-  }
-
-  // The list of child ids that we *should* have a manager for.
-  const currentIds = /** @type {!Array<string>} */ (this.get(listName));
-
-  // The known managers at the start of the sync.  Any manager still in this
-  // list at the end should be discarded.
-  const oldIds = Object.keys(this.childLists_[listName]);
-
-  for (let i = 0; i < currentIds.length; i++) {
-    const id = currentIds[i];
-
-    const managerIndex = oldIds.indexOf(id);
-    if (managerIndex >= 0) {
-      oldIds.splice(managerIndex, 1);
-    }
-
-    if (!this.childLists_[listName][id]) {
-      const childManager = this.childFactories_[listName](this, id);
-      if (!childManager) {
-        console.warn('Unable to restore child: ' + listName + ': ' + id);
-        continue;
-      }
-
-      childManager.trace = this.trace;
-      this.childLists_[listName][id] = childManager;
-      pendingChildren++;
-      childManager.readStorage(onChildStorage);
-    }
-  }
-
-  for (let i = 0; i < oldIds.length; i++) {
-    delete this.childLists_[listName][oldIds[i]];
-  }
-
-  if (!pendingChildren && callback) {
-    setTimeout(callback);
-  }
 };
 
 /**
@@ -3250,91 +3105,6 @@ lib.PreferenceManager.prototype.getString = function(name) {
   const result = this.get(name);
   lib.assert(typeof result == 'string');
   return result;
-};
-
-/**
- * Return all non-default preferences as a JSON object.
- *
- * This includes any nested preference managers as well.
- *
- * @return {!Object} The JSON preferences.
- */
-lib.PreferenceManager.prototype.exportAsJson = function() {
-  const rv = {};
-
-  for (const name in this.prefRecords_) {
-    if (name in this.childLists_) {
-      rv[name] = [];
-      const childIds = /** @type {!Array<string>} */ (this.get(name));
-      for (let i = 0; i < childIds.length; i++) {
-        const id = childIds[i];
-        rv[name].push({id: id, json: this.getChild(name, id).exportAsJson()});
-      }
-
-    } else {
-      const record = this.prefRecords_[name];
-      if (record.currentValue != this.DEFAULT_VALUE) {
-        rv[name] = record.currentValue;
-      }
-    }
-  }
-
-  return rv;
-};
-
-/**
- * Import a JSON blob of preferences previously generated with exportAsJson.
- *
- * This will create nested preference managers as well.
- *
- * @param {!Object} json The JSON settings to import.
- * @return {!Promise<void>} A promise that resolves once the import completes.
- */
-lib.PreferenceManager.prototype.importFromJson = async function(json) {
-  this.isImportingJson_ = true;
-
-  // Clear the current prefernces back to their defaults, and throw away any
-  // children.  We'll recreate them if needed.
-  for (const listName in this.childLists_) {
-    const childList = this.childLists_[listName];
-    for (const id in childList) {
-      this.removeChild(listName, id);
-    }
-  }
-  this.resetAll();
-
-  for (const name in json) {
-    if (name in this.childLists_) {
-      const childList = json[name];
-      const ids = [];
-      for (let i = 0; i < childList.length; i++) {
-        const id = childList[i].id;
-        ids.push(id);
-
-        let childPrefManager = this.childLists_[name][id];
-        if (!childPrefManager) {
-          childPrefManager = this.createChild(name, null, id);
-        }
-
-        await childPrefManager.importFromJson(childList[i].json);
-      }
-      // Update the list of children now that we've finished creating them.
-      await this.set(name, ids);
-    } else {
-      await this.set(name, json[name]);
-    }
-  }
-
-  this.isImportingJson_ = false;
-};
-
-/**
- * Called when one of the child list preferences changes.
- *
- * @param {string} listName The child list to synchronize.
- */
-lib.PreferenceManager.prototype.onChildListChange_ = function(listName) {
-  this.syncChildList(listName);
 };
 
 /**
@@ -8763,14 +8533,6 @@ hterm.PreferenceManager.definePref_ = function(
 };
 
 hterm.PreferenceManager.defaultPreferences = {
-  'alt-backspace-is-meta-backspace': hterm.PreferenceManager.definePref_(
-      'Alt+Backspace is Meta+Backspace',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `If set, undoes the ChromeOS Alt+Backspace->Delete remap, so that ` +
-      `Alt+Backspace indeed is Alt+Backspace.`,
-  ),
-
   'audible-bell-sound': hterm.PreferenceManager.definePref_(
       'Alert bell sound (URI)',
       hterm.PreferenceManager.Categories.Sounds,

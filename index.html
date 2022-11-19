@@ -391,42 +391,62 @@ window.onload = function()
 	lib.init().then(term_init);
 };
 
-window.do_term_lines = function(fn)
+window.line_indexer = function()
 {
-	var visible;
+	var visible = window.t.getDocument().getElementsByTagName('x-row');
+	var sb = window.t.scrollbackRows_;
+	var cnt = visible.length + sb.length;
 
-	function doarr(base, els)
-	{
-		var i;
-		for (i = 0; i < els.length; i++) {
-			fn(els.length - i - 1 + base, els[i].innerHTML);
-		}
-	}
+	return {
+		'cnt': cnt,
+		'at': function(i)
+		{
+			if (i < 0 || i >= cnt) return undefined;
 
-	visible = window.t.getDocument().getElementsByTagName('x-row');
-	doarr(0, visible);
-	doarr(visible.length, window.t.scrollbackRows_);
+			if (i < sb.length) return sb[i].innerText;
+
+			return visible[i - sb.length].innerText;
+		},
+	};
 };
 
 window.f = function(op)
 {
-	var matcher, matched;
+	var matcher, matched, ndxr;
+
 	if (typeof op === 'string')
 		matcher = function(line) { return line.indexOf(op) >= 0; };
 	else
 		matcher = function(line) { return op.exec(line); };
 
 	matched = [];
-	window.do_term_lines(function(ndx, str) {
-		if (matcher(str)) console.log([ndx, str]);
-	});
+	ndxr = window.line_indexer();
+	for (i = 0; i < ndxr.cnt; i++) {
+		if (!matcher(ndxr.at(i))) continue;
+		matched.push(i);
+		matched.push(':');
+		matched.push(ndxr.at(i));
+		matched.push('\n');
+	}
 
-	return matched;
+	console.log(matched.join(''));
 };
 
-window.ar = function(x, y)
+window.ar = function(ln, cnt)
 {
+	var ndxr = window.line_indexer();
+	var matched = [], i;
+
+	if (cnt === undefined) cnt = 3;
+
+	for (i = ln - cnt; i <= ln + cnt; i++) {
+		matched.push(ndxr.at(i));
+		matched.push('\n');
+	}
+
+	console.log(matched.join(''));
 };
+
     </script>
   </body>
 </html>

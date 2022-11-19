@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
 <meta charset='utf-8'/>
 <html>
   <head>
@@ -248,7 +249,7 @@ function term_init()
 		// This doesn't work in tab apparently:
 		// t.passCtrlW = true;
 
-		// window.t = t;
+		window.t = t;
 	};
 
 	t.decorate(document.querySelector('#terminal'));
@@ -388,6 +389,43 @@ function term_init()
 window.onload = function()
 {
 	lib.init().then(term_init);
+};
+
+window.do_term_lines = function(fn)
+{
+	var visible;
+
+	function doarr(base, els)
+	{
+		var i;
+		for (i = 0; i < els.length; i++) {
+			fn(els.length - i - 1 + base, els[i].innerHTML);
+		}
+	}
+
+	visible = window.t.getDocument().getElementsByTagName('x-row');
+	doarr(0, visible);
+	doarr(visible.length, window.t.scrollbackRows_);
+};
+
+window.f = function(op)
+{
+	var matcher, matched;
+	if (typeof op === 'string')
+		matcher = function(line) { return line.indexOf(op) >= 0; };
+	else
+		matcher = function(line) { return op.exec(line); };
+
+	matched = [];
+	window.do_term_lines(function(ndx, str) {
+		if (matcher(str)) console.log([ndx, str]);
+	});
+
+	return matched;
+};
+
+window.ar = function(x, y)
+{
 };
     </script>
   </body>

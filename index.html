@@ -410,26 +410,47 @@ window.line_indexer = function()
 	};
 };
 
-window.f = function(op)
+window.f = function(op, around)
 {
-	var matcher, matched, ndxr;
+	var matcher, ndxr, inc, need_sep, i, j, prior_match, match_type;
 
 	if (typeof op === 'string')
 		matcher = function(line) { return line.indexOf(op) >= 0; };
-	else
+	else if (typeof op !== 'function')
 		matcher = function(line) { return op.exec(line); };
 
-	matched = [];
+	inc = {};
 	ndxr = window.line_indexer();
+	around = around || 0;
 	for (i = 0; i < ndxr.cnt; i++) {
 		if (!matcher(ndxr.at(i))) continue;
-		matched.push(i);
-		matched.push(':');
-		matched.push(ndxr.at(i));
-		matched.push('\n');
+
+		for (j = i - around; j <= i + around; j++) inc[j] = inc[j] || '-';
+		inc[i] = ':';
 	}
 
-	console.log(matched.join(''));
+	out = [];
+	need_sep = false;
+	prior_match = false;
+
+	for (i = 0; i < ndxr.cnt; i++) {
+		match_type = inc[i];
+		if (!match_type) {
+			need_sep = true;
+			continue;
+		}
+
+		if (need_sep && prior_match) out.push('----------\n');
+		prior_match = true;
+		need_sep = false;
+
+		out.push(i);
+		out.push(match_type);
+		out.push(ndxr.at(i));
+		out.push('\n');
+	}
+
+	console.log(out.join(''));
 };
 
 window.ar = function(ln, cnt)

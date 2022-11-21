@@ -286,10 +286,6 @@ function term_init()
 			case 'Digit2': signal(pref + '\x00'); return true;
 			case 'Digit6': signal(pref + '\x1e'); return true;
 			}
-			if (!e.metaKey && e.code === 'KeyF') {
-				t.findBar.display();
-				return true;
-			}
 			return false;
 		}
 

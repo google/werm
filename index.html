@@ -410,20 +410,50 @@ window.line_indexer = function()
 	};
 };
 
+window.array_against_str = function(arr, str)
+{
+	var i = 0, pass = true;
+
+	if (arr[0] === -1) {
+		i++;
+		pass = false;
+	}
+
+	while (i < arr.length) {
+		if (pass === !window.op_against_str(arr[i++], str)) return false;
+	}
+
+	return true;
+};
+
+window.op_against_str = function(op, str)
+{
+	if (typeof op === 'function') return op(str);
+	if (typeof op === 'string') return str.indexOf(op) >= 0;
+	if (op.__proto__ === RegExp.prototype) return op.exec(str);
+
+	if (op.__proto__ == Array.prototype)
+		return window.array_against_str(op, str);
+
+	throw 'unknown op type: ' + op;
+};
+
 window.f = function(op, around)
 {
-	var matcher, ndxr, inc, need_sep, i, j, prior_match, match_type;
-
-	if (typeof op === 'string')
-		matcher = function(line) { return line.indexOf(op) >= 0; };
-	else if (typeof op !== 'function')
-		matcher = function(line) { return op.exec(line); };
+	var matcher, ndxr, inc, need_sep, i, j, prior_match, match_type, sep;
 
 	inc = {};
 	ndxr = window.line_indexer();
-	around = around || 0;
+
+	if (around === undefined) {
+		around = 0;
+		sep = '';
+	}
+	else
+		sep = '----------\n';
+
 	for (i = 0; i < ndxr.cnt; i++) {
-		if (!matcher(ndxr.at(i))) continue;
+		if (!window.op_against_str(op, ndxr.at(i))) continue;
 
 		for (j = i - around; j <= i + around; j++) inc[j] = inc[j] || '-';
 		inc[i] = ':';
@@ -440,7 +470,7 @@ window.f = function(op, around)
 			continue;
 		}
 
-		if (need_sep && prior_match) out.push('----------\n');
+		if (need_sep && prior_match) out.push(sep);
 		prior_match = true;
 		need_sep = false;
 

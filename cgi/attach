@@ -21,6 +21,11 @@ td.loose {
 h1 {
 	margin-top:0;
 	margin-bottom:8pt;
+	padding-bottom:8pt;
+	border-bottom: solid 1px yellow;
+}
+.start-common-group {
+	margin-top: 1em;
 }
 .column {
 	padding-top: 6pt;
@@ -49,13 +54,15 @@ EOF
 test -f ~/gum/attach_common && ~/gum/attach_common
 
 termno=1
+start=class=start-common-group
 for dir in werm `sort ~/gum/attach_dirs 2>/dev/null`
 do
 	termid=`echo $dir | sed 's/^\///; s/\//-/g'`
 
 	printf '
-	<li><a href="/?termid=%s&pream=export%%20LC_TITLEPREF=;exec%%20ow%%20%s%%0d">%s</a>
-	' $termid $dir $dir
+	<li %s><a href="/?termid=%s&pream=export%%20LC_TITLEPREF=;exec%%20ow%%20%s%%0d">%s</a>
+	'   "$start" $termid $dir $dir
+	start=
 done
 
 cat <<EOF

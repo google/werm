@@ -406,20 +406,37 @@ window.line_indexer = function()
 	};
 };
 
+// -2: any false
+// -1: all false
+//  1: all true [default]
+//  2: any true
+window.notall = -2;
+window.none = -1;
+window.all = 1;
+window.any = 2;
+
 window.array_against_str = function(arr, str)
 {
-	var i = 0, pass = true;
+	var i, type, res;
 
-	if (arr[0] === -1) {
-		i++;
-		pass = false;
+	type = all;
+	for (i = 0; i < arr.length; i++) {
+		if ('number' === typeof arr[i]) {
+			type = arr[i];
+			continue;
+		}
+
+		res = window.op_against_str(arr[i], str);
+
+		switch (type) {
+		case notall:	if (!res)	return true;	else break;
+		case none:	if (res)	return false;	else break;
+		case all:	if (!res)	return false;	else break;
+		case any:	if (res)	return true;	else break;
+		}
 	}
 
-	while (i < arr.length) {
-		if (pass === !window.op_against_str(arr[i++], str)) return false;
-	}
-
-	return true;
+	return !!(type & 1);
 };
 
 window.op_against_str = function(op, str)

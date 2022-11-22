@@ -60,7 +60,7 @@ do
 	termid=`echo $dir | sed 's/^\///; s/\//-/g'`
 
 	printf '
-	<li %s><a href="/?termid=%s&pream=export%%20LC_TITLEPREF=;exec%%20ow%%20%s%%0d">%s</a>
+	<li %s><a href="/?termid=%s&pream=cd%%20%s%%0d">%s</a>
 	'   "$start" $termid $dir $dir
 	start=
 done

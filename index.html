@@ -31,7 +31,17 @@ body {
     <script src="hterm_all.js"></script>
     <script>
 
-var log_send = 0, log_display = 0;
+var log_send = 0, log_display = 0, mkeys = [];
+
+var macro_map = [
+	[['AltLeft', 'KeyI', 'KeyF'], 'git status -s -uno\r'],
+	[['AltLeft', 'KeyI', 'KeyD'], 'git diff '],
+	[['AltRight', 'KeyS', 'KeyD'], '\x1b:w\r'],
+	[['AltRight', 'KeyS', 'KeyK'], '\x1b:wq\r'],
+	[['AltLeft', 'KeyI', 'KeyL'], 'git log --name-status '],
+	[['AltLeft', 'KeyI', 'KeyC', 'KeyM'], 'git commit '],
+	[['AltLeft', 'Backslash', 'KeyU'], '| grep '],
+];
 
 function term_init()
 {
@@ -359,6 +369,38 @@ function term_init()
 
 	t.getScrollPort().getDocument().body.onkeydown = function(e)
 	{
+		var mi, ki;
+
+		if (e.code === 'AltLeft' || e.code === 'AltRight'
+		    || mkeys.length) {
+			mkeys.push(e.code);
+			e.stopPropagation();
+			e.preventDefault();
+
+			for (mi = 0; mi < macro_map.length; mi++) {
+				if (macro_map[mi][0].length < mkeys.length) continue;
+
+				for (ki = 0; ki < mkeys.length; ki++) {
+					if (mkeys[ki] !== macro_map[mi][0][ki]) break;
+				}
+
+				if (ki < mkeys.length) continue;
+
+				if (mkeys.length === macro_map[mi][0].length) {
+					// Full match (not just prefix).
+					signal(escape(macro_map[mi][1]));
+					mkeys.length = 0;
+				}
+
+				return;
+			}
+
+			// Neither a full match nor a prefix match.
+			signal('?');
+			mkeys.length = 0;
+			return;
+		}
+
 		push_dead_key_hist(e);
 		dead_key_hist.splice(0, 2);
 
@@ -370,6 +412,8 @@ function term_init()
 	t.getScrollPort().getDocument().body.onkeyup = function(e)
 	{
 		var hist;
+
+		if (mkeys.length) return;
 
 		push_dead_key_hist(e);
 		hist = dead_key_hist.join('');

@@ -389,19 +389,29 @@ window.onload = function()
 
 window.line_indexer = function()
 {
+	var res = [], curr_rows = [], i, xrow;
+
 	var visible = window.t.getDocument().getElementsByTagName('x-row');
 	var sb = window.t.scrollbackRows_;
 	var cnt = visible.length + sb.length;
 
+	for (i = 0; i < cnt; i++) {
+		xrow = i < sb.length ? sb[i] : visible[i - sb.length];
+
+		curr_rows.push(xrow);
+
+		if (xrow.getAttribute('line-overflow') && i < cnt-1) continue;
+
+		res.push(curr_rows);
+		curr_rows = [];
+	}
+
 	return {
-		'cnt': cnt,
-		'at': function(i)
-		{
-			if (i < 0 || i >= cnt) return undefined;
+		'cnt': res.length,
+		'at': function(i) {
+			if (i < 0 || res >= res.length) return undefined;
 
-			if (i < sb.length) return sb[i].innerText;
-
-			return visible[i - sb.length].innerText;
+			return res[i].map(function(xr) { return xr.innerText; }).join('');
 		},
 	};
 };

@@ -11,6 +11,11 @@
   src: url(font.ttf);
 }
 
+@font-face {
+  font-family: ibm_vga_9x16;
+  src: url(ibm_vga_9x16.ttf);
+}
+
 html {
   height: 100%;
 }
@@ -354,15 +359,18 @@ function term_init()
 	var macro_map = [
 		[['AltLeft', 'KeyI', 'KeyF'], 'git status -s -uno\r'],
 		[['AltLeft', 'KeyI', 'KeyD'], 'git diff '],
+		[['AltLeft', 'KeyI', 'KeyC', 'KeyO'], 'git checkout '],
+		[['AltLeft', 'KeyI', 'KeyC', 'KeyD'], 'git diff --cached '],
 		[['AltRight', 'KeyS', 'KeyD'], '\x1b:w\r'],
 		[['AltRight', 'KeyS', 'KeyK'], '\x1b:wq\r'],
 		[['AltLeft', 'KeyI', 'KeyL'], 'git log --name-status '],
 		[['AltLeft', 'KeyI', 'KeyC', 'KeyM'], 'git commit '],
 		[['AltLeft', 'Backslash', 'KeyU'], '| grep '],
 		[['AltLeft', 'KeyI', 'KeyS'], 'git show '],
-		[['AltLeft', 'KeyI', 'KeyC', 'KeyO'], 'git checkout '],
 		[['AltLeft', 'KeyH', 'KeyT'], open_child_term],
 		[['AltLeft', 'Semicolon', 'KeyP'], ':e %:p:h\t'],
+		[['AltLeft', 'Semicolon', 'BracketLeft'], ':e \x12%'],
+		[['AltRight', 'KeyR', 'KeyS', 'KeyE'], 'sudo shutdown -r now; exit\r'],
 	];
 
 	t.getScrollPort().getDocument().body.onkeydown = function(e)

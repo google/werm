@@ -13098,6 +13098,10 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
   font-family: jfdot;
   src: url(font.ttf);
 }
+@font-face {
+  font-family: ibm_vga_9x16;
+  src: url(ibm_vga_9x16.ttf);
+}
 .cursor-node[focus="false"] {
   box-sizing: border-box;
   background-color: transparent !important;

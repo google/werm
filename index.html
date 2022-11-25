@@ -362,6 +362,7 @@ function term_init()
 		[['AltLeft', 'KeyI', 'KeyS'], 'git show '],
 		[['AltLeft', 'KeyI', 'KeyC', 'KeyO'], 'git checkout '],
 		[['AltLeft', 'KeyH', 'KeyT'], open_child_term],
+		[['AltLeft', 'Semicolon', 'KeyP'], ':e %:p:h\t'],
 	];
 
 	t.getScrollPort().getDocument().body.onkeydown = function(e)

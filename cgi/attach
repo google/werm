@@ -10,11 +10,6 @@ Content-type: text/html
 <head>
 	<title>Attach</title>
 <style>
-@font-face {
-  font-family: jfdot;
-  src: url(font.ttf);
-}
-
 td.loose {
 	padding-right:20pt;
 }

@@ -14640,7 +14640,7 @@ hterm.Terminal.prototype.displayImage = function(options, onLoad, onError) {
                              'Loading $1 ...'));
 
     // While we're loading the image, eat all the user's input.
-    io.onVTKeystroke = io.sendString = () => {};
+    io.sendString = () => {};
 
     // Initialize this new image.
     const img = this.document_.createElement('img');
@@ -14849,21 +14849,6 @@ hterm.Terminal.prototype.overlaySize = function() {
   if (this.prefs_.get('enable-resize-status')) {
     this.showOverlay(`${this.screenSize.width} × ${this.screenSize.height}`);
   }
-};
-
-/**
- * Invoked by hterm.Terminal.Keyboard when a VT keystroke is detected.
- *
- * @param {string} string The VT string representing the keystroke, in UTF-16.
- */
-hterm.Terminal.prototype.onVTKeystroke = function(string) {
-  if (this.scrollOnKeystroke_) {
-    this.scrollPort_.scrollRowToBottom(this.getRowCount());
-  }
-
-  this.pauseCursorBlink_();
-
-  this.io.onVTKeystroke(string);
 };
 
 /**
@@ -15374,13 +15359,13 @@ hterm.Terminal.prototype.onTmuxControlModeLine = function(line) {};
  * part of their argv object.  This allows them to write to and read from the
  * terminal without exposing them to an entire hterm.Terminal instance.
  *
- * The active command must override the onVTKeystroke() and sendString() methods
+ * The active command must override the sendString() method
  * of this class in order to receive keystrokes and send output to the correct
  * destination.
  *
  * Isolating commands from the terminal provides the following benefits:
- * - Provides a mechanism to save and restore onVTKeystroke and sendString
- *   handlers when invoking subcommands (see the push() and pop() methods).
+ * - Provides a mechanism to save and restore sendString
+ *   handler when invoking subcommands (see the push() and pop() methods).
  * - The isolation makes it easier to make changes in Terminal and supporting
  *   classes without affecting commands.
  * - In The Future commands may run in web workers where they would only be able
@@ -15492,18 +15477,6 @@ hterm.Terminal.IO.prototype.flush = function() {
 hterm.Terminal.IO.prototype.sendString = function(string) {
   // Override this.
   console.log('Unhandled sendString: ' + string);
-};
-
-/**
- * Called when a terminal keystroke is detected.
- *
- * Clients should override this to receive notification of keystrokes.
- *
- * @param {string} string The VT key sequence.
- */
-hterm.Terminal.IO.prototype.onVTKeystroke = function(string) {
-  // Override this.
-  console.log('Unobserverd VT keystroke: ' + JSON.stringify(string));
 };
 
 /**

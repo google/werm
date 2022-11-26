@@ -216,7 +216,7 @@ function term_init()
 
 	function open_child_term()
 	{
-		var newid = (termid || '') + '.' + String.fromCharCode(97 + Math.floor(Math.random() * 26));
+		var newid = (termid || '') + '.' + String.fromCharCode(97 + 26*Math.random());
 		window.open(
 			'/?termid=' + encodeURIComponent(newid) +
 			'&pream=' + encodeURIComponent(pream || ''));
@@ -227,7 +227,6 @@ function term_init()
 		io = t.io.push();
 
 		io.sendString = function(s) { signal(escape(s)); };
-		io.onVTKeystroke = function(s) { signal(escape(s)); };
 		io.onTerminalResize = function(c, r) {
 			signal('\\w' + (10000 + r + '').substr(1)
 				     + (10000 + c + '').substr(1));

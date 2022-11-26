@@ -349,9 +349,12 @@ function term_init()
 	// font-family, font-size (height), line-height-padding-size
 	var fonts = [
 		['jfdot_7x14',		14,	0],
-		['ibm_vga_8x16',	16,	2],
+		['ibm_vga_8x16',	16,	1],
 		['ibm_vga_9x16',	16,	1],
 		['dos_v_ibm_8x19',	20,	1],
+		['cl_stringray_8x19',	20,	1],
+		['ibm_xga_ai_12x23',	24,	1],
+		['dos_v_re_12x30',	32,	-2],
 	];
 
 	function set_font(ndx)
@@ -394,6 +397,9 @@ function term_init()
 		[['AltRight', 'KeyF', 'KeyN', 'KeyB'], set_font.bind(null, 1)],
 		[['AltRight', 'KeyF', 'KeyN', 'KeyC'], set_font.bind(null, 2)],
 		[['AltRight', 'KeyF', 'KeyN', 'KeyD'], set_font.bind(null, 3)],
+		[['AltRight', 'KeyF', 'KeyN', 'KeyE'], set_font.bind(null, 4)],
+		[['AltRight', 'KeyF', 'KeyN', 'KeyF'], set_font.bind(null, 5)],
+		[['AltRight', 'KeyF', 'KeyN', 'KeyG'], set_font.bind(null, 6)],
 	];
 
 	t.getScrollPort().getDocument().body.onkeydown = function(e)

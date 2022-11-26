@@ -220,7 +220,6 @@ function term_init()
 		window.open(
 			'/?termid=' + encodeURIComponent(newid) +
 			'&pream=' + encodeURIComponent(pream || ''));
-		// return hterm.Keyboard.KeyActions.CANCEL;
 	};
 	t.onTerminalReady = function()
 	{
@@ -235,20 +234,11 @@ function term_init()
 
 		term_ready = true;
 		display('');
-		// t.keyboard.keyMap.onCtrlShiftA_ = function(e)
-		// {
-		// 	return hterm.Keyboard.KeyActions.PASS;
-		// };
-		// t.keyboard.keyMap.onShiftTab_ = on_shift_tab;
-
-		// This doesn't work in tab apparently:
-		// t.passCtrlW = true;
 
 		window.t = t;
 	};
 
 	t.decorate(document.querySelector('#terminal'));
-	// t.installKeyboard();
 
 	dead_key_hist = ['?', 'x', '?', 'x'];
 	function push_dead_key_hist(e)

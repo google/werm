@@ -6,16 +6,6 @@
     <title>werm</title>
 <style>
 
-@font-face {
-  font-family: jfdot;
-  src: url(font.ttf);
-}
-
-@font-face {
-  font-family: ibm_vga_9x16;
-  src: url(ibm_vga_9x16.ttf);
-}
-
 html {
   height: 100%;
 }
@@ -356,8 +346,37 @@ function term_init()
 		return true;
 	}
 
+	// font-family, font-size (height), line-height-padding-size
+	var fonts = [
+		['jfdot_7x14',		14,	0],
+		['ibm_vga_8x16',	16,	2],
+		['ibm_vga_9x16',	16,	1],
+		['dos_v_ibm_8x19',	20,	1],
+	];
+
+	function set_font(ndx)
+	{
+		t.scrollPort_.screen_.style.fontFamily = fonts[ndx][0];
+		t.setFontSize(fonts[ndx][1]);
+		t.scrollPort_.lineHeightPaddingSize = fonts[ndx][2];
+
+		t.scrollPort_.syncCharacterSize();
+		t.updateCssCharsize_();
+		t.syncBoldSafeState();
+	};
+
+	fonts.forEach(function(fnt, ndx) {
+		var name = fnt[0], sz = fnt[1];
+		t.document_.fonts.add(new FontFace(name, 'url(/' + name + '.ttf)'));
+		t.document_.fonts.load(`${sz}px ${name}`).then(function()
+		{
+			if (ndx === 2) set_font(2);
+		});
+	});
+
 	var macro_map = [
 		[['AltLeft', 'KeyI', 'KeyF'], 'git status -s -uno\r'],
+		[['AltLeft', 'KeyI', 'ShiftLeft', 'KeyF'], 'git status -s -uall\r'],
 		[['AltLeft', 'KeyI', 'KeyD'], 'git diff '],
 		[['AltLeft', 'KeyI', 'KeyC', 'KeyO'], 'git checkout '],
 		[['AltLeft', 'KeyI', 'KeyC', 'KeyD'], 'git diff --cached '],
@@ -371,6 +390,10 @@ function term_init()
 		[['AltLeft', 'Semicolon', 'KeyP'], ':e %:p:h\t'],
 		[['AltLeft', 'Semicolon', 'BracketLeft'], ':e \x12%'],
 		[['AltRight', 'KeyR', 'KeyS', 'KeyE'], 'sudo shutdown -r now; exit\r'],
+		[['AltRight', 'KeyF', 'KeyN', 'KeyA'], set_font.bind(null, 0)],
+		[['AltRight', 'KeyF', 'KeyN', 'KeyB'], set_font.bind(null, 1)],
+		[['AltRight', 'KeyF', 'KeyN', 'KeyC'], set_font.bind(null, 2)],
+		[['AltRight', 'KeyF', 'KeyN', 'KeyD'], set_font.bind(null, 3)],
 	];
 
 	t.getScrollPort().getDocument().body.onkeydown = function(e)

@@ -6313,44 +6313,7 @@ hterm.Keyboard.KeyMap.prototype.onMetaV_ = function(e) {
       hterm.Keyboard.KeyActions.DEFAULT;
 };
 
-/**
- * Handle font zooming.
- *
- * @param {!KeyboardEvent} e The event to process.
- * @param {!hterm.Keyboard.KeyDef} keyDef Key definition.
- * @return {symbol|string} Key action or sequence.
- */
-hterm.Keyboard.KeyMap.prototype.onZoom_ = function(e, keyDef) {
-  if (this.keyboard.ctrlPlusMinusZeroZoom === e.shiftKey) {
-    // If ctrl-PMZ controls zoom and the shift key is pressed, or
-    // ctrl-shift-PMZ controls zoom and this shift key is not pressed,
-    // then we want to send the control code instead of affecting zoom.
-    if (keyDef.keyCap == '-_') {
-      // ^_
-      return '\x1f';
-    }
-
-    // Only ^_ is valid, the other sequences have no meaning.
-    return hterm.Keyboard.KeyActions.CANCEL;
-  }
-
-  const cap = keyDef.keyCap.substr(0, 1);
-  if (cap == '0') {
-      this.keyboard.terminal.setFontSize(0);
-  } else {
-    let size = this.keyboard.terminal.getFontSize();
-
-    if (cap == '-' || keyDef.keyCap == '[KP-]') {
-      size -= 1;
-    } else {
-      size += 1;
-    }
-
-    this.keyboard.terminal.setFontSize(size);
-  }
-
-  return hterm.Keyboard.KeyActions.CANCEL;
-};
+hterm.Keyboard.KeyMap.prototype.onZoom_ = function() {};
 // SOURCE FILE: hterm/js/hterm_keyboard_keypattern.js
 // Copyright (c) 2015 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -7744,35 +7707,11 @@ hterm.PreferenceManager.defaultPreferences = {
       `The initial set of environment variables, as an object.`,
   ),
 
-  'font-family': hterm.PreferenceManager.definePref_(
-      'Text font family',
-      hterm.PreferenceManager.Categories.Appearance,
-      'jfdot, ' +
-      '"DejaVu Sans Mono", "Noto Sans Mono", "Everson Mono", FreeMono, ' +
-      'Menlo, Terminal, monospace',
-      'string',
-      `Default font family for the terminal text.`,
-  ),
-
-  'font-size': hterm.PreferenceManager.definePref_(
-      'Text font size',
-      hterm.PreferenceManager.Categories.Appearance,
-      14, 'int',
-      `The default font size in pixels.`,
-  ),
-
   'font-smoothing': hterm.PreferenceManager.definePref_(
       'Text font smoothing',
       hterm.PreferenceManager.Categories.Appearance,
       'antialiased', 'string',
       `CSS font-smoothing property.`,
-  ),
-
-  'line-height-padding-size': hterm.PreferenceManager.definePref_(
-      'Line height padding size',
-      hterm.PreferenceManager.Categories.Appearance,
-      -3, 'int',
-      `The padding size in pixels between each row of the terminal screen.`,
   ),
 
   'foreground-color': hterm.PreferenceManager.definePref_(
@@ -10153,22 +10092,6 @@ hterm.ScrollPort.prototype.scrollPageDown = function() {
   this.assertiveAnnounce_();
 };
 
-/**
- * Select the font-family and font-smoothing for this scrollport.
- *
- * @param {string} fontFamily Value of the CSS 'font-family' to use for this
- *     scrollport.  Should be a monospace font.
- * @param {string=} smoothing Optional value for '-webkit-font-smoothing'.
- *     Defaults to an empty string if not specified.
- */
-hterm.ScrollPort.prototype.setFontFamily = function(
-    fontFamily, smoothing = '') {
-  this.screen_.style.fontFamily = fontFamily;
-  this.screen_.style.webkitFontSmoothing = smoothing;
-
-  this.syncCharacterSize();
-};
-
 /** @return {string} */
 hterm.ScrollPort.prototype.getFontFamily = function() {
   return this.screen_.style.fontFamily;
@@ -10232,12 +10155,6 @@ hterm.ScrollPort.prototype.setBackgroundPosition = function(position) {
 hterm.ScrollPort.prototype.setScreenPaddingSize = function(size) {
   this.screenPaddingSize = size;
   this.resize();
-};
-
-/** @param {number} size */
-hterm.ScrollPort.prototype.setLineHeightPaddingSize = function(size) {
-  this.lineHeightPaddingSize = size;
-  this.syncCharacterSize();
 };
 
 /** @param {boolean} ctrlVPaste */
@@ -10377,16 +10294,6 @@ hterm.ScrollPort.prototype.scheduleInvalidate = function() {
     delete this.timeouts_.invalidate;
     this.invalidate();
   });
-};
-
-/**
- * Set the font size of the ScrollPort.
- *
- * @param {number} px
- */
-hterm.ScrollPort.prototype.setFontSize = function(px) {
-  this.screen_.style.fontSize = px + 'px';
-  this.syncCharacterSize();
 };
 
 /**
@@ -11895,22 +11802,7 @@ hterm.Terminal.prototype.setProfile = function(
       this.vt.enableCsiJ3 = !!v;
     },
 
-    'font-family': (v) => {
-      this.syncFontFamily();
-    },
-
-    'font-size': (v) => {
-      v = parseInt(v, 10);
-      if (isNaN(v) || v <= 0) {
-        console.error(`Invalid font size: ${v}`);
-        return;
-      }
-
-      this.setFontSize(v);
-    },
-
     'font-smoothing': (v) => {
-      this.syncFontFamily();
     },
 
     'foreground-color': (v) => {
@@ -11923,15 +11815,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'home-keys-scroll': (v) => {
       this.keyboard.homeKeysScroll = v;
-    },
-
-    'line-height-padding-size': (v) => {
-      v = parseFloat(v);
-      if (isNaN(v)) {
-        console.error(`Invalid line height padding size: ${v}`);
-        return;
-      }
-      this.setLineHeightPaddingSize(v);
     },
 
     'media-keys-are-fkeys': (v) => {
@@ -12310,20 +12193,11 @@ hterm.Terminal.prototype.updateCssCharsize_ = function() {
 /**
  * Set the font size for this terminal.
  *
- * Call setFontSize(0) to reset to the default font size.
- *
- * This function does not modify the font-size preference.
- *
  * @param {number} px The desired font size, in pixels.
  */
 hterm.Terminal.prototype.setFontSize = function(px) {
-  if (px <= 0) {
-    px = this.prefs_.getNumber('font-size');
-  }
-
-  this.scrollPort_.setFontSize(px);
+  this.scrollPort_.screen_.style.fontSize = px + 'px';
   this.setCssVar('font-size', `${px}px`);
-  this.updateCssCharsize_();
 };
 
 /**
@@ -12342,16 +12216,6 @@ hterm.Terminal.prototype.getFontSize = function() {
  */
 hterm.Terminal.prototype.getFontFamily = function() {
   return this.scrollPort_.getFontFamily();
-};
-
-/**
- * Set the CSS "font-family" for this terminal.
- */
-hterm.Terminal.prototype.syncFontFamily = function() {
-  this.scrollPort_.setFontFamily(this.prefs_.getString('font-family'),
-                                 this.prefs_.getString('font-smoothing'));
-  this.updateCssCharsize_();
-  this.syncBoldSafeState();
 };
 
 /**
@@ -12537,15 +12401,6 @@ hterm.Terminal.prototype.setCursorShape = function(shape) {
  */
 hterm.Terminal.prototype.getCursorShape = function() {
   return this.cursorShape_;
-};
-
-/**
- * Set the line height padding size in pixels.
- *
- * @param {number} size
- */
-hterm.Terminal.prototype.setLineHeightPaddingSize = function(size) {
-  this.scrollPort_.setLineHeightPaddingSize(size);
 };
 
 /**
@@ -13051,9 +12906,6 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
 
   this.div_.focus = this.focus.bind(this);
 
-  this.setFontSize(this.prefs_.getNumber('font-size'));
-  this.syncFontFamily();
-
   this.setScrollbarVisible(this.prefs_.getBoolean('scrollbar-visible'));
   this.setScrollWheelMoveMultipler(
       this.prefs_.getNumber('scroll-wheel-move-multiplier'));
@@ -13093,14 +12945,6 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
 
   const style = this.document_.createElement('style');
   style.textContent = `
-@font-face {
-  font-family: jfdot;
-  src: url(font.ttf);
-}
-@font-face {
-  font-family: ibm_vga_9x16;
-  src: url(ibm_vga_9x16.ttf);
-}
 .cursor-node[focus="false"] {
   box-sizing: border-box;
   background-color: transparent !important;
@@ -13230,10 +13074,6 @@ transition: opacity, background-color 100ms linear;`;
     }.bind(this));
 
   this.setReverseVideo(false);
-
-  // Re-sync fonts whenever a web font loads.
-  this.document_.fonts.addEventListener(
-      'loadingdone', () => this.syncFontFamily());
 
   this.scrollPort_.focus();
   this.scrollPort_.scheduleRedraw();

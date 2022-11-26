@@ -214,13 +214,14 @@ function term_init()
 		return e.join('');
 	}
 
-	var open_child_term = function()
+	function open_child_term()
 	{
-		var newid = (termid || '') + '.' + String.fromCharCode(Math.floor(Math.random() * 26) + 'a'.charCodeAt(0));
+		var newid = (termid || '') + '.' + String.fromCharCode(97 + Math.floor(Math.random() * 26));
 		window.open(
 			'/?termid=' + encodeURIComponent(newid) +
 			'&pream=' + encodeURIComponent(pream || ''));
-	};
+	}
+
 	t.onTerminalReady = function()
 	{
 		io = t.io.push();
@@ -367,6 +368,14 @@ function term_init()
 		});
 	});
 
+	var font_key;
+	function set_font_key(key)
+	{
+		font_key = key.charCodeAt(3) - 65;
+		return /^Key.$/.test(key) && font_key >= 0 && font_key < fonts.length;
+	}
+	function set_font_macro() { set_font(font_key); }
+
 	var macro_map = [
 		[['AltLeft', 'KeyI', 'KeyF'], 'git status -s -uno\r'],
 		[['AltLeft', 'KeyI', 'ShiftLeft', 'KeyF'], 'git status -s -uall\r'],
@@ -383,18 +392,12 @@ function term_init()
 		[['AltLeft', 'Semicolon', 'KeyP'], ':e %:p:h\t'],
 		[['AltLeft', 'Semicolon', 'BracketLeft'], ':e \x12%'],
 		[['AltRight', 'KeyR', 'KeyS', 'KeyE'], 'sudo shutdown -r now; exit\r'],
-		[['AltRight', 'KeyF', 'KeyN', 'KeyA'], set_font.bind(null, 0)],
-		[['AltRight', 'KeyF', 'KeyN', 'KeyB'], set_font.bind(null, 1)],
-		[['AltRight', 'KeyF', 'KeyN', 'KeyC'], set_font.bind(null, 2)],
-		[['AltRight', 'KeyF', 'KeyN', 'KeyD'], set_font.bind(null, 3)],
-		[['AltRight', 'KeyF', 'KeyN', 'KeyE'], set_font.bind(null, 4)],
-		[['AltRight', 'KeyF', 'KeyN', 'KeyF'], set_font.bind(null, 5)],
-		[['AltRight', 'KeyF', 'KeyN', 'KeyG'], set_font.bind(null, 6)],
+		[['AltRight', 'KeyF', 'KeyN', set_font_key], set_font_macro],
 	];
 
 	t.getScrollPort().getDocument().body.onkeydown = function(e)
 	{
-		var mi, ki, mch;
+		var mi, ki, mch, mk;
 
 		if (e.code === 'AltLeft' || e.code === 'AltRight'
 		    || mkeys.length) {
@@ -406,7 +409,17 @@ function term_init()
 				if (macro_map[mi][0].length < mkeys.length) continue;
 
 				for (ki = 0; ki < mkeys.length; ki++) {
-					if (mkeys[ki] !== macro_map[mi][0][ki]) break;
+					mk = macro_map[mi][0][ki];
+					if (typeof mk === 'string') {
+						if (mkeys[ki] !== mk) break;
+					}
+					else if (typeof mk === 'function') {
+						if (!mk(mkeys[ki])) break;
+					}
+					else {
+						console.log(mi, macro_map[mi], ki, mk);
+						throw 'invalid macro key';
+					}
 				}
 
 				if (ki < mkeys.length) continue;

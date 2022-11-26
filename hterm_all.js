@@ -7853,7 +7853,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'screen-padding-size': hterm.PreferenceManager.definePref_(
       'Screen padding size',
       hterm.PreferenceManager.Categories.Appearance,
-      8, 'int',
+      3, 'int',
       `The padding size in pixels around the border of the terminal screen.\n` +
       `\n` +
       `This controls the size of the border around the terminal screen so ` +
@@ -7863,7 +7863,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'screen-border-size': hterm.PreferenceManager.definePref_(
       'Screen border size',
       hterm.PreferenceManager.Categories.Appearance,
-      0, 'int',
+      1, 'int',
       `The border size in pixels around the terminal screen.\n` +
       `\n` +
       `This controls the size of the border around the terminal screen to ` +
@@ -7873,7 +7873,7 @@ hterm.PreferenceManager.defaultPreferences = {
   'screen-border-color': hterm.PreferenceManager.definePref_(
       'Screen border color',
       hterm.PreferenceManager.Categories.Appearance,
-      'rgb(128, 128, 128)', 'color',
+      'rgb(0, 64, 64)', 'color',
       `The color for the border around the terminal screen.\n` +
       `\n` +
       `This controls the color of the border around the terminal screen to ` +

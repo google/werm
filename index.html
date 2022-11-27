@@ -336,26 +336,31 @@ function term_init()
 		return true;
 	}
 
-	// font-family, font-size (height), line-height-padding-size
+	// font-family, font-size (height), line-height-padding-size, allow bold face
 	var fonts = [
-		['jfdot_7x14',		14,	0],
-		['ibm_vga_8x16',	16,	1],
-		['ibm_vga_9x16',	16,	1],
-		['dos_v_ibm_8x19',	20,	1],
-		['cl_stringray_8x19',	20,	1],
-		['ibm_xga_ai_12x23',	24,	1],
-		['dos_v_re_12x30',	32,	-2],
+		['jfdot_7x14',		14,	0,	true],
+		['ibm_vga_8x16',	16,	1,	false],
+		['ibm_vga_9x16',	16,	1,	false],
+		['dos_v_ibm_8x19',	20,	1,	false],
+		['cl_stringray_8x19',	20,	1,	false],
+		['ibm_xga_ai_12x23',	24,	1,	false],
+		['dos_v_re_12x30',	32,	-2,	true],
 	];
 
 	function set_font(ndx)
 	{
-		t.scrollPort_.screen_.style.fontFamily = fonts[ndx][0];
-		t.setFontSize(fonts[ndx][1]);
-		t.scrollPort_.lineHeightPaddingSize = fonts[ndx][2];
+		var f = fonts[ndx];
+
+		t.scrollPort_.screen_.style.fontFamily = f[0];
+		t.setFontSize(f[1]);
+		t.scrollPort_.lineHeightPaddingSize = f[2];
 
 		t.scrollPort_.syncCharacterSize();
 		t.updateCssCharsize_();
-		t.syncBoldSafeState();
+
+		function bolden(scr) { scr.textAttributes.enableBold = f[3]; }
+		bolden(t.primaryScreen_);
+		bolden(t.alternateScreen_);
 	};
 
 	fonts.forEach(function(fnt, ndx) {

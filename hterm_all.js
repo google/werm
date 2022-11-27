@@ -11776,10 +11776,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.vt.enable8BitControl = !!v;
     },
 
-    'enable-bold': (v) => {
-      this.syncBoldSafeState();
-    },
-
     'enable-bold-as-bright': (v) => {
       this.primaryScreen_.textAttributes.enableBoldAsBright = !!v;
       this.alternateScreen_.textAttributes.enableBoldAsBright = !!v;
@@ -12233,32 +12229,6 @@ hterm.Terminal.prototype.syncMousePasteButton = function() {
   } else {
     this.mousePasteButton = 2;  // Right mouse button.
   }
-};
-
-/**
- * Enable or disable bold based on the enable-bold pref, autodetecting if
- * necessary.
- */
-hterm.Terminal.prototype.syncBoldSafeState = function() {
-  const enableBold = this.prefs_.get('enable-bold');
-  if (enableBold !== null) {
-    this.primaryScreen_.textAttributes.enableBold = enableBold;
-    this.alternateScreen_.textAttributes.enableBold = enableBold;
-    return;
-  }
-
-  const normalSize = this.scrollPort_.measureCharacterSize();
-  const boldSize = this.scrollPort_.measureCharacterSize('bold');
-
-  const isBoldSafe = normalSize.equals(boldSize);
-  if (!isBoldSafe) {
-    console.warn('Bold characters disabled: Size of bold weight differs ' +
-                 'from normal.  Font family is: ' +
-                 this.scrollPort_.getFontFamily());
-  }
-
-  this.primaryScreen_.textAttributes.enableBold = isBoldSafe;
-  this.alternateScreen_.textAttributes.enableBold = isBoldSafe;
 };
 
 /**

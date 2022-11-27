@@ -9860,7 +9860,6 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
       caret-color: transparent;
       color: rgb(var(--hterm-foreground-color));
       display: block;
-      font-family: monospace;
       font-variant-ligatures: none;
       height: 100%;
       overflow-y: scroll; overflow-x: hidden;

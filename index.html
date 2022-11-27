@@ -26,7 +26,7 @@ body {
     <script src="hterm_all.js"></script>
     <script>
 
-var log_send = 0, log_display = 0, mkeys = [];
+var log_send = 0, log_display = 0, log_keys = 0;
 
 function term_init()
 {
@@ -402,62 +402,80 @@ function term_init()
 		[['AltRight', 'KeyF', 'KeyN', set_font_key], set_font_macro],
 	];
 
-	t.getScrollPort().getDocument().body.onkeydown = function(e)
+	var mkeys = [], got_key_up = false;
+
+	function process_mkey(e)
 	{
 		var mi, ki, mch, mk;
 
-		if (e.code === 'AltLeft' || e.code === 'AltRight'
-		    || mkeys.length) {
-			mkeys.push(e.code);
-			e.stopPropagation();
-			e.preventDefault();
-
-			for (mi = 0; mi < macro_map.length; mi++) {
-				if (macro_map[mi][0].length < mkeys.length) continue;
-
-				for (ki = 0; ki < mkeys.length; ki++) {
-					mk = macro_map[mi][0][ki];
-					if (typeof mk === 'string') {
-						if (mkeys[ki] !== mk) break;
-					}
-					else if (typeof mk === 'function') {
-						if (!mk(mkeys[ki])) break;
-					}
-					else {
-						console.log(mi, macro_map[mi], ki, mk);
-						throw 'invalid macro key';
-					}
-				}
-
-				if (ki < mkeys.length) continue;
-
-				if (mkeys.length === macro_map[mi][0].length) {
-					// Full match (not just prefix).
-					mch = macro_map[mi][1];
-
-					if (typeof mch === 'string')
-						signal(escape(mch));
-					else if (typeof mch === 'function')
-						mch();
-					else
-						throw 'unknown mapping type: ' + mch;
-
-					mkeys.length = 0;
-				}
-
-				return;
-			}
-
-			// Neither a full match nor a prefix match.
-			signal('?');
+		if (!mkeys.length) {
+			if (!/^Alt/.test(e.code)) return false;
+			got_key_up = false;
+		}
+		else if (!got_key_up && !e.altKey) {
+			// We never received Alt release event, but the current
+			// event doesn't have the altKey bit set.
+			// Chrome may have hid the event from us, indicating an
+			// Ash shortcut was activated, so we don't consider
+			// macros.
 			mkeys.length = 0;
-			return;
+			return false;
 		}
 
-		push_dead_key_hist(e);
-		dead_key_hist.splice(0, 2);
+		mkeys.push(e.code);
 
-		if (!process_key_down(e)) return;
+		for (mi = 0; mi < macro_map.length; mi++) {
+			if (macro_map[mi][0].length < mkeys.length) continue;
+
+			for (ki = 0; ki < mkeys.length; ki++) {
+				mk = macro_map[mi][0][ki];
+				if (typeof mk === 'string') {
+					if (mkeys[ki] !== mk) break;
+				}
+				else if (typeof mk === 'function') {
+					if (!mk(mkeys[ki])) break;
+				}
+				else {
+					console.log(mi, macro_map[mi], ki, mk);
+					throw 'invalid macro key';
+				}
+			}
+
+			if (ki < mkeys.length) continue;
+
+			if (mkeys.length === macro_map[mi][0].length) {
+				// Full match (not just prefix).
+				mch = macro_map[mi][1];
+
+				if (typeof mch === 'string')
+					signal(escape(mch));
+				else if (typeof mch === 'function')
+					mch();
+				else
+					throw 'unknown mapping type: ' + mch;
+
+				mkeys.length = 0;
+			}
+
+			return true;
+		}
+
+		// Neither a full match nor a prefix match.
+		signal('?');
+		mkeys.length = 0;
+		return true;
+	}
+
+	t.getScrollPort().getDocument().body.onkeydown = function(e)
+	{
+		if (log_keys) console.log('scrollport key:', e);
+
+		if (!process_mkey(e)) {
+			push_dead_key_hist(e);
+			dead_key_hist.splice(0, 2);
+
+			if (!process_key_down(e)) return;
+		}
 		e.stopPropagation();
 		e.preventDefault();
 	};
@@ -466,7 +484,12 @@ function term_init()
 	{
 		var hist;
 
-		if (mkeys.length) return;
+		if (log_keys) console.log('scrollport key:', e);
+
+		if (mkeys.length) {
+			got_key_up = true;
+			return;
+		}
 
 		push_dead_key_hist(e);
 		hist = dead_key_hist.join('');

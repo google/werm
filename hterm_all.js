@@ -1846,17 +1846,6 @@ lib.f.smartFloorDivide = function(numerator, denominator) {
 };
 
 /**
- * Get a random integer in a range (inclusive).
- *
- * @param {number} min The lowest integer in the range.
- * @param {number} max The highest integer in the range.
- * @return {number} A random number between min & max.
- */
-lib.f.randomInt = function(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-
-/**
  * Get the current OS.
  *
  * @return {!Promise<string>} A promise that resolves to a constant in
@@ -2525,28 +2514,6 @@ lib.PreferenceManager.prototype.notifyChange_ = function(name) {
 
   for (let i = 0; i < record.observers.length; i++) {
     record.observers[i](currentValue, name, this);
-  }
-};
-
-/**
- * Generate a random, 4-digit hex identifier.
- *
- * @param {!Array<string>=} existingIds A list of existing ids to avoid.
- * @param {?string=} prefix Optional prefix to include in the id.
- * @return {string} The id.
- */
-lib.PreferenceManager.newRandomId = function(
-    existingIds = [], prefix = undefined) {
-  // Pick a random, unique 4-digit hex identifier for the new profile.
-  while (true) {
-    let id = lib.f.randomInt(1, 0xffff).toString(16);
-    id = lib.f.zpad(id, 4);
-    if (prefix) {
-      id = `${prefix}:${id}`;
-    }
-    if (existingIds.indexOf(id) === -1) {
-      return id;
-    }
   }
 };
 
@@ -4365,75 +4332,6 @@ hterm.openUrl = function(url) {
     if (win) {
       win.focus();
     }
-  }
-};
-
-/**
- * Tracks size of the terminal.
- *
- * Instances of this class have public read/write members for width and height.
- */
-hterm.Size = class {
-  /**
-   * @param {number} width The width of this record.
-   * @param {number} height The height of this record.
-   */
-  constructor(width, height) {
-    this.width = width;
-    this.height = height;
-  }
-
-  /**
-   * Adjust the width and height of this record.
-   *
-   * @param {number} width The new width of this record.
-   * @param {number} height The new height of this record.
-   */
-  resize(width, height) {
-    this.width = width;
-    this.height = height;
-  }
-
-  /**
-   * Return a copy of this record.
-   *
-   * @return {!hterm.Size} A new hterm.Size instance with the same width and
-   *     height.
-   */
-  clone() {
-    return new this.constructor(this.width, this.height);
-  }
-
-  /**
-   * Set the height and width of this instance based on another hterm.Size.
-   *
-   * @param {!hterm.Size} that The object to copy from.
-   */
-  setTo(that) {
-    this.width = that.width;
-    this.height = that.height;
-  }
-
-  /**
-   * Test if another hterm.Size instance is equal to this one.
-   *
-   * @param {!hterm.Size} that The other hterm.Size instance.
-   * @return {boolean} True if both instances have the same width/height, false
-   *     otherwise.
-   */
-  equals(that) {
-    return this.width == that.width && this.height == that.height;
-  }
-
-  /**
-   * Return a string representation of this instance.
-   *
-   * @return {string} A string that identifies the width and height of this
-   *     instance.
-   * @override
-   */
-  toString() {
-    return `[hterm.Size: ${this.width}, ${this.height}]`;
   }
 };
 
@@ -8212,16 +8110,6 @@ hterm.Screen = function(columnCount = 0) {
 };
 
 /**
- * Return the screen size as an hterm.Size object.
- *
- * @return {!hterm.Size} hterm.Size object representing the current number
- *     of rows and columns in this screen.
- */
-hterm.Screen.prototype.getSize = function() {
-  return new hterm.Size(this.columnCount_, this.rowsArray.length);
-};
-
-/**
  * Return the current number of rows in this screen.
  *
  * @return {number} The number of rows in this screen.
@@ -9275,10 +9163,7 @@ hterm.ScrollPort = function(rowProvider) {
   this.rowProvider_ = rowProvider;
 
   // SWAG the character size until we can measure it.
-  this.characterSize = new hterm.Size(10, 10);
-
-  // DOM node used for character measurement.
-  this.ruler_ = null;
+  this.characterSize = {width: 10, height: 10};
 
   this.selection = new hterm.ScrollPort.Selection(this);
 
@@ -9315,11 +9200,6 @@ hterm.ScrollPort = function(rowProvider) {
    * Size of screen padding in pixels.
    */
   this.screenPaddingSize = 0;
-
-  /**
-   * Size of line height padding in pixels.
-   */
-  this.lineHeightPaddingSize = 0;
 
   /**
    * True if the last scroll caused the scrollport to show the final row.
@@ -9782,7 +9662,7 @@ hterm.ScrollPort.prototype.decorate = function(div, callback) {
  */
 hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   this.iframe_.contentWindow.addEventListener('resize',
-                                              this.onResize_.bind(this));
+                                              this.resize.bind(this));
 
   const doc = this.document_ = this.iframe_.contentDocument;
   doc.body.style.cssText = (
@@ -10302,42 +10182,6 @@ hterm.ScrollPort.prototype.scheduleInvalidate = function() {
  */
 hterm.ScrollPort.prototype.getFontSize = function() {
   return parseInt(this.screen_.style.fontSize, 10);
-};
-
-/**
- * Measure the size of a single character in pixels.
- *
- * @param {string=} weight The font weight to measure, or 'normal' if
- *     omitted.
- * @return {!hterm.Size} A new hterm.Size object.
- */
-hterm.ScrollPort.prototype.measureCharacterSize = function(weight = '') {
-  let ruler = this.ruler_;
-  if (!ruler) {
-    ruler = this.ruler_ = this.document_.createElement('canvas');
-  }
-  const context = ruler.getContext('2d');
-  context.font = `${weight} ${this.getFontSize()}px ${this.getFontFamily()}`;
-  const heightBox = context.measureText('X\u{2588}');
-  const ascent =
-      heightBox.actualBoundingBoxAscent || heightBox.fontBoundingBoxAscent;
-  const descent =
-      heightBox.actualBoundingBoxDescent || heightBox.fontBoundingBoxDescent;
-  const widthBox = context.measureText('X');
-  return new hterm.Size(widthBox.width,
-                        ascent + descent + this.lineHeightPaddingSize);
-};
-
-/**
- * Synchronize the character size.
- *
- * This will re-measure the current character size and adjust the height
- * of an x-row to match.
- */
-hterm.ScrollPort.prototype.syncCharacterSize = function() {
-  this.characterSize = this.measureCharacterSize();
-
-  this.resize();
 };
 
 /**
@@ -11178,19 +11022,6 @@ hterm.ScrollPort.prototype.onTouch_ = function(e) {
 };
 
 /**
- * Handler for resize events.
- *
- * The browser will resize us such that the top row stays at the top, but we
- * prefer to the bottom row to stay at the bottom.
- *
- * @param {!FocusEvent} e
- */
-hterm.ScrollPort.prototype.onResize_ = function(e) {
-  // Re-measure, since onResize also happens for browser zoom changes.
-  this.syncCharacterSize();
-};
-
-/**
  * Clients can override this if they want to hear copy events.
  *
  * Clients may call event.preventDefault() if they want to keep the scrollport
@@ -11430,7 +11261,7 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // indicates their present size.  During size changes, the two may disagree.
   // Also, the inactive screen's size is not altered until it is made the active
   // screen.
-  this.screenSize = new hterm.Size(0, 0);
+  this.screenSize = {width: 0, height: 0};
 
   // The scroll port we'll be using to display the visible rows.
   this.scrollPort_ = new hterm.ScrollPort(this);

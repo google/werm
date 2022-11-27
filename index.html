@@ -400,6 +400,8 @@ function term_init()
 		[['AltLeft', 'Semicolon', 'BracketLeft'], ':e \x12%'],
 		[['AltRight', 'KeyR', 'KeyS', 'KeyE'], 'sudo shutdown -r now; exit\r'],
 		[['AltRight', 'KeyF', 'KeyN', set_font_key], set_font_macro],
+		[['AltRight', 'ShiftLeft', 'KeyE'], '\x1bA'],
+		[['AltRight', 'ShiftLeft', 'KeyI'], '\x1bI'],
 	];
 
 	var mkeys = [], got_key_up = false;

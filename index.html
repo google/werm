@@ -383,6 +383,39 @@ function term_init()
 	}
 	function set_font_macro() { set_font(font_key); }
 
+	var repeat_key;
+	function set_repeat_key(code)
+	{
+		var ascii;
+
+		switch (code) {
+		case 'Minus':		repeat_key = 25; return true;
+		case 'BracketLeft':	repeat_key = 30; return true;
+		case 'Semicolon':	repeat_key = 34; return true;
+		case 'Quote':		repeat_key = 35; return true;
+		case 'Comma':		repeat_key = 37; return true;
+		case 'Period':		repeat_key = 38; return true;
+		case 'Slash':		repeat_key = 39; return true;
+		case 'ShiftRight':	repeat_key = 40; return true;
+		}
+
+		if (/^Key[A-Z]$/.test(code))
+			ascii = code[3];
+		else if (/^Digit[0-9]$/.test(code))
+			ascii = code[5];
+		else
+			return false;
+
+		repeat_key =
+			//000000000111111111122222222223333333
+			//123456789012345678901234567890123456
+			' 12345QWERTASDFGZXCVB7890 UIOP JKL  M'
+			.indexOf(ascii);
+		return repeat_key >= 1;
+	}
+
+	function repeat_keystroke() { while (repeat_key-- > 0) signal(this); }
+
 	var macro_map = [
 		[['AltLeft', 'KeyI', 'KeyF'], 'git status -s -uno\r'],
 		[['AltLeft', 'KeyI', 'ShiftLeft', 'KeyF'], 'git status -s -uall\r'],
@@ -402,6 +435,10 @@ function term_init()
 		[['AltRight', 'KeyF', 'KeyN', set_font_key], set_font_macro],
 		[['AltRight', 'ShiftLeft', 'KeyE'], '\x1bA'],
 		[['AltRight', 'ShiftLeft', 'KeyI'], '\x1bI'],
+
+		[['AltRight', 'Backspace', set_repeat_key], repeat_keystroke.bind('\x7f')],
+		[['AltRight', 'Backslash', set_repeat_key], repeat_keystroke.bind('\x1b\x5b\x33\x7e')],
+		[['AltRight', 'Enter', set_repeat_key], repeat_keystroke.bind('\r')],
 	];
 
 	var mkeys = [], got_key_up = false;

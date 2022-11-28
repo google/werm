@@ -383,20 +383,72 @@ function term_init()
 	}
 	function set_font_macro() { set_font(font_key); }
 
-	var repeat_key;
+	var repeat_cnt, repeat_key, repeat_boxes = [];
+	function make_repeat_box(layer)
+	{
+		var box;
+
+		if (repeat_boxes[layer]) return;
+		repeat_boxes[layer] = box = t.document_.createElement('div');
+
+		box.style.position = 'absolute';
+		box.style.opacity = 0.5;
+		box.style.borderColor = 'red';
+		box.style.borderStyle = 'solid';
+		box.style.borderBottomWidth = box.style.borderTopWidth = 
+			t.cursorNode_.style.height;
+		box.style.borderLeftWidth = box.style.borderRightWidth = 
+			t.cursorNode_.style.width;
+
+		layer++;
+		box.style.left = 'calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-width) * var(--hterm-cursor-offset-col) - var(--hterm-charsize-width) * ' + layer * 5 + ')';
+		box.style.width = 'calc(var(--hterm-charsize-width) * ' + (layer * 10 - 1) + ')';
+
+		box.style.top = 'calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-height) * var(--hterm-cursor-offset-row) - var(--hterm-charsize-height) * ' + layer * 5 + ')';
+		box.style.height = 'calc(var(--hterm-charsize-height) * ' + (layer * 10 - 1) + ')';
+
+		t.scrollPort_.screen_.appendChild(box);
+	}
+
 	function set_repeat_key(code)
 	{
-		var ascii;
+		var boxi, box;
 
 		switch (code) {
-		case 'Minus':		repeat_key = 25; return true;
-		case 'BracketLeft':	repeat_key = 30; return true;
-		case 'Semicolon':	repeat_key = 34; return true;
-		case 'Quote':		repeat_key = 35; return true;
-		case 'Comma':		repeat_key = 37; return true;
-		case 'Period':		repeat_key = 38; return true;
-		case 'Slash':		repeat_key = 39; return true;
-		case 'ShiftRight':	repeat_key = 40; return true;
+		case 'Backspace':	repeat_key = '\x7f';			break;
+		case 'Backslash':	repeat_key = '\x1b\x5b\x33\x7e';	break;
+		case 'Enter':		repeat_key = '\r';			break;
+		case 'ArrowRight':	repeat_key = '\x1b\x5b\x43';		break;
+		case 'ArrowLeft':	repeat_key = '\x1b\x5b\x44';		break;
+		case 'ArrowUp':		repeat_key = '\x1b\x5b\x41';		break;
+		case 'ArrowDown':	repeat_key = '\x1b\x5b\x42';		break;
+		default:							return false;
+		}
+
+		for (boxi = 0; boxi < 8; boxi++) {
+			make_repeat_box(boxi);
+			repeat_boxes[boxi].style.visibility = 'visible';
+		}
+
+		return true;
+	}
+
+	function set_repeat_cnt(code)
+	{
+		var ascii, boxi;
+
+		for (boxi = 0; boxi < repeat_boxes.length; boxi++)
+			repeat_boxes[boxi].style.visibility = 'hidden';
+
+		switch (code) {
+		case 'Minus':		repeat_cnt = 25; return true;
+		case 'BracketLeft':	repeat_cnt = 30; return true;
+		case 'Semicolon':	repeat_cnt = 34; return true;
+		case 'Quote':		repeat_cnt = 35; return true;
+		case 'Comma':		repeat_cnt = 37; return true;
+		case 'Period':		repeat_cnt = 38; return true;
+		case 'Slash':		repeat_cnt = 39; return true;
+		case 'ShiftRight':	repeat_cnt = 40; return true;
 		}
 
 		if (/^Key[A-Z]$/.test(code))
@@ -406,15 +458,15 @@ function term_init()
 		else
 			return false;
 
-		repeat_key =
+		repeat_cnt =
 			//000000000111111111122222222223333333
 			//123456789012345678901234567890123456
 			' 12345QWERTASDFGZXCVB7890 UIOP JKL  M'
 			.indexOf(ascii);
-		return repeat_key >= 1;
+		return repeat_cnt >= 1;
 	}
 
-	function repeat_keystroke() { while (repeat_key-- > 0) signal(this); }
+	function repeat_keystroke() { while (repeat_cnt--) signal(repeat_key); }
 
 	var macro_map = [
 		[['AltLeft', 'KeyI', 'KeyF'], 'git status -s -uno\r'],
@@ -436,9 +488,7 @@ function term_init()
 		[['AltRight', 'ShiftLeft', 'KeyE'], '\x1bA'],
 		[['AltRight', 'ShiftLeft', 'KeyI'], '\x1bI'],
 
-		[['AltRight', 'Backspace', set_repeat_key], repeat_keystroke.bind('\x7f')],
-		[['AltRight', 'Backslash', set_repeat_key], repeat_keystroke.bind('\x1b\x5b\x33\x7e')],
-		[['AltRight', 'Enter', set_repeat_key], repeat_keystroke.bind('\r')],
+		[['AltRight', set_repeat_key, set_repeat_cnt], repeat_keystroke],
 	];
 
 	var mkeys = [], got_key_up = false;

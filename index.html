@@ -384,6 +384,7 @@ function term_init()
 	function set_font_macro() { set_font(font_key); }
 
 	var repeat_cnt, repeat_key, repeat_boxes = [];
+	const REPEAT_BOX_CNT = 8;
 	function make_repeat_box(layer)
 	{
 		var box;
@@ -393,7 +394,9 @@ function term_init()
 
 		box.style.position = 'absolute';
 		box.style.opacity = 0.5;
-		box.style.borderColor = 'red';
+		box.style.borderColor = `hsl(
+			${layer*5%REPEAT_BOX_CNT/REPEAT_BOX_CNT * 360},
+			90%, 50%)`
 		box.style.borderStyle = 'solid';
 		box.style.borderBottomWidth = box.style.borderTopWidth = 
 			t.cursorNode_.style.height;
@@ -425,7 +428,7 @@ function term_init()
 		default:							return false;
 		}
 
-		for (boxi = 0; boxi < 8; boxi++) {
+		for (boxi = 0; boxi < REPEAT_BOX_CNT; boxi++) {
 			make_repeat_box(boxi);
 			repeat_boxes[boxi].style.visibility = 'visible';
 		}

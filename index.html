@@ -444,14 +444,15 @@ function term_init()
 			repeat_boxes[boxi].style.visibility = 'hidden';
 
 		switch (code) {
-		case 'Minus':		repeat_cnt = 25; return true;
-		case 'BracketLeft':	repeat_cnt = 30; return true;
-		case 'Semicolon':	repeat_cnt = 34; return true;
-		case 'Quote':		repeat_cnt = 35; return true;
-		case 'Comma':		repeat_cnt = 37; return true;
-		case 'Period':		repeat_cnt = 38; return true;
-		case 'Slash':		repeat_cnt = 39; return true;
-		case 'ShiftRight':	repeat_cnt = 40; return true;
+		case 'AltRight':	repeat_cnt = 0;		return true;
+		case 'Minus':		repeat_cnt = 25;	return true;
+		case 'BracketLeft':	repeat_cnt = 30;	return true;
+		case 'Semicolon':	repeat_cnt = 34;	return true;
+		case 'Quote':		repeat_cnt = 35;	return true;
+		case 'Comma':		repeat_cnt = 37;	return true;
+		case 'Period':		repeat_cnt = 38;	return true;
+		case 'Slash':		repeat_cnt = 39;	return true;
+		case 'ShiftRight':	repeat_cnt = 40;	return true;
 		}
 
 		if (/^Key[A-Z]$/.test(code))

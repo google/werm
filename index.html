@@ -23,6 +23,7 @@ body {
   <body>
     <div id="terminal"
          style="position:relative; width:100%; height:100%"></div>
+    <script src="gum.js"></script>
     <script src="hterm_all.js"></script>
     <script>
 
@@ -494,6 +495,7 @@ function term_init()
 
 		[['AltRight', set_repeat_key, set_repeat_cnt], repeat_keystroke],
 	];
+	while (gum_macro_map.length) macro_map.push(gum_macro_map.pop());
 
 	var mkeys = [], got_key_up = false;
 

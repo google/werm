@@ -404,10 +404,10 @@ function term_init()
 			t.cursorNode_.style.width;
 
 		layer++;
-		box.style.left = 'calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-width) * var(--hterm-cursor-offset-col) - var(--hterm-charsize-width) * ' + layer * 5 + ')';
+		box.style.left = 'calc(var(--hterm-curs-left) - var(--hterm-charsize-width) * ' + layer * 5 + ')';
 		box.style.width = 'calc(var(--hterm-charsize-width) * ' + (layer * 10 - 1) + ')';
 
-		box.style.top = 'calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-height) * var(--hterm-cursor-offset-row) - var(--hterm-charsize-height) * ' + layer * 5 + ')';
+		box.style.top = 'calc(var(--hterm-curs-top) - var(--hterm-charsize-height) * ' + layer * 5 + ')';
 		box.style.height = 'calc(var(--hterm-charsize-height) * ' + (layer * 10 - 1) + ')';
 
 		t.scrollPort_.screen_.appendChild(box);

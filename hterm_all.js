@@ -12792,6 +12792,8 @@ menuitem:hover {
   --hterm-mouse-cursor-pointer: pointer;
   --hterm-mouse-cursor-style: var(--hterm-mouse-cursor-text);
   --hterm-screen-padding-size: 0;
+  --hterm-curs-left: calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-width) * var(--hterm-cursor-offset-col));
+  --hterm-curs-top: calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-height) * var(--hterm-cursor-offset-row));
 
 ${lib.colors.stockPalette.map((c, i) => `
   --hterm-color-${i}: ${lib.colors.crackRGB(c).slice(0, 3).join(',')};
@@ -12824,10 +12826,8 @@ ${lib.colors.stockPalette.map((c, i) => `
   this.cursorNode_.className = 'cursor-node';
   this.cursorNode_.style.cssText = `
 position: absolute;
-left: calc(var(--hterm-screen-padding-size) +
-    var(--hterm-charsize-width) * var(--hterm-cursor-offset-col));
-top: calc(var(--hterm-screen-padding-size) +
-    var(--hterm-charsize-height) * var(--hterm-cursor-offset-row));
+left: var(--hterm-curs-left);
+top: var(--hterm-curs-top);
 display: ${this.options_.cursorVisible ? '' : 'none'};
 width: var(--hterm-charsize-width);
 height: var(--hterm-charsize-height);

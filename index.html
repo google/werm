@@ -33,28 +33,41 @@ function term_init()
 {
 	var t, pend_send = '', term_ready = false, sock, pend_display = [],
 		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
-		params, dead_key_hist, keep_title_until;
+		params, dead_key_hist, keep_row_ttl, remote_ttl, row_ttl;
+
+	function find_row_ttl()
+	{
+		var rows, rowi, txt;
+		rows = t.document_.getElementsByTagName('x-row');
+		rowi = rows.length;
+		while (rowi && !txt) txt = rows[--rowi].innerText;
+		return txt;
+	}
 
 	function set_title()
 	{
-		var rows = t.document_.getElementsByTagName('x-row');
-		do {
-			document.title = rows[rows.length-1].innerText;
-			rows.length--;
-		} while (!document.title && rows.length);
-		console.log(rows[rows.length-1]);
+		var compons;
+
+		compons = [];
+		if (termid) compons.push(`[${termid}]`);
+		if (remote_ttl) compons.push(remote_ttl);
+
+		row_ttl = find_row_ttl() || row_ttl;
+		if (row_ttl) compons.push('>>' + row_ttl);
+
+		document.title = compons.join(' ');
 	}
 
 	function print(str)
 	{
 		t.io.print(str);
 
-		if (keep_title_until) return;
+		if (keep_row_ttl) return;
 
 		set_title();
-		keep_title_until = setTimeout(function()
+		keep_row_ttl = setTimeout(function()
 		{
-			keep_title_until = null;
+			keep_row_ttl = null;
 			set_title();
 		}, 2000);
 	}
@@ -211,17 +224,13 @@ function term_init()
 	termid = params.get('termid');
 	pream = params.get('pream');
 
-	cached_title = localStorage['title-' + termid] || '無名';
+	remote_ttl = localStorage['title-' + termid] || '';
 	if (termid) localStorage['pream-' + termid] = pream || '';
 
-	t.setWindowTitle = function(t)
+	t.setWindowTitle = function(ttl)
 	{
-		if (termid) {
-			localStorage['title-' + termid] = t;
-			document.title = `[${termid}] ${t}`;
-		}
-		else
-			document.title = t;
+		remote_ttl = localStorage['title-' + termid] = ttl;
+		set_title();
 	};
 	t.setWindowTitle(cached_title);
 

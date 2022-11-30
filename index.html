@@ -31,9 +31,33 @@ var log_send = 0, log_display = 0, log_keys = 0;
 
 function term_init()
 {
-	var t, io, pend_send = '', term_ready = false, sock, pend_display = [],
+	var t, pend_send = '', term_ready = false, sock, pend_display = [],
 		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
-		params, dead_key_hist;
+		params, dead_key_hist, keep_title_until;
+
+	function set_title()
+	{
+		var rows = t.document_.getElementsByTagName('x-row');
+		do {
+			document.title = rows[rows.length-1].innerText;
+			rows.length--;
+		} while (!document.title && rows.length);
+		console.log(rows[rows.length-1]);
+	}
+
+	function print(str)
+	{
+		t.io.print(str);
+
+		if (keep_title_until) return;
+
+		set_title();
+		keep_title_until = setTimeout(function()
+		{
+			keep_title_until = null;
+			set_title();
+		}, 2000);
+	}
 
 	function display(s)
 	{
@@ -42,7 +66,7 @@ function term_init()
 		function pend(di) { return pend_display[pend_i + di]; }
 		function is_utf_trail(di) {
 			if (0x80 == (pend(di) & 0xc0)) return true;
-			t.io.print('?');
+			print('?');
 			return false;
 		}
 
@@ -92,12 +116,12 @@ function term_init()
 
 		for (pend_i = 0; pend_i < pend_display.length; pend_i++) {
 			if (typeof pend(0) === 'string') {
-				t.io.print(pend(0));
+				print(pend(0));
 				continue;
 			}
 
 			if (pend(0) < 0x80) {
-				t.io.print(String.fromCharCode(pend(0)));
+				print(String.fromCharCode(pend(0)));
 				continue;
 			}
 
@@ -108,7 +132,7 @@ function term_init()
 
 			if (0xc0 == (pend(0) & 0xe0)) {
 				c += (pend(0) & ~0xe0) << 6;
-				t.io.print(String.fromCodePoint(c));
+				print(String.fromCodePoint(c));
 				pend_i+=1;
 				continue;
 			}
@@ -120,7 +144,7 @@ function term_init()
 
 			if (0xe0 == (pend(0) & 0xf0)) {
 				c += (pend(0) & ~0xf0) << 12;
-				t.io.print(String.fromCodePoint(c));
+				print(String.fromCodePoint(c));
 				pend_i+=2;
 				continue;
 			}
@@ -132,12 +156,12 @@ function term_init()
 
 			if (0xf0 == (pend(0) & 0xf8)) {
 				c += (pend(0) & ~0xf8) << 18;
-				t.io.print(String.fromCodePoint(c));
+				print(String.fromCodePoint(c));
 				pend_i+=3;
 				continue;
 			}
 
-			t.io.print('?');
+			print('?');
 		}
 
 		pend_display = pend_display.slice(pend_i);
@@ -225,7 +249,7 @@ function term_init()
 
 	t.onTerminalReady = function()
 	{
-		io = t.io.push();
+		var io = t.io.push();
 
 		io.sendString = function(s) { signal(escape(s)); };
 		io.onTerminalResize = function(c, r) {

@@ -53,7 +53,7 @@ function term_init()
 		if (remote_ttl) compons.push(remote_ttl);
 
 		row_ttl = find_row_ttl() || row_ttl;
-		if (row_ttl) compons.push('>>' + row_ttl);
+		if (row_ttl) compons.push('|', row_ttl);
 
 		document.title = compons.join(' ');
 	}

@@ -5199,18 +5199,6 @@ hterm.Keyboard = function(terminal) {
   this.shiftInsertPaste = true;
 
   /**
-   * If true, home/end will control the terminal scrollbar and shift home/end
-   * will send the VT keycodes.  If false then home/end sends VT codes and
-   * shift home/end scrolls.
-   */
-  this.homeKeysScroll = false;
-
-  /**
-   * Same as above, except for page up/page down.
-   */
-  this.pageKeysScroll = false;
-
-  /**
    * If true, Ctrl+Plus/Minus/Zero controls zoom.
    * If false, Ctrl+Shift+Plus/Minus/Zero controls zoom, Ctrl+Minus sends ^_,
    * Ctrl+Plus/Zero do nothing.
@@ -5910,7 +5898,7 @@ hterm.Keyboard.KeyMap.prototype.onKeyInsert_ = function(e) {
  * @return {symbol|string} Key action or sequence.
  */
 hterm.Keyboard.KeyMap.prototype.onKeyHome_ = function(e) {
-  if (this.keyboard.homeKeysScroll === e.shiftKey) {
+  if (!e.shiftKey) {
     if ((e.altKey || e.ctrlKey || e.shiftKey) ||
         !this.keyboard.applicationCursor) {
       return '\x1b[H';
@@ -5930,7 +5918,7 @@ hterm.Keyboard.KeyMap.prototype.onKeyHome_ = function(e) {
  * @return {symbol|string} Key action or sequence.
  */
 hterm.Keyboard.KeyMap.prototype.onKeyEnd_ = function(e) {
-  if (this.keyboard.homeKeysScroll === e.shiftKey) {
+  if (!e.shiftKey) {
     if ((e.altKey || e.ctrlKey || e.shiftKey) ||
         !this.keyboard.applicationCursor) {
       return '\x1b[F';
@@ -5950,7 +5938,7 @@ hterm.Keyboard.KeyMap.prototype.onKeyEnd_ = function(e) {
  * @return {symbol|string} Key action or sequence.
  */
 hterm.Keyboard.KeyMap.prototype.onKeyPageUp_ = function(e) {
-  if (this.keyboard.pageKeysScroll === e.shiftKey) {
+  if (!e.shiftKey) {
     return '\x1b[5~';
   }
 
@@ -5965,7 +5953,7 @@ hterm.Keyboard.KeyMap.prototype.onKeyPageUp_ = function(e) {
  * @return {symbol|string} Key action or sequence.
  */
 hterm.Keyboard.KeyMap.prototype.onKeyPageDown_ = function(e) {
-  if (this.keyboard.pageKeysScroll === e.shiftKey) {
+  if (!e.shiftKey) {
     return '\x1b[6~';
   }
 
@@ -11621,10 +11609,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.setAutomaticMouseHiding(v);
     },
 
-    'home-keys-scroll': (v) => {
-      this.keyboard.homeKeysScroll = v;
-    },
-
     'media-keys-are-fkeys': (v) => {
       this.keyboard.mediaKeysAreFKeys = v;
     },
@@ -11635,10 +11619,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'mouse-paste-button': (v) => {
       this.syncMousePasteButton();
-    },
-
-    'page-keys-scroll': (v) => {
-      this.keyboard.pageKeysScroll = v;
     },
 
     'pass-alt-number': (v) => {

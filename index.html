@@ -509,8 +509,8 @@ function term_init()
 	var barrier_dig = [], barrier_div;
 	function set_barrier_dig(code)
 	{
-		if (!/^Digit/.test(code)) return false;
-		barrier_dig[this] = code[5];
+		if (!/^Numpad/.test(code)) return false;
+		barrier_dig[this] = code[6];
 		return true;
 	}
 	function hide_barrier()
@@ -563,9 +563,10 @@ function term_init()
 		[['AltRight', 'ShiftLeft', 'KeyI'], '\x1bI'],
 
 		[['AltRight', set_repeat_key, set_repeat_cnt], repeat_keystroke],
-		[['AltRight', 'ShiftLeft', 'Backslash',
+		[['AltLeft', 'ShiftLeft',
 		 set_barrier_dig.bind(0),
-		 set_barrier_dig.bind(1)], show_barrier],
+		 set_barrier_dig.bind(1),
+		 set_barrier_dig.bind(2)], show_barrier],
 		[['AltRight', 'ShiftLeft', 'Backslash', 'KeyH'], hide_barrier],
 	];
 	while (gum_macro_map.length) macro_map.push(gum_macro_map.pop());

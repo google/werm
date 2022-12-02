@@ -5209,12 +5209,6 @@ hterm.Keyboard = function(terminal) {
    * the backspace key should send '\x7f'.
    */
   this.backspaceSendsBackspace = false;
-
-  /**
-   * If true, ChromeOS media keys will be mapped to their F-key equivalent.
-   * E.g. "Back" will be mapped to F1. If false, Chrome will handle the keys.
-   */
-  this.mediaKeysAreFKeys = false;
 };
 
 /**
@@ -5533,12 +5527,6 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   // Ignore if not trapping media keys.
   const med = (fn) => {
     return (e, k) => {
-      if (!this.keyboard.mediaKeysAreFKeys) {
-        // Block Back, Forward, and Reload keys to avoid navigating away from
-        // the current page.
-        return (e.keyCode == 166 || e.keyCode == 167 || e.keyCode == 168) ?
-            CANCEL : PASS;
-      }
       return resolve(fn, e, k);
     };
   };
@@ -7466,23 +7454,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `\n` +
       `Note: Your operating system might override this setting and thus you ` +
       `might not be able to always disable it.`,
-  ),
-
-  'home-keys-scroll': hterm.PreferenceManager.definePref_(
-      'Home/End key scroll behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `If true, Home/End controls the terminal scrollbar and Shift+Home/` +
-      `Shift+End are sent to the remote host. If false, then Home/End are ` +
-      `sent to the remote host and Shift+Home/Shift+End scrolls.`,
-  ),
-
-  'media-keys-are-fkeys': hterm.PreferenceManager.definePref_(
-      'Media keys are Fkeys',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `If true, convert media keys to their Fkey equivalent. If false, let ` +
-      `the browser handle the keys.`,
   ),
 
   'mouse-right-click-paste': hterm.PreferenceManager.definePref_(
@@ -11407,10 +11378,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'hide-mouse-while-typing': (v) => {
       this.setAutomaticMouseHiding(v);
-    },
-
-    'media-keys-are-fkeys': (v) => {
-      this.keyboard.mediaKeysAreFKeys = v;
     },
 
     'mouse-right-click-paste': (v) => {

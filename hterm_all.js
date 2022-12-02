@@ -5190,8 +5190,6 @@ hterm.Keyboard = function(terminal) {
    */
   this.keyMap = new hterm.Keyboard.KeyMap(this);
 
-  this.bindings = new hterm.Keyboard.Bindings();
-
   /**
    * If true, Shift+Insert will fall through to the browser as a paste.
    * If false, the keystroke will be sent to the host.
@@ -5340,55 +5338,6 @@ hterm.Keyboard.KeyBindingAction;
  * }}
  */
 hterm.Keyboard.KeyBinding;
-
-/**
- * A mapping from hterm.Keyboard.KeyPattern to an action.
- *
- * TODO(rginda): For now this bindings code is only used for user overrides.
- * hterm.Keyboard.KeyMap still handles all of the built-in key mappings.
- * It'd be nice if we migrated that over to be hterm.Keyboard.Bindings based.
- *
- * @constructor
- */
-hterm.Keyboard.Bindings = function() {
-  /** @private {!Object<number, !Array<!hterm.Keyboard.KeyBinding>>} */
-  this.bindings_ = {};
-};
-
-/**
- * Default bindings for each OS.
- *
- * @type {!Object<string, !Object<string, string>>}
- */
-hterm.Keyboard.Bindings.OsDefaults = {
-  'android': {
-  },
-  'cros': {
-    // Submit feedback.
-    'Alt+Shift+I': 'PASS',
-    // Toggle chromevox.
-    'Ctrl+Alt+Z': 'PASS',
-    // Switch input method.
-    'Ctrl+Space': 'PASS',
-  },
-  'linux': {
-  },
-  'mac': {
-    // Home.
-    'Meta+Left': '"\u001b[H"',
-    // End.
-    'Meta+Right': '"\u001b[F"',
-  },
-  'windows': {
-  },
-};
-
-/**
- * Remove all bindings.
- */
-hterm.Keyboard.Bindings.prototype.clear = function() {
-  this.bindings_ = {};
-};
 
 // SOURCE FILE: hterm/js/hterm_keyboard_keymap.js
 // Copyright (c) 2012 The Chromium OS Authors. All rights reserved.

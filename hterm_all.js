@@ -5191,31 +5191,6 @@ hterm.Keyboard = function(terminal) {
   this.keyMap = new hterm.Keyboard.KeyMap(this);
 
   /**
-   * If true, Shift+Insert will fall through to the browser as a paste.
-   * If false, the keystroke will be sent to the host.
-   */
-  this.shiftInsertPaste = true;
-
-  /**
-   * If true, Ctrl+Plus/Minus/Zero controls zoom.
-   * If false, Ctrl+Shift+Plus/Minus/Zero controls zoom, Ctrl+Minus sends ^_,
-   * Ctrl+Plus/Zero do nothing.
-   */
-  this.ctrlPlusMinusZeroZoom = true;
-
-  /**
-   * Ctrl+C copies if true, sends ^C to host if false.
-   * Ctrl+Shift+C sends ^C to host if true, copies if false.
-   */
-  this.ctrlCCopy = false;
-
-  /**
-   * Ctrl+V pastes if true, sends ^V to host if false.
-   * Ctrl+Shift+V sends ^V to host if true, pastes if false.
-   */
-  this.ctrlVPaste = false;
-
-  /**
    * Enable/disable application keypad.
    *
    * This changes the way numeric keys are sent from the keyboard.
@@ -5234,11 +5209,6 @@ hterm.Keyboard = function(terminal) {
    * the backspace key should send '\x7f'.
    */
   this.backspaceSendsBackspace = false;
-
-  /**
-   * Set whether meta-V gets passed to host.
-   */
-  this.passMetaV = true;
 
   /**
    * If true, ChromeOS media keys will be mapped to their F-key equivalent.
@@ -5833,7 +5803,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
  * @return {symbol|string} Key action or sequence.
  */
 hterm.Keyboard.KeyMap.prototype.onKeyInsert_ = function(e) {
-  if (this.keyboard.shiftInsertPaste && e.shiftKey) {
+  if (e.shiftKey) {
     return hterm.Keyboard.KeyActions.PASS;
   }
 
@@ -6010,18 +5980,7 @@ hterm.Keyboard.KeyMap.prototype.onCtrlC_ = function(e) {
   const selection = this.keyboard.terminal.getDocument().getSelection();
 
   if (!selection.isCollapsed) {
-    if (this.keyboard.ctrlCCopy && !e.shiftKey) {
-      // Ctrl+C should copy if there is a selection, send ^C otherwise.
-      // Perform the copy by letting the browser handle Ctrl+C.  On most
-      // browsers, this is the *only* way to place text on the clipboard from
-      // the 'drive-by' web.
-      if (this.keyboard.terminal.clearSelectionAfterCopy) {
-        setTimeout(selection.collapseToEnd.bind(selection), 50);
-      }
-      return hterm.Keyboard.KeyActions.PASS;
-    }
-
-    if (!this.keyboard.ctrlCCopy && e.shiftKey) {
+    if (e.shiftKey) {
       // Ctrl+Shift+C should copy if there is a selection, send ^C otherwise.
       // Perform the copy manually.  This only works in situations where
       // document.execCommand('copy') is allowed.
@@ -6040,15 +5999,13 @@ hterm.Keyboard.KeyMap.prototype.onCtrlC_ = function(e) {
  * Either send a ^V or issue a paste command.
  *
  * The default behavior is to paste if the user presses Ctrl+Shift+V, and send
- * a ^V if the user presses Ctrl+V. This can be flipped with the
- * 'ctrl-v-paste' preference.
+ * a ^V if the user presses Ctrl+V.
  *
  * @param {!KeyboardEvent} e The event to process.
  * @return {symbol|string} Key action or sequence.
  */
 hterm.Keyboard.KeyMap.prototype.onCtrlV_ = function(e) {
-  if ((!e.shiftKey && this.keyboard.ctrlVPaste) ||
-      (e.shiftKey && !this.keyboard.ctrlVPaste)) {
+  if (e.shiftKey) {
     // We try to do the pasting ourselves as not all browsers/OSs bind Ctrl+V to
     // pasting.  Notably, on macOS, Ctrl+V/Ctrl+Shift+V do nothing.
     // However, this might run into web restrictions, so if it fails, we still
@@ -6121,13 +6078,7 @@ hterm.Keyboard.KeyMap.prototype.onMetaC_ = function(e, keyDef) {
  * @return {symbol|string} Key action or sequence.
  */
 hterm.Keyboard.KeyMap.prototype.onMetaV_ = function(e) {
-  if (e.shiftKey) {
-    return hterm.Keyboard.KeyActions.PASS;
-  }
-
-  return this.keyboard.passMetaV ?
-      hterm.Keyboard.KeyActions.PASS :
-      hterm.Keyboard.KeyActions.DEFAULT;
+  return hterm.Keyboard.KeyActions.PASS;
 };
 
 hterm.Keyboard.KeyMap.prototype.onZoom_ = function() {};
@@ -7404,31 +7355,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `Whether to clear the selection after copying.`,
   ),
 
-  'ctrl-plus-minus-zero-zoom': hterm.PreferenceManager.definePref_(
-      'Ctrl++/-/0 zoom behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      true, 'bool',
-      `If true, Ctrl+Plus/Minus/Zero controls zoom.\n` +
-      `If false, Ctrl+Shift+Plus/Minus/Zero controls zoom, Ctrl+Minus sends ` +
-      `^_, Ctrl+Plus/Zero do nothing.`,
-  ),
-
-  'ctrl-c-copy': hterm.PreferenceManager.definePref_(
-      'Ctrl+C copy behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Ctrl+C copies if true, send ^C to host if false.\n` +
-      `Ctrl+Shift+C sends ^C to host if true, copies if false.`,
-  ),
-
-  'ctrl-v-paste': hterm.PreferenceManager.definePref_(
-      'Ctrl+V paste behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Ctrl+V pastes if true, send ^V to host if false.\n` +
-      `Ctrl+Shift+V sends ^V to host if true, pastes if false.`,
-  ),
-
   'east-asian-ambiguous-as-two-column': hterm.PreferenceManager.definePref_(
       'East Asian Ambiguous use two columns',
       hterm.PreferenceManager.Categories.Keyboard,
@@ -7713,15 +7639,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `browser platform and window type.`,
   ),
 
-  'pass-meta-v': hterm.PreferenceManager.definePref_(
-      'Meta+V paste behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      true, 'bool',
-      `Whether Meta+V gets passed to the browser.\n` +
-      `\n` +
-      `On some systems, this is used to paste content.`,
-  ),
-
   'paste-on-drop': hterm.PreferenceManager.definePref_(
       'Allow drag & drop to paste',
       hterm.PreferenceManager.Categories.CopyPaste,
@@ -7789,13 +7706,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `\n` +
       `You should stick with UTF-8 unless you notice broken rendering with ` +
       `legacy applications.`,
-  ),
-
-  'shift-insert-paste': hterm.PreferenceManager.definePref_(
-      'Shift+Insert paste',
-      hterm.PreferenceManager.Categories.Keyboard,
-      true, 'bool',
-      `Whether Shift+Insert is used for pasting or is sent to the remote host.`,
   ),
 
   'user-css': hterm.PreferenceManager.definePref_(
@@ -9131,11 +9041,6 @@ hterm.ScrollPort = function(rowProvider) {
   this.currentScrollbarWidthPx = hterm.ScrollPort.DEFAULT_SCROLLBAR_WIDTH;
 
   /**
-   * Whether the ctrl-v key on the screen should paste.
-   */
-  this.ctrlVPaste = false;
-
-  /**
    * Whether to paste on dropped text.
    */
   this.pasteOnDrop = true;
@@ -9683,8 +9588,6 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   this.screen_.addEventListener('paste', el(this.onPaste_.bind(this)));
   this.screen_.addEventListener('drop', el(this.onDragAndDrop_.bind(this)));
 
-  doc.body.addEventListener('keydown', this.onBodyKeyDown_.bind(this));
-
   // Add buttons to make accessible scrolling through terminal history work
   // well. These are positioned off-screen until they are selected, at which
   // point they are moved on-screen.
@@ -9953,11 +9856,6 @@ hterm.ScrollPort.prototype.setBackgroundPosition = function(position) {
 hterm.ScrollPort.prototype.setScreenPaddingSize = function(size) {
   this.screenPaddingSize = size;
   this.resize();
-};
-
-/** @param {boolean} ctrlVPaste */
-hterm.ScrollPort.prototype.setCtrlVPaste = function(ctrlVPaste) {
-  this.ctrlVPaste = ctrlVPaste;
 };
 
 /** @param {boolean} pasteOnDrop */
@@ -11016,22 +10914,6 @@ hterm.ScrollPort.prototype.onCopy_ = function(e) {
 };
 
 /**
- * Focuses on the paste target on a ctrl-v keydown event, as in
- * FF a content editable element must be focused before the paste event.
- *
- * @param {!KeyboardEvent} e
- */
-hterm.ScrollPort.prototype.onBodyKeyDown_ = function(e) {
-  if (!this.ctrlVPaste) {
-    return;
-  }
-
-  if ((e.ctrlKey || e.metaKey) && e.keyCode == 86 /* 'V' */) {
-    this.pasteTarget_.focus();
-  }
-};
-
-/**
  * Handle a paste event on the the ScrollPort's screen element.
  *
  * TODO: Handle ClipboardData.files transfers.  https://crbug.com/433581.
@@ -11501,19 +11383,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.clearSelectionAfterCopy = !!v;
     },
 
-    'ctrl-plus-minus-zero-zoom': (v) => {
-      this.keyboard.ctrlPlusMinusZeroZoom = v;
-    },
-
-    'ctrl-c-copy': (v) => {
-      this.keyboard.ctrlCCopy = v;
-    },
-
-    'ctrl-v-paste': (v) => {
-      this.keyboard.ctrlVPaste = v;
-      this.scrollPort_.setCtrlVPaste(v);
-    },
-
     'paste-on-drop': (v) => {
       this.scrollPort_.setPasteOnDrop(v);
     },
@@ -11594,10 +11463,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.passMetaNumber = v;
     },
 
-    'pass-meta-v': (v) => {
-      this.keyboard.passMetaV = v;
-    },
-
     'screen-padding-size': (v) => {
       v = parseInt(v, 10);
       if (isNaN(v) || v < 0) {
@@ -11638,10 +11503,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'scroll-wheel-move-multiplier': (v) => {
       this.setScrollWheelMoveMultipler(v);
-    },
-
-    'shift-insert-paste': (v) => {
-      this.keyboard.shiftInsertPaste = v;
     },
 
     'terminal-encoding': (v) => {

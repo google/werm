@@ -339,22 +339,29 @@ function term_init()
 				}
 			}
 
+			function app(c)
+			{
+				var kind = t.keyboard.applicationCursor
+					? 'O' : '[';
+				signal(pref + '\x1b' + kind + c);
+			}
+
 			switch (e.key) {
-			case 'ArrowLeft':	signal(pref + '\x1b\x5b\x44');		return true;
-			case 'ArrowUp':		signal(pref + '\x1b\x5b\x41');		return true;
-			case 'ArrowRight':	signal(pref + '\x1b\x5b\x43');		return true;
-			case 'ArrowDown':	signal(pref + '\x1b\x5b\x42');		return true;
+			case 'ArrowUp':		app('A');	return true;
+			case 'ArrowDown':	app('B');	return true;
+			case 'ArrowRight':	app('C');	return true;
+			case 'ArrowLeft':	app('D');	return true;
+			case 'End':		app('F');	return true;
+			case 'Home':		app('H');	return true;
+			case 'Insert':		app('2~');	return true;
+			case 'PageUp':		app('5~');	return true;
+			case 'PageDown':	app('6~');	return true;
 			case 'Enter':		signal(pref + '\r');			return true;
 			case 'Backspace':	signal(pref + '\x7f');			return true;
 			case 'Escape':		signal(pref + '\x1b');			return true;
 			case 'ContextMenu':	signal(pref + '_');			return true;
 			case 'Delete':		signal(pref + '\x1b[3~');		return true;
 			case 'Tab':		signal(pref + '\t');			return true;
-			case 'PageDown':	signal(pref + '\x1b\x5b\x36\x7e');	return true;
-			case 'PageUp':		signal(pref + '\x1b\x5b\x35\x7e');	return true;
-			case 'Home':		signal(pref + '\x1b\x5b\x48');		return true;
-			case 'End':		signal(pref + '\x1b\x5b\x46');		return true;
-			case 'Insert':		signal(pref + '\x1b\x5b\x32\x7e');	return true;
 			default:							return false;
 			}
 		}

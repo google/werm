@@ -250,7 +250,10 @@ function term_init()
 
 	function open_child_term()
 	{
-		var newid = (termid || '') + '.' + String.fromCharCode(97 + 26*Math.random());
+		var rand_ltr, newid;
+
+		rand_ltr = String.fromCharCode(97 + 26*Math.random());
+		newid = (termid || '') + '.' + rand_ltr;
 		window.open(
 			'/?termid=' + encodeURIComponent(newid) +
 			'&pream=' + encodeURIComponent(pream || ''));
@@ -374,6 +377,8 @@ function term_init()
 	// [3] padded-cell-height, [4] allow bold face
 	// Small fonts require overriding Chrome's minimum font size setting.
 	var fonts = [
+		['ibm_ega_8x8',		8,	8,	9,	false],
+		['hp_100lx_10x11',	12,	10,	13,	false],
 		['jfdot_7x14',		14,	7,	14,	true],
 		['ibm_vga_8x16',	16,	8,	17,	false],
 		['ibm_vga_9x16',	16,	9,	17,	false],
@@ -381,7 +386,6 @@ function term_init()
 		['cl_stringray_8x19',	20,	8,	19,	false],
 		['ibm_xga_ai_12x23',	24,	12,	24,	false],
 		['dos_v_re_12x30',	32,	12,	28,	true],
-		['ibm_ega_8x8',		8,	8,	9,	false],
 	];
 
 	function set_font(ndx)
@@ -402,18 +406,20 @@ function term_init()
 
 	fonts.forEach(function(fnt, ndx) {
 		var name = fnt[0], sz = fnt[1];
-		t.document_.fonts.add(new FontFace(name, 'url(/' + name + '.ttf)'));
+		t.document_.fonts.add(new FontFace(name, `url(/${name}.ttf)`));
 		t.document_.fonts.load(`${sz}px ${name}`).then(function()
 		{
-			if (ndx === 2) set_font(2);
+			if (ndx === 4) set_font(4);
 		});
 	});
 
 	var font_key;
 	function set_font_key(key)
 	{
+		if (!/^Key.$/.test(key)) return false;
+
 		font_key = key.charCodeAt(3) - 65;
-		return /^Key.$/.test(key) && font_key >= 0 && font_key < fonts.length;
+		return font_key >= 0 && font_key < fonts.length;
 	}
 	function set_font_macro() { set_font(font_key); }
 
@@ -438,11 +444,22 @@ function term_init()
 			t.cursorNode_.style.width;
 
 		layer++;
-		box.style.left = 'calc(var(--hterm-curs-left) - var(--hterm-charsize-width) * ' + layer * 5 + ')';
-		box.style.width = 'calc(var(--hterm-charsize-width) * ' + (layer * 10 - 1) + ')';
+		box.style.left = `calc(
+			var(--hterm-curs-left)
+			- ${layer*5} * var(--hterm-charsize-width)
+		)`;
 
-		box.style.top = 'calc(var(--hterm-curs-top) - var(--hterm-charsize-height) * ' + layer * 5 + ')';
-		box.style.height = 'calc(var(--hterm-charsize-height) * ' + (layer * 10 - 1) + ')';
+		box.style.width = `calc(
+			${layer*10 - 1} * var(--hterm-charsize-width)
+		)`;
+
+		box.style.top = `calc(
+			var(--hterm-curs-top)
+			- ${layer*5} * var(--hterm-charsize-height)
+		)`;
+		box.style.height = `calc(
+			${layer*10 - 1} * var(--hterm-charsize-height)
+		)`;
 
 		t.scrollPort_.screen_.appendChild(box);
 	}
@@ -532,7 +549,10 @@ function term_init()
 		s.position = 'absolute';
 		s.opacity = 0.3;
 		s.backgroundColor = 'hsl(' + (col * 283 % 360) + ', 90%, 50%)'
-		s.left = 'calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-width) * ' + col + ')'
+		s.left = `calc(
+			var(--hterm-charsize-width) * ${col}
+			+ var(--hterm-screen-padding-size)
+		)`;
 		s.width = 'var(--hterm-charsize-width)'
 		s.top = '0';
 		s.height = '100%';

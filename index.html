@@ -222,6 +222,10 @@ function term_init()
 		var kind = t.keyboard.applicationCursor ? 'O' : '[';
 		signal(p + '\x1b' + kind + c);
 	}
+	function bs_sends()
+	{
+		return t.keyboard.backspaceSendsBackspace ? '\x08' : '\x7f';
+	}
 
 	t = new hterm.Terminal();
 	params = new URLSearchParams(window.location.search);
@@ -354,13 +358,13 @@ function term_init()
 			case 'Insert':		sigapp(pref, '2~');	return true;
 			case 'PageUp':		sigapp(pref, '5~');	return true;
 			case 'PageDown':	sigapp(pref, '6~');	return true;
-			case 'Enter':		signal(pref + '\r');			return true;
-			case 'Backspace':	signal(pref + '\x7f');			return true;
-			case 'Escape':		signal(pref + '\x1b');			return true;
-			case 'ContextMenu':	signal(pref + '_');			return true;
-			case 'Delete':		signal(pref + '\x1b[3~');		return true;
-			case 'Tab':		signal(pref + '\t');			return true;
-			default:							return false;
+			case 'Enter':		signal(pref + '\r');		return true;
+			case 'Backspace':	signal(pref + bs_sends());	return true;
+			case 'Escape':		signal(pref + '\x1b');		return true;
+			case 'ContextMenu':	signal(pref + '_');		return true;
+			case 'Delete':		signal(pref + '\x1b[3~');	return true;
+			case 'Tab':		signal(pref + '\t');		return true;
+			default:						return false;
 			}
 		}
 
@@ -474,7 +478,7 @@ function term_init()
 		var boxi, box;
 
 		switch (code) {
-		case 'Backspace':	repeater = [0, '\x7f'];		break;
+		case 'Backspace':	repeater = [0, bs_sends()];	break;
 		case 'Backslash':	repeater = [0, '\x1b[3~'];	break;
 		case 'Enter':		repeater = [0, '\r'];		break;
 		case 'ArrowRight':	repeater = [1, 'C'];		break;

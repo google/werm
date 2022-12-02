@@ -5466,20 +5466,6 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   };
 
   /**
-   * If not backspace-sends-backspace keypad a, else b.
-   *
-   * @param {!hterm.Keyboard.KeyDefAction} a
-   * @param {!hterm.Keyboard.KeyDefAction} b
-   * @return {!hterm.Keyboard.KeyDefFunction}
-   */
-  const bs = (a, b) => {
-    return (e, k) => {
-      const action = !this.keyboard.backspaceSendsBackspace ? a : b;
-      return resolve(action, e, k);
-    };
-  };
-
-  /**
    * If not e.shiftKey a, else b.
    *
    * @param {!hterm.Keyboard.KeyDefAction} a
@@ -5652,7 +5638,7 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   add(keycapMU, '-_', DEFAULT, c('onZoom_'),  DEFAULT,        c('onZoom_'));
   add(keycapEP, '=+', DEFAULT, c('onZoom_'),  DEFAULT,        c('onZoom_'));
 
-  add(8,   '[BKSP]', bs('\x7f', '\b'), bs('\b', '\x7f'), DEFAULT,     DEFAULT);
+  // add(8, '[BKSP]', ...);
 
   // Third row.
   add(9,   '[TAB]', sh('\t', c('onShiftTab_')), PASS, PASS, DEFAULT);
@@ -11294,10 +11280,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'background-position': (v) => {
       this.scrollPort_.setBackgroundPosition(v);
-    },
-
-    'backspace-sends-backspace': (v) => {
-      this.keyboard.backspaceSendsBackspace = v;
     },
 
     'character-map-overrides': (v) => {
@@ -17497,6 +17479,7 @@ hterm.VT.ESC['9'] = hterm.VT.ignore;
  * @this {!hterm.VT}
  */
 hterm.VT.ESC['='] = function() {
+  console.log('application keypad was turned on');
   this.terminal.keyboard.applicationKeypad = true;
 };
 
@@ -17506,6 +17489,7 @@ hterm.VT.ESC['='] = function() {
  * @this {!hterm.VT}
  */
 hterm.VT.ESC['>'] = function() {
+  console.log('application keypad was turned on');
   this.terminal.keyboard.applicationKeypad = false;
 };
 

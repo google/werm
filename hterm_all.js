@@ -5543,24 +5543,6 @@ hterm.Keyboard.KeyMap.prototype.reset = function() {
   };
 
   /**
-   * If not application keypad a, else b.  The keys that care about
-   * application keypad ignore it when the key is modified.
-   *
-   * @param {!hterm.Keyboard.KeyDefAction} a
-   * @param {!hterm.Keyboard.KeyDefAction} b
-   * @return {!hterm.Keyboard.KeyDefFunction}
-   */
-  /* TODO(crbug.com/1065216): Delete this if no longer needed.
-  const ak = (a, b) => {
-    return (e, k) => {
-      const action = (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey ||
-                      !this.keyboard.applicationKeypad) ? a : b;
-      return resolve(action, e, k);
-    };
-  };
-  */
-
-  /**
    * If mod or not application cursor a, else b.  The keys that care about
    * application cursor ignore it when the key is modified.
    *

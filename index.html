@@ -217,6 +217,11 @@ function term_init()
 		pend_send += s;
 		if (sock.readyState > WebSocket.OPEN) prepare_sock();
 	}
+	function sigapp(p, c)
+	{
+		var kind = t.keyboard.applicationCursor ? 'O' : '[';
+		signal(p + '\x1b' + kind + c);
+	}
 
 	t = new hterm.Terminal();
 	params = new URLSearchParams(window.location.search);
@@ -339,23 +344,16 @@ function term_init()
 				}
 			}
 
-			function app(c)
-			{
-				var kind = t.keyboard.applicationCursor
-					? 'O' : '[';
-				signal(pref + '\x1b' + kind + c);
-			}
-
 			switch (e.key) {
-			case 'ArrowUp':		app('A');	return true;
-			case 'ArrowDown':	app('B');	return true;
-			case 'ArrowRight':	app('C');	return true;
-			case 'ArrowLeft':	app('D');	return true;
-			case 'End':		app('F');	return true;
-			case 'Home':		app('H');	return true;
-			case 'Insert':		app('2~');	return true;
-			case 'PageUp':		app('5~');	return true;
-			case 'PageDown':	app('6~');	return true;
+			case 'ArrowUp':		sigapp(pref, 'A');	return true;
+			case 'ArrowDown':	sigapp(pref, 'B');	return true;
+			case 'ArrowRight':	sigapp(pref, 'C');	return true;
+			case 'ArrowLeft':	sigapp(pref, 'D');	return true;
+			case 'End':		sigapp(pref, 'F');	return true;
+			case 'Home':		sigapp(pref, 'H');	return true;
+			case 'Insert':		sigapp(pref, '2~');	return true;
+			case 'PageUp':		sigapp(pref, '5~');	return true;
+			case 'PageDown':	sigapp(pref, '6~');	return true;
 			case 'Enter':		signal(pref + '\r');			return true;
 			case 'Backspace':	signal(pref + '\x7f');			return true;
 			case 'Escape':		signal(pref + '\x1b');			return true;
@@ -430,7 +428,7 @@ function term_init()
 	}
 	function set_font_macro() { set_font(font_key); }
 
-	var repeat_cnt, repeat_key, repeat_boxes = [];
+	var repeat_cnt, repeater, repeat_boxes = [];
 	const REPEAT_BOX_CNT = 8;
 	function make_repeat_box(layer)
 	{
@@ -476,14 +474,15 @@ function term_init()
 		var boxi, box;
 
 		switch (code) {
-		case 'Backspace':	repeat_key = '\x7f';			break;
-		case 'Backslash':	repeat_key = '\x1b\x5b\x33\x7e';	break;
-		case 'Enter':		repeat_key = '\r';			break;
-		case 'ArrowRight':	repeat_key = '\x1b\x5b\x43';		break;
-		case 'ArrowLeft':	repeat_key = '\x1b\x5b\x44';		break;
-		case 'ArrowUp':		repeat_key = '\x1b\x5b\x41';		break;
-		case 'ArrowDown':	repeat_key = '\x1b\x5b\x42';		break;
-		default:							return false;
+		case 'Backspace':	repeater = [0, '\x7f'];		break;
+		case 'Backslash':	repeater = [0, '\x1b[3~'];	break;
+		case 'Enter':		repeater = [0, '\r'];		break;
+		case 'ArrowRight':	repeater = [1, 'C'];		break;
+		case 'ArrowLeft':	repeater = [1, 'D'];		break;
+		case 'ArrowUp':		repeater = [1, 'A'];		break;
+		case 'ArrowDown':	repeater = [1, 'B'];		break;
+
+		default:	return false;
 		}
 
 		for (boxi = 0; boxi < REPEAT_BOX_CNT; boxi++) {
@@ -528,7 +527,14 @@ function term_init()
 		return repeat_cnt >= 1;
 	}
 
-	function repeat_keystroke() { while (repeat_cnt--) signal(repeat_key); }
+	function repeat_keystroke() {
+		while (repeat_cnt--) {
+			if (!repeater[0])
+				signal(repeater[1]);
+			else
+				sigapp('', repeater[1]);
+		}
+	}
 
 	var barrier_dig = [], barrier_div;
 	function set_barrier_dig(code)

@@ -6535,16 +6535,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `runtime via terminal escape sequences.`,
   ),
 
-  'cursor-blink-cycle': hterm.PreferenceManager.definePref_(
-      'Cursor blink rate',
-      hterm.PreferenceManager.Categories.Appearance,
-      [1000, 500], 'value',
-      `The text cursor blink rate in milliseconds.\n` +
-      `\n` +
-      `A two element array, the first of which is how long the text cursor ` +
-      `should be on, second is how long it should be off.`,
-  ),
-
   'cursor-shape': hterm.PreferenceManager.definePref_(
       'Text cursor shape',
       hterm.PreferenceManager.Categories.Appearance,
@@ -10344,8 +10334,7 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // The current cursor shape of the terminal.
   this.cursorShape_ = hterm.Terminal.cursorShape.BLOCK;
 
-  // Cursor blink on/off cycle in ms, overwritten by prefs once they're loaded.
-  this.cursorBlinkCycle_ = [100, 100];
+  this.cursorBlinkCycle_ = [1000, 500];
 
   // Cursor is hidden when scrolling up pushes it off the bottom of the screen.
   this.cursorOffScreen_ = false;
@@ -10549,19 +10538,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'cursor-shape': (v) => {
       this.setCursorShape(v);
-    },
-
-    'cursor-blink-cycle': (v) => {
-        if (v instanceof Array &&
-            typeof v[0] == 'number' &&
-            typeof v[1] == 'number') {
-          this.cursorBlinkCycle_ = v;
-        } else if (typeof v == 'number') {
-          this.cursorBlinkCycle_ = [v, v];
-        } else {
-          // Fast blink indicates an error.
-          this.cursorBlinkCycle_ = [100, 100];
-        }
     },
 
     'cursor-color': (v) => {

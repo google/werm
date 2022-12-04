@@ -46,16 +46,19 @@ function term_init()
 
 	function set_title()
 	{
-		var compons;
+		var compons, skip_tid;
 
 		compons = [];
 		if (termid) compons.push(`[${termid}]`);
+		skip_tid = compons.length;
 		if (remote_ttl) compons.push(remote_ttl);
 
 		row_ttl = find_row_ttl() || row_ttl;
 		if (row_ttl) compons.push('|', row_ttl);
 
 		document.title = compons.join(' ');
+		localStorage['title-' + termid] =
+			compons.splice(skip_tid).join(' ');
 	}
 
 	function print(str)
@@ -233,12 +236,12 @@ function term_init()
 	termid = params.get('termid');
 	pream = params.get('pream');
 
-	remote_ttl = localStorage['title-' + termid] || '';
+	remote_ttl = localStorage['remote-title-' + termid] || '';
 	if (termid) localStorage['pream-' + termid] = pream || '';
 
 	t.setWindowTitle = function(ttl)
 	{
-		remote_ttl = localStorage['title-' + termid] = ttl;
+		remote_ttl = localStorage['remote-title-' + termid] = ttl;
 		set_title();
 	};
 	t.setWindowTitle(cached_title);

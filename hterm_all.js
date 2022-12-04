@@ -10347,9 +10347,6 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // Cursor blink on/off cycle in ms, overwritten by prefs once they're loaded.
   this.cursorBlinkCycle_ = [100, 100];
 
-  // Whether to temporarily disable blinking.
-  this.cursorBlinkPause_ = false;
-
   // Cursor is hidden when scrolling up pushes it off the bottom of the screen.
   this.cursorOffScreen_ = false;
 
@@ -13098,32 +13095,6 @@ hterm.Terminal.prototype.setCursorVisible = function(state) {
 };
 
 /**
- * Pause blinking temporarily.
- *
- * When the cursor moves around, it can be helpful to momentarily pause the
- * blinking.  This could be when the user is typing in things, or when they're
- * moving around with the arrow keys.
- */
-hterm.Terminal.prototype.pauseCursorBlink_ = function() {
-  if (!this.options_.cursorBlink) {
-    return;
-  }
-
-  this.cursorBlinkPause_ = true;
-
-  // If a timeout is already pending, reset the clock due to the new input.
-  if (this.timeouts_.cursorBlinkPause) {
-    clearTimeout(this.timeouts_.cursorBlinkPause);
-  }
-  // After 500ms, resume blinking.  That seems like a good balance between user
-  // input timings & responsiveness to resume.
-  this.timeouts_.cursorBlinkPause = setTimeout(() => {
-    delete this.timeouts_.cursorBlinkPause;
-    this.cursorBlinkPause_ = false;
-  }, 500);
-};
-
-/**
  * Synchronizes the visible cursor and document selection with the current
  * cursor coordinates.
  *
@@ -14066,8 +14037,7 @@ hterm.Terminal.prototype.onCursorBlink_ = function() {
   }
 
   if (this.cursorNode_.getAttribute('focus') == 'false' ||
-      this.cursorNode_.style.opacity == '0' ||
-      this.cursorBlinkPause_) {
+      this.cursorNode_.style.opacity == '0') {
     this.cursorNode_.style.opacity = '1';
     this.timeouts_.cursorBlink = setTimeout(this.myOnCursorBlink_,
                                             this.cursorBlinkCycle_[0]);

@@ -10608,10 +10608,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.alternateScreen_.textAttributes.enableBoldAsBright = !!v;
     },
 
-    'enable-blink': (v) => {
-      this.setTextBlink(!!v);
-    },
-
     'enable-clipboard-write': (v) => {
       this.vt.enableClipboardWrite = !!v;
     },
@@ -11036,18 +11032,6 @@ hterm.Terminal.prototype.syncMousePasteButton = function() {
   } else {
     this.mousePasteButton = 2;  // Right mouse button.
   }
-};
-
-/**
- * Control text blinking behavior.
- *
- * @param {boolean=} state Whether to enable support for blinking text.
- */
-hterm.Terminal.prototype.setTextBlink = function(state) {
-  if (state === undefined) {
-    state = this.prefs_.getBoolean('enable-blink');
-  }
-  this.setCssVar('blink-node-duration', state ? '0.7s' : '0');
 };
 
 /**

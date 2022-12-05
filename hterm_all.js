@@ -5078,7 +5078,7 @@ hterm.Frame.prototype.sendTerminalInfo_ = function() {
       acceptLanguages: languages,
       foregroundColor: this.terminal_.getForegroundColor(),
       backgroundColor: this.terminal_.getBackgroundColor(),
-      cursorColor: this.terminal_.getCursorColor(),
+      cursorColor: this.terminal_.getCssVar('cursor-color'),
       fontSize: this.terminal_.getFontSize(),
       fontFamily: this.terminal_.getFontFamily(),
       baseURL: lib.f.getURL('/'),
@@ -6525,29 +6525,6 @@ hterm.PreferenceManager.defaultPreferences = {
       hterm.PreferenceManager.Categories.Miscellaneous,
       true, 'bool',
       `Whether to close the window when the command finishes executing.`,
-  ),
-
-  'cursor-blink': hterm.PreferenceManager.definePref_(
-      'Cursor blink',
-      hterm.PreferenceManager.Categories.Appearance,
-      false, 'bool',
-      `Whether the text cursor blinks by default. This can be toggled at ` +
-      `runtime via terminal escape sequences.`,
-  ),
-
-  'cursor-shape': hterm.PreferenceManager.definePref_(
-      'Text cursor shape',
-      hterm.PreferenceManager.Categories.Appearance,
-      'BLOCK', ['BLOCK', 'BEAM', 'UNDERLINE'],
-      `The shape of the visible text cursor. This can be changed at ` +
-      `runtime via terminal escape sequences.`,
-  ),
-
-  'cursor-color': hterm.PreferenceManager.definePref_(
-      'Text cursor color',
-      hterm.PreferenceManager.Categories.Appearance,
-      'rgba(255, 0, 0, 0.5)', 'color',
-      `The color of the visible text cursor.`,
   ),
 
   'color-palette-overrides': hterm.PreferenceManager.definePref_(
@@ -10490,18 +10467,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.vt.characterMaps.setOverrides(v);
     },
 
-    'cursor-blink': (v) => {
-      this.setCursorBlink(!!v);
-    },
-
-    'cursor-shape': (v) => {
-      this.setCursorShape(v);
-    },
-
-    'cursor-color': (v) => {
-      this.setCursorColor(v);
-    },
-
     'color-palette-overrides': (v) => {
       if (!(v == null || v instanceof Object || v instanceof Array)) {
         console.warn('Preference color-palette-overrides is not an array or ' +
@@ -10725,20 +10690,7 @@ hterm.Terminal.prototype.setBracketedPaste = function(state) {
  *     saved user preference.
  */
 hterm.Terminal.prototype.setCursorColor = function(color) {
-  if (color === undefined) {
-    color = this.prefs_.getString('cursor-color');
-  }
-
-  this.setCssVar('cursor-color', color);
-};
-
-/**
- * Return the current cursor color as a string.
- *
- * @return {string}
- */
-hterm.Terminal.prototype.getCursorColor = function() {
-  return this.getCssVar('cursor-color');
+  this.setCssVar('cursor-color', color || 'hsl(100, 60%, 80%)');
 };
 
 /**
@@ -11417,7 +11369,7 @@ hterm.Terminal.prototype.reset = function() {
 
   // Reset terminal options to their default values.
   this.options_ = new hterm.Options();
-  this.setCursorBlink(!!this.prefs_.get('cursor-blink'));
+  this.setCursorBlink();
 
   this.setVTScrollRegion(null, null);
 
@@ -11656,8 +11608,14 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
 .cursor-node[focus="false"] {
   box-sizing: border-box;
   background-color: transparent !important;
+  border-color: var(--hterm-cursor-color);
   border-width: 2px;
   border-style: solid;
+}
+@keyframes cursor-blink {
+  0%	{ opacity: 0.1; }
+  95%	{ opacity: 0.7; }
+  100%	{ opacity: 0.3; }
 }
 menu {
   background: #fff;
@@ -11733,18 +11691,21 @@ ${lib.colors.stockPalette.map((c, i) => `
   this.cursorNode_.id = 'hterm:terminal-cursor';
   this.cursorNode_.className = 'cursor-node';
   this.cursorNode_.style.cssText = `
+animation-duration: 0.8s;
+animation-name: cursor-blink;
+animation-iteration-count: infinite;
+animation-timing-function: ease-out;
+
 position: absolute;
 left: var(--hterm-curs-left);
 top: var(--hterm-curs-top);
 display: ${this.options_.cursorVisible ? '' : 'none'};
 width: var(--hterm-charsize-width);
 height: var(--hterm-charsize-height);
-background-color: var(--hterm-cursor-color);
-border-color: var(--hterm-cursor-color);
-transition: opacity, background-color 100ms linear;`;
+`;
 
   this.setCursorColor();
-  this.setCursorBlink(!!this.prefs_.get('cursor-blink'));
+  this.setCursorBlink();
   this.restyleCursor_();
 
   this.document_.body.appendChild(this.cursorNode_);
@@ -12797,8 +12758,9 @@ hterm.Terminal.prototype.setReverseVideo = function(state) {
  */
 hterm.Terminal.prototype.ringBell = function() {
   this.cursorNode_.style.backgroundColor = 'rgb(var(--hterm-foreground-color))';
+  this.cursorNode_.style.animationName = '';
 
-  setTimeout(() => this.restyleCursor_(), 200);
+  setTimeout(() => this.restyleCursor_(), 500);
 
   if (this.desktopNotificationBell_ && !this.document_.hasFocus()) {
     const n = hterm.notify();
@@ -12951,16 +12913,10 @@ hterm.Terminal.prototype.setAlternateMode = function(state) {
  * @param {boolean} state True to set cursor-blink mode, false to unset.
  */
 hterm.Terminal.prototype.setCursorBlink = function(state) {
-  this.options_.cursorBlink = state;
+  if (state === undefined) state = true;
 
-  if (!state && this.timeouts_.cursorBlink) {
-    clearTimeout(this.timeouts_.cursorBlink);
-    delete this.timeouts_.cursorBlink;
-  }
-
-  if (this.options_.cursorVisible) {
-    this.setCursorVisible(true);
-  }
+  this.options_.cursorBlink = !!state;
+  this.cursorNode_.style.animationName = state ? 'cursor-blink' : '';
 };
 
 /**
@@ -13078,16 +13034,23 @@ hterm.Terminal.prototype.restyleCursor_ = function() {
     shape = hterm.Terminal.cursorShape.BLOCK;
   }
 
+  // Restore blinking animation in case ringBell stopped it.
+  this.setCursorBlink(this.options_.cursorBlink);
+
   const style = this.cursorNode_.style;
 
   switch (shape) {
     case hterm.Terminal.cursorShape.BEAM:
+      style.borderColor = 'var(--hterm-cursor-color)';
+      style.opacity = 0.9;
       style.backgroundColor = 'transparent';
       style.borderBottomStyle = '';
       style.borderLeftStyle = 'solid';
       break;
 
     case hterm.Terminal.cursorShape.UNDERLINE:
+      style.borderColor = 'var(--hterm-cursor-color)';
+      style.opacity = 0.9;
       style.backgroundColor = 'transparent';
       style.borderBottomStyle = 'solid';
       style.borderLeftStyle = '';
@@ -13095,6 +13058,7 @@ hterm.Terminal.prototype.restyleCursor_ = function() {
 
     default:
       style.backgroundColor = 'var(--hterm-cursor-color)';
+      style.opacity = 0.6;
       style.borderBottomStyle = '';
       style.borderLeftStyle = '';
       break;

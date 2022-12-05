@@ -6937,20 +6937,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `legacy applications.`,
   ),
 
-  'user-css': hterm.PreferenceManager.definePref_(
-      'Custom CSS (URI)',
-      hterm.PreferenceManager.Categories.Appearance,
-      '', 'url',
-      `URL of user stylesheet to include in the terminal document.`,
-  ),
-
-  'user-css-text': hterm.PreferenceManager.definePref_(
-      'Custom CSS (inline text)',
-      hterm.PreferenceManager.Categories.Appearance,
-      '', 'multiline-string',
-      `Custom CSS text for styling the terminal.`,
-  ),
-
   'allow-images-inline': hterm.PreferenceManager.definePref_(
       'Allow inline image display',
       hterm.PreferenceManager.Categories.Extensions,
@@ -8751,9 +8737,6 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   this.userCssLink_ = doc.createElement('link');
   this.userCssLink_.setAttribute('rel', 'stylesheet');
 
-  this.userCssText_ = doc.createElement('style');
-  doc.head.appendChild(this.userCssText_);
-
   // TODO(rginda): Sorry, this 'screen_' isn't the same thing as hterm.Screen
   // from screen.js.  I need to pick a better name for one of them to avoid
   // the collision.
@@ -9025,31 +9008,6 @@ hterm.ScrollPort.prototype.scrollPageDown = function() {
 /** @return {string} */
 hterm.ScrollPort.prototype.getFontFamily = function() {
   return this.screen_.style.fontFamily;
-};
-
-/**
- * Set a custom stylesheet to include in the scrollport.
- *
- * Defaults to null, meaning no custom css is loaded.  Set it back to null or
- * the empty string to remove a previously applied custom css.
- *
- * @param {?string} url
- */
-hterm.ScrollPort.prototype.setUserCssUrl = function(url) {
-  if (url) {
-    this.userCssLink_.setAttribute('href', url);
-
-    if (!this.userCssLink_.parentNode) {
-      this.document_.head.appendChild(this.userCssLink_);
-    }
-  } else if (this.userCssLink_.parentNode) {
-    this.document_.head.removeChild(this.userCssLink_);
-  }
-};
-
-/** @param {string} text */
-hterm.ScrollPort.prototype.setUserCssText = function(text) {
-  this.userCssText_.textContent = text;
 };
 
 /** Focus. */
@@ -10709,14 +10667,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.vt.setEncoding(v);
     },
 
-    'user-css': (v) => {
-      this.scrollPort_.setUserCssUrl(v);
-    },
-
-    'user-css-text': (v) => {
-      this.scrollPort_.setUserCssText(v);
-    },
-
     'word-break-match-left': (v) => {
       this.primaryScreen_.wordBreakMatchLeft = v;
       this.alternateScreen_.wordBreakMatchLeft = v;
@@ -11659,8 +11609,6 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
   this.scrollPort_.setBackgroundSize(this.prefs_.getString('background-size'));
   this.scrollPort_.setBackgroundPosition(
       this.prefs_.getString('background-position'));
-  this.scrollPort_.setUserCssUrl(this.prefs_.getString('user-css'));
-  this.scrollPort_.setUserCssText(this.prefs_.getString('user-css-text'));
   this.scrollPort_.setAccessibilityReader(
       lib.notNull(this.accessibilityReader_));
 

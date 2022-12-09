@@ -6327,7 +6327,7 @@ hterm.Options = function(copy = undefined) {
   this.reverseWraparound = copy ? copy.reverseWraparound : false;
   this.originMode = copy ? copy.originMode : false;
   this.autoCarriageReturn = copy ? copy.autoCarriageReturn : false;
-  this.cursorVisible = copy ? copy.cursorVisible : false;
+  this.cursorVisible = copy ? copy.cursorVisible : true;
   this.cursorBlink = copy ? copy.cursorBlink : false;
   this.insertMode = copy ? copy.insertMode : false;
   this.reverseVideo = copy ? copy.reverseVideo : false;
@@ -10266,17 +10266,11 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // The DIV element for the visible cursor.
   this.cursorNode_ = null;
 
-  // The current cursor shape of the terminal.
-  this.cursorShape_ = hterm.Terminal.cursorShape.BLOCK;
-
-  this.cursorBlinkCycle_ = [1000, 500];
+  // '_' shape is user preference.
+  this.cursorShape_ = '_';
 
   // Cursor is hidden when scrolling up pushes it off the bottom of the screen.
   this.cursorOffScreen_ = false;
-
-  // Pre-bound onCursorBlink_ handler, so we don't have to do this for each
-  // cursor on/off servicing.
-  this.myOnCursorBlink_ = this.onCursorBlink_.bind(this);
 
   // These prefs are cached so we don't have to read from local storage with
   // each output and keystroke.  They are initialized by the preference manager.
@@ -11046,11 +11040,6 @@ hterm.Terminal.prototype.restoreCursorAndState = function(both) {
   }
 };
 
-/**
- * Sets the cursor shape
- *
- * @param {string} shape The shape to set.
- */
 hterm.Terminal.prototype.setCursorShape = function(shape) {
   this.cursorShape_ = shape;
   this.restyleCursor_();
@@ -11369,7 +11358,7 @@ hterm.Terminal.prototype.reset = function() {
 
   // Reset terminal options to their default values.
   this.options_ = new hterm.Options();
-  this.setCursorBlink();
+  this.setCursorBlink('u');
 
   this.setVTScrollRegion(null, null);
 
@@ -11612,9 +11601,8 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
   border-style: solid;
 }
 @keyframes cursor-blink {
-  0%	{ opacity: 0.1; }
-  95%	{ opacity: 0.7; }
-  100%	{ opacity: 0.3; }
+  0%	{ opacity: calc(var(--hterm-curs-opac-factor)); }
+  100%	{ opacity: calc(var(--hterm-curs-opac-factor) * 0.1); }
 }
 menu {
   background: #fff;
@@ -11665,6 +11653,7 @@ menuitem:hover {
 	var(--hterm-screen-padding-size)
 	+ var(--hterm-charsize-height) * var(--hterm-cursor-offset-row)
   );
+  --hterm-curs-opac-factor: 1.0;
 
 ${lib.colors.stockPalette.map((c, i) => `
   --hterm-color-${i}: ${lib.colors.crackRGB(c).slice(0, 3).join(',')};
@@ -11699,19 +11688,19 @@ ${lib.colors.stockPalette.map((c, i) => `
 animation-duration: 0.8s;
 animation-name: cursor-blink;
 animation-iteration-count: infinite;
-animation-timing-function: ease-out;
+animation-timing-function: cubic-bezier(1,-0.18,0,1);
 
 box-sizing: border-box;
 position: absolute;
 left: var(--hterm-curs-left);
 top: var(--hterm-curs-top);
-display: ${this.options_.cursorVisible ? '' : 'none'};
 width: var(--hterm-charsize-width);
 height: var(--hterm-charsize-height);
+opacity: var(--hterm-curs-opac-factor);
 `;
 
   this.setCursorColor();
-  this.setCursorBlink();
+  this.setCursorBlink('u');
   this.restyleCursor_();
 
   this.document_.body.appendChild(this.cursorNode_);
@@ -12908,21 +12897,27 @@ hterm.Terminal.prototype.setAlternateMode = function(state) {
 /**
  * Set the cursor-blink mode bit.
  *
- * If cursor-blink is on, the cursor will blink when it is visible.  Otherwise
- * a visible cursor does not blink.
- *
- * You should make sure to turn blinking off if you're going to dispose of a
- * terminal, otherwise you'll leak a timeout.
- *
- * Defaults to on.
- *
- * @param {boolean} state True to set cursor-blink mode, false to unset.
+ * 'p' - pauses blink if it's on
+ * 'r' - resumes blink from normal state
+ * 'u' - set according to user preference
+ * 'y' - turn on
+ * 'n' - turn off
  */
-hterm.Terminal.prototype.setCursorBlink = function(state) {
-  if (state === undefined) state = true;
+hterm.Terminal.prototype.setCursorBlink = function(b) {
+  var temp, perm = this.options_.cursorBlink;
 
-  this.options_.cursorBlink = !!state;
-  this.cursorNode_.style.animationName = state ? 'cursor-blink' : '';
+  switch (b) {
+  case 'p': temp = 0;		break;
+  case 'r': temp = perm;	break;
+  case 'u':
+  case 'y': temp = perm = 1;	break;
+  case 'n': temp = perm = 0;	break;
+
+  default: throw 'invalid blink: ' + b;
+  }
+
+  this.options_.cursorBlink = !!perm;
+  this.cursorNode_.style.animationName = temp ? 'cursor-blink' : '';
 };
 
 /**
@@ -12937,31 +12932,9 @@ hterm.Terminal.prototype.setCursorBlink = function(state) {
 hterm.Terminal.prototype.setCursorVisible = function(state) {
   this.options_.cursorVisible = state;
 
-  if (!state) {
-    if (this.timeouts_.cursorBlink) {
-      clearTimeout(this.timeouts_.cursorBlink);
-      delete this.timeouts_.cursorBlink;
-    }
-    this.cursorNode_.style.opacity = '0';
-    return;
-  }
+  if (state) this.syncCursorPosition_();
 
-  this.syncCursorPosition_();
-
-  this.cursorNode_.style.opacity = '1';
-
-  if (this.options_.cursorBlink) {
-    if (this.timeouts_.cursorBlink) {
-      return;
-    }
-
-    this.onCursorBlink_();
-  } else {
-    if (this.timeouts_.cursorBlink) {
-      clearTimeout(this.timeouts_.cursorBlink);
-      delete this.timeouts_.cursorBlink;
-    }
-  }
+  this.restyleCursor_();
 };
 
 /**
@@ -13033,42 +13006,48 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
  * and character cell dimensions.
  */
 hterm.Terminal.prototype.restyleCursor_ = function() {
+  var opac;
   let shape = this.cursorShape_;
-
-  if (this.cursorNode_.getAttribute('focus') == 'false') {
-    // Always show a block cursor when unfocused.
-    shape = hterm.Terminal.cursorShape.BLOCK;
-  }
-
-  // Restore blinking animation in case ringBell stopped it.
-  this.setCursorBlink(this.options_.cursorBlink);
 
   const style = this.cursorNode_.style;
 
+  if (this.cursorNode_.getAttribute('focus') == 'false') {
+    // Always show a block cursor when unfocused.
+    shape = 'b';
+    this.setCursorBlink('p');
+  }
+  else {
+    this.setCursorBlink('r');
+  }
+
+  opac = this.options_.cursorVisible ? 1.0 : 0.25;
+
   switch (shape) {
-    case hterm.Terminal.cursorShape.BEAM:
+    case '|':
       style.borderColor = 'var(--hterm-cursor-color)';
-      style.opacity = 0.9;
+      opac *= 0.9;
       style.backgroundColor = 'transparent';
       style.borderBottomStyle = '';
       style.borderLeftStyle = 'solid';
       break;
 
-    case hterm.Terminal.cursorShape.UNDERLINE:
+    case '_':
       style.borderColor = 'var(--hterm-cursor-color)';
-      style.opacity = 0.9;
+      opac *= 0.9;
       style.backgroundColor = 'transparent';
       style.borderBottomStyle = 'solid';
       style.borderLeftStyle = '';
       break;
 
-    default:
+    case 'b':
       style.backgroundColor = 'var(--hterm-cursor-color)';
-      style.opacity = 0.6;
+      opac *= 0.6;
       style.borderBottomStyle = '';
       style.borderLeftStyle = '';
       break;
   }
+
+  this.setCssVar('curs-opac-factor', opac);
 };
 
 /**
@@ -13902,27 +13881,6 @@ hterm.Terminal.prototype.onResize_ = function() {
 
   if (wasScrolledEnd) {
     this.scrollEnd();
-  }
-};
-
-/**
- * Service the cursor blink timeout.
- */
-hterm.Terminal.prototype.onCursorBlink_ = function() {
-  if (!this.options_.cursorBlink) {
-    delete this.timeouts_.cursorBlink;
-    return;
-  }
-
-  if (this.cursorNode_.getAttribute('focus') == 'false' ||
-      this.cursorNode_.style.opacity == '0') {
-    this.cursorNode_.style.opacity = '1';
-    this.timeouts_.cursorBlink = setTimeout(this.myOnCursorBlink_,
-                                            this.cursorBlinkCycle_[0]);
-  } else {
-    this.cursorNode_.style.opacity = '0';
-    this.timeouts_.cursorBlink = setTimeout(this.myOnCursorBlink_,
-                                            this.cursorBlinkCycle_[1]);
   }
 };
 
@@ -15823,7 +15781,7 @@ hterm.VT.prototype.setDECMode = function(code, state) {
 
     case 12:  // Start blinking cursor
       if (this.enableDec12) {
-        this.terminal.setCursorBlink(state);
+        this.terminal.setCursorBlink(state ? 'y' : 'n');
       }
       break;
 
@@ -16938,16 +16896,11 @@ hterm.VT.OSC['50'] = function(parseState) {
   }
 
   switch (args[1]) {
-    case '1':  // CursorShape=1: I-Beam.
-      this.terminal.setCursorShape(hterm.Terminal.cursorShape.BEAM);
-      break;
+    case '0': this.terminal.setCursorShape('b'); break;
+    case '1': this.terminal.setCursorShape('|'); break;
+    case '2': this.terminal.setCursorShape('_'); break;
 
-    case '2':  // CursorShape=2: Underline.
-      this.terminal.setCursorShape(hterm.Terminal.cursorShape.UNDERLINE);
-      break;
-
-    default:  // CursorShape=0: Block.
-      this.terminal.setCursorShape(hterm.Terminal.cursorShape.BLOCK);
+    default: console.warn('invalid cursor shape: ', args[1]);
   }
 };
 
@@ -17983,23 +17936,23 @@ hterm.VT.CSI[' q'] = function(parseState) {
   const arg = parseState.args[0];
 
   if (arg == 0 || arg == 1) {
-    this.terminal.setCursorShape(hterm.Terminal.cursorShape.BLOCK);
-    this.terminal.setCursorBlink(true);
+    this.terminal.setCursorShape('b');
+    this.terminal.setCursorBlink('y');
   } else if (arg == 2) {
-    this.terminal.setCursorShape(hterm.Terminal.cursorShape.BLOCK);
-    this.terminal.setCursorBlink(false);
+    this.terminal.setCursorShape('b');
+    this.terminal.setCursorBlink('n');
   } else if (arg == 3) {
-    this.terminal.setCursorShape(hterm.Terminal.cursorShape.UNDERLINE);
-    this.terminal.setCursorBlink(true);
+    this.terminal.setCursorShape('_');
+    this.terminal.setCursorBlink('y');
   } else if (arg == 4) {
-    this.terminal.setCursorShape(hterm.Terminal.cursorShape.UNDERLINE);
-    this.terminal.setCursorBlink(false);
+    this.terminal.setCursorShape('_');
+    this.terminal.setCursorBlink('n');
   } else if (arg == 5) {
-    this.terminal.setCursorShape(hterm.Terminal.cursorShape.BEAM);
-    this.terminal.setCursorBlink(true);
+    this.terminal.setCursorShape('|');
+    this.terminal.setCursorBlink('y');
   } else if (arg == 6) {
-    this.terminal.setCursorShape(hterm.Terminal.cursorShape.BEAM);
-    this.terminal.setCursorBlink(false);
+    this.terminal.setCursorShape('|');
+    this.terminal.setCursorBlink('n');
   } else {
     console.warn('Unknown cursor style: ' + arg);
   }

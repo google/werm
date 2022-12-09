@@ -10372,9 +10372,9 @@ hterm.Terminal.DEFAULT_PROFILE_ID = 'default';
  * Possible cursor shapes.
  */
 hterm.Terminal.cursorShape = {
-  BLOCK: 'BLOCK',
-  BEAM: 'BEAM',
-  UNDERLINE: 'UNDERLINE',
+  BLOCK: 'b',
+  BEAM: '|',
+  UNDERLINE: '_',
 };
 
 /**
@@ -11606,7 +11606,6 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
   const style = this.document_.createElement('style');
   style.textContent = `
 .cursor-node[focus="false"] {
-  box-sizing: border-box;
   background-color: transparent !important;
   border-color: var(--hterm-cursor-color);
   border-width: 2px;
@@ -11658,8 +11657,14 @@ menuitem:hover {
   --hterm-mouse-cursor-pointer: pointer;
   --hterm-mouse-cursor-style: var(--hterm-mouse-cursor-text);
   --hterm-screen-padding-size: 0;
-  --hterm-curs-left: calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-width) * var(--hterm-cursor-offset-col));
-  --hterm-curs-top: calc(var(--hterm-screen-padding-size) + var(--hterm-charsize-height) * var(--hterm-cursor-offset-row));
+  --hterm-curs-left: calc(
+	var(--hterm-screen-padding-size)
+	+ var(--hterm-charsize-width) * var(--hterm-cursor-offset-col)
+  );
+  --hterm-curs-top: calc(
+	var(--hterm-screen-padding-size)
+	+ var(--hterm-charsize-height) * var(--hterm-cursor-offset-row)
+  );
 
 ${lib.colors.stockPalette.map((c, i) => `
   --hterm-color-${i}: ${lib.colors.crackRGB(c).slice(0, 3).join(',')};
@@ -11696,6 +11701,7 @@ animation-name: cursor-blink;
 animation-iteration-count: infinite;
 animation-timing-function: ease-out;
 
+box-sizing: border-box;
 position: absolute;
 left: var(--hterm-curs-left);
 top: var(--hterm-curs-top);

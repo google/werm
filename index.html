@@ -23,7 +23,10 @@ body {
   <body>
     <div id="terminal"
          style="position:relative; width:100%; height:100%"></div>
+    <script>window['extended_macros'] = {}</script>
+    <script src="local.js"></script>
     <script src="gum.js"></script>
+
     <script src="hterm_all.js"></script>
     <script>
 
@@ -604,7 +607,15 @@ function term_init()
 		 set_barrier_dig.bind(1),
 		 set_barrier_dig.bind(2)], show_barrier],
 	];
-	while (gum_macro_map.length) macro_map.push(gum_macro_map.pop());
+
+	function collect_macros(name)
+	{
+		var map = window.extended_macros[name] || [];
+		while (map.length) macro_map.push(map.pop());
+	}
+
+	collect_macros('gum');
+	collect_macros('local');
 
 	var mkeys = [], got_key_up = false;
 

@@ -6327,7 +6327,6 @@ hterm.Options = function(copy = undefined) {
   this.reverseWraparound = copy ? copy.reverseWraparound : false;
   this.originMode = copy ? copy.originMode : false;
   this.autoCarriageReturn = copy ? copy.autoCarriageReturn : false;
-  this.cursorVisible = copy ? copy.cursorVisible : true;
   this.cursorBlink = copy ? copy.cursorBlink : false;
   this.insertMode = copy ? copy.insertMode : false;
   this.reverseVideo = copy ? copy.reverseVideo : false;
@@ -11046,15 +11045,6 @@ hterm.Terminal.prototype.setCursorShape = function(shape) {
 };
 
 /**
- * Get the cursor shape
- *
- * @return {string}
- */
-hterm.Terminal.prototype.getCursorShape = function() {
-  return this.cursorShape_;
-};
-
-/**
  * Set the screen padding size in pixels.
  *
  * @param {number} size
@@ -11601,8 +11591,8 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
   border-style: solid;
 }
 @keyframes cursor-blink {
-  0%	{ opacity: calc(var(--hterm-curs-opac-factor)); }
-  100%	{ opacity: calc(var(--hterm-curs-opac-factor) * 0.1); }
+  0%	{ opacity: var(--hterm-curs-opac); }
+  100%	{ opacity: calc(var(--hterm-curs-opac) * 0.1); }
 }
 menu {
   background: #fff;
@@ -11653,7 +11643,10 @@ menuitem:hover {
 	var(--hterm-screen-padding-size)
 	+ var(--hterm-charsize-height) * var(--hterm-cursor-offset-row)
   );
-  --hterm-curs-opac-factor: 1.0;
+  --hterm-curs-vis-factor: 1;
+  --hterm-curs-opac: calc(
+        var(--hterm-curs-shape-factor) * var(--hterm-curs-vis-factor)
+  );
 
 ${lib.colors.stockPalette.map((c, i) => `
   --hterm-color-${i}: ${lib.colors.crackRGB(c).slice(0, 3).join(',')};
@@ -11696,7 +11689,7 @@ left: var(--hterm-curs-left);
 top: var(--hterm-curs-top);
 width: var(--hterm-charsize-width);
 height: var(--hterm-charsize-height);
-opacity: var(--hterm-curs-opac-factor);
+opacity: var(--hterm-curs-opac);
 `;
 
   this.setCursorColor();
@@ -12930,11 +12923,7 @@ hterm.Terminal.prototype.setCursorBlink = function(b) {
  * @param {boolean} state True to set cursor-visible mode, false to unset.
  */
 hterm.Terminal.prototype.setCursorVisible = function(state) {
-  this.options_.cursorVisible = state;
-
-  if (state) this.syncCursorPosition_();
-
-  this.restyleCursor_();
+  this.setCssVar('curs-vis-factor', state ? '1.0' : '0.25');
 };
 
 /**
@@ -13020,12 +13009,10 @@ hterm.Terminal.prototype.restyleCursor_ = function() {
     this.setCursorBlink('r');
   }
 
-  opac = this.options_.cursorVisible ? 1.0 : 0.25;
-
   switch (shape) {
     case '|':
       style.borderColor = 'var(--hterm-cursor-color)';
-      opac *= 0.9;
+      this.setCssVar('curs-shape-factor', 0.9);
       style.backgroundColor = 'transparent';
       style.borderBottomStyle = '';
       style.borderLeftStyle = 'solid';
@@ -13033,7 +13020,7 @@ hterm.Terminal.prototype.restyleCursor_ = function() {
 
     case '_':
       style.borderColor = 'var(--hterm-cursor-color)';
-      opac *= 0.9;
+      this.setCssVar('curs-shape-factor', 0.9);
       style.backgroundColor = 'transparent';
       style.borderBottomStyle = 'solid';
       style.borderLeftStyle = '';
@@ -13041,13 +13028,11 @@ hterm.Terminal.prototype.restyleCursor_ = function() {
 
     case 'b':
       style.backgroundColor = 'var(--hterm-cursor-color)';
-      opac *= 0.6;
+      this.setCssVar('curs-shape-factor', 0.6);
       style.borderBottomStyle = '';
       style.borderLeftStyle = '';
       break;
   }
-
-  this.setCssVar('curs-opac-factor', opac);
 };
 
 /**
@@ -13612,8 +13597,7 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
     return;
   }
 
-  if (this.options_.cursorVisible && !reportMouseEvents &&
-      !this.cursorOffScreen_) {
+  if (!reportMouseEvents && !this.cursorOffScreen_) {
     // If the cursor is visible and we're not sending mouse events to the
     // host app, then we want to hide the terminal cursor when the mouse
     // cursor is over top.  This keeps the terminal cursor from interfering

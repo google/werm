@@ -5,11 +5,18 @@ cmd_scratch=/tmp/compile_commands_$$.json
 cd `dirname $0`
 echo '{' >| compile_commands.json
 
+oops () {
+	set -x
+	: 'required Debian pkgs:'
+	: '    libwslay-dev nettle-dev clang pkg-config websocketd'
+	exit 1
+}
+
 build () {
 	mod="$1"
 	libs="$2"
 	clang -x c -std=c99 -MJ $cmd_scratch -o $mod $mod.c $libs ||
-		exit 1
+		oops
 	cat $cmd_scratch >> compile_commands.json
 	rm $cmd_scratch
 }

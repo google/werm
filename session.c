@@ -123,9 +123,12 @@ static void parse_query(void)
 	}
 }
 
+#define DTACH "/bin/dtach"
+
 static _Noreturn void do_exec()
 {
 	char *slave_name;
+	const char *shell;
 	int slave;
 
 	slave_name = ptsname(master);
@@ -143,11 +146,18 @@ static _Noreturn void do_exec()
 
 	setenv("TERM", "xterm-256color", 1);
 
-	if (!dtach_sock) execl(getenv("SHELL"), getenv("SHELL"), NULL);
-	else execl("/bin/dtach", "/bin/dtach", "-A", dtach_sock, "-r", "none",
-		   "script", "-fa", log, NULL);
+	if (!dtach_sock) {
+		shell = getenv("SHELL");
 
-	err(1, "exec");
+		execl(shell, shell, NULL);
+		err(1, "execl $SHELL, which is: %s\n",
+		    shell ? shell : "<undef>");
+	}
+	else {
+		execl(DTACH, DTACH, "-A", dtach_sock,
+		      "-r", "none", "script", "-fa", log, NULL);
+		err(1, "execl " DTACH);
+	}
 }
 
 static _Bool send_byte(int b)

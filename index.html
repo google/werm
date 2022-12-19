@@ -805,6 +805,10 @@ function term_init()
 		if (log_keys) console.log('scrollport key:', e);
 
 		ce = cookev(e);
+
+		// Let search+right alt (in that order) turn on capslock.
+		if (ce.mn == 'ra' && ce.metaKey) return;
+
 		if (!process_mkey(ce)) {
 			push_dead_key_hist(ce);
 			dead_key_hist.splice(0, 2);

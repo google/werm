@@ -30,7 +30,139 @@ body {
     <script src="hterm_all.js"></script>
     <script>
 
-var log_send = 0, log_display = 0, log_keys = 0;
+var native_to_mn = {
+	'Escape':		'es',
+	'F1':			'f1',
+	'F2':			'f2',
+	'F3':			'f3',
+	'F4':			'f4',
+	'F5':			'f5',
+	'F6':			'f6',
+	'F7':			'f7',
+	'F8':			'f8',
+	'F9':			'f9',
+	'F10':			'fA',
+	'F11':			'fB',
+	'F12':			'fC',
+	'PrintScreen':		'sr',
+	'Pause':		'pa',
+	'Enter':		'en',
+	'Minus':		'- ',
+	'Equal':		'= ',
+	'Backspace':		'bs',
+	'Tab':			'ta',
+	'KeyA':			'A ',
+	'KeyB':			'B ',
+	'KeyC':			'C ',
+	'KeyD':			'D ',
+	'KeyE':			'E ',
+	'KeyF':			'F ',
+	'KeyG':			'G ',
+	'KeyH':			'H ',
+	'KeyI':			'I ',
+	'KeyJ':			'J ',
+	'KeyK':			'K ',
+	'KeyL':			'L ',
+	'KeyM':			'M ',
+	'KeyN':			'N ',
+	'KeyO':			'O ',
+	'KeyP':			'P ',
+	'KeyQ':			'Q ',
+	'KeyR':			'R ',
+	'KeyS':			'S ',
+	'KeyT':			'T ',
+	'KeyU':			'U ',
+	'KeyV':			'V ',
+	'KeyW':			'W ',
+	'KeyX':			'X ',
+	'KeyY':			'Y ',
+	'KeyZ':			'Z ',
+	'BracketLeft':		'[ ',
+	'BracketRight':		'] ',
+	'Space':		'sp',
+	'AltLeft':		'la',
+	'AltRight':		'ra',
+	'Digit0':		'0 ',
+	'Digit1':		'1 ',
+	'Digit2':		'2 ',
+	'Digit3':		'3 ',
+	'Digit4':		'4 ',
+	'Digit5':		'5 ',
+	'Digit6':		'6 ',
+	'Digit7':		'7 ',
+	'Digit8':		'8 ',
+	'Digit9':		'9 ',
+	'Backslash':		'vs',	// Reverse solidus
+	'ShiftLeft':		'ls',
+	'ShiftRight':		'rs',
+	'CapsLock':		'cl',
+	'MetaLeft':		'lw',
+	'MetaRight':		'rw',
+	'Quote':		'" ',
+	'ContextMenu':		'me',
+	'ControlLeft':		'lc',
+	'ControlRight':		'rc',
+	'Comma':		', ',
+	'Period':		'. ',
+	'Slash':		'/ ',
+	'Backquote':		'` ',
+	'ScrollLock':		'sl',
+	'Home':			'ho',
+	'End':			'nd',
+	'Delete':		'de',
+	'PageUp':		'pu',
+	'PageDown':		'pd',
+	'Insert':		'in',
+	'ArrowUp':		'up',
+	'ArrowDown':		'do',
+	'ArrowLeft':		'le',
+	'ArrowRight':		'ri',
+	'NumLock':		'#l',
+	'NumpadDivide':		'#/',
+	'NumpadSubtract':	'#-',
+	'NumpadMultiply':	'#*',
+	'NumpadAdd':		'#+',
+	'NumpadEnter':		'#e',
+	'NumpadDecimal':	'#.',
+	'Numpad0':		'#0',
+	'Numpad1':		'#1',
+	'Numpad2':		'#2',
+	'Numpad3':		'#3',
+	'Numpad4':		'#4',
+	'Numpad5':		'#5',
+	'Numpad6':		'#6',
+	'Numpad7':		'#7',
+	'Numpad8':		'#8',
+	'Numpad9':		'#9',
+	'Semicolon':		'; ',
+	'IntlRo':		'j1',
+	'IntlYen':		'j7',
+};
+ 
+function cookev(e)
+{
+	var mn, ce;
+
+	mn = native_to_mn[e.code];
+	if (!mn) {
+		console.error('no mn available:', e);
+		mn = '??';
+	}
+
+	ce = {
+		mn:		mn,
+		type:		e.type,
+		key:		e.key,
+		ctrlKey:	e.ctrlKey,
+		metaKey:	e.metaKey,
+		altKey:		e.altKey,
+		shiftKey:	e.shiftKey,
+	};
+	if (log_keys>=2) console.log(ce);
+	return ce;
+}
+
+var log_send = 0, log_display = 0, log_keys = 0, test = {};
 
 function term_init()
 {
@@ -85,6 +217,7 @@ function term_init()
 		function pend(di) { return pend_display[pend_i + di]; }
 		function is_utf_trail(di) {
 			if (0x80 == (pend(di) & 0xc0)) return true;
+			console.warn('not a utf8 trailing byte in print data');
 			print('?');
 			return false;
 		}
@@ -180,6 +313,7 @@ function term_init()
 				continue;
 			}
 
+			console.warn('not a valid utf8 sequence');
 			print('?');
 		}
 
@@ -301,13 +435,7 @@ function term_init()
 		default:	dead_key_hist.push('?');
 		}
 
-		switch (e.code) {
-		case 'ShiftLeft':	dead_key_hist.push('LS'); break;
-		case 'ShiftRight':	dead_key_hist.push('RS'); break;
-		case 'ControlLeft':	dead_key_hist.push('LC'); break;
-		case 'ControlRight':	dead_key_hist.push('RC'); break;
-		default:		dead_key_hist.push('?');
-		}
+		dead_key_hist.push(e.mn);
 	}
 
 	function process_key_down(e)
@@ -319,58 +447,58 @@ function term_init()
 		pref = e.metaKey ? '\x1b' : '';
 
 		if (e.shiftKey && e.ctrlKey) {
-			switch (e.code) {
-			case 'Digit2': signal(pref + '\x00'); return true;
-			case 'Digit6': signal(pref + '\x1e'); return true;
+			switch (e.mn) {
+			case '2 ': signal(pref + '\x00'); return true;
+			case '6 ': signal(pref + '\x1e'); return true;
 			}
 			return false;
 		}
 
 		if (e.key.length !== 1) {
 			if (e.ctrlKey) {
-				switch (e.key) {
-				case 'Backspace':	/* consume or else it makes a mess */	return true;
-				case 'ContextMenu':	signal(pref + '\x1f');			return true;
-				default:		return false;
+				switch (e.mn) {
+				case 'bs':	/* consume or else it makes a mess */	return true;
+				case 'me':	signal(pref + '\x1f');			return true;
+				default:						return false;
 				}
 			}
 
 			if (e.shiftKey) {
 				if (!pref) {
 					// These shortcuts cannot be preceded by Esc as they are not sent to I/O
-					switch (e.key) {
-					case 'PageDown':	t.scrollPageDown();	return true;
-					case 'PageUp':		t.scrollPageUp();	return true;
-					case 'Home':		t.scrollHome();		return true;
-					case 'End':		t.scrollEnd();		return true;
+					switch (e.mn) {
+					case 'pd': t.scrollPageDown();	return true;
+					case 'pu': t.scrollPageUp();	return true;
+					case 'ho': t.scrollHome();	return true;
+					case 'nd': t.scrollEnd();	return true;
 					}
 				}
 
-				switch (e.key) {
-				case 'Backspace':	signal(pref + '\x17');		return true;	// C+N
-				case 'Enter':		signal(pref + '\x0e');		return true;	// C+W
-				case 'Tab':		signal(pref + '\x1b\x5b\x5a');	return true;
-				default:						return false;
+				switch (e.mn) {
+				case 'bs': signal(pref + '\x17');		return true;	// C+N
+				case 'en': signal(pref + '\x0e');		return true;	// C+W
+				case 'ta': signal(pref + '\x1b\x5b\x5a');	return true;
+				default:					return false;
 				}
 			}
 
-			switch (e.key) {
-			case 'ArrowUp':		sigapp(pref, 'A');	return true;
-			case 'ArrowDown':	sigapp(pref, 'B');	return true;
-			case 'ArrowRight':	sigapp(pref, 'C');	return true;
-			case 'ArrowLeft':	sigapp(pref, 'D');	return true;
-			case 'End':		sigapp(pref, 'F');	return true;
-			case 'Home':		sigapp(pref, 'H');	return true;
-			case 'Insert':		signal(pref + '\x1b[2~');	return true;
-			case 'Delete':		signal(pref + '\x1b[3~');	return true;
-			case 'PageUp':		signal(pref + '\x1b[5~');	return true;
-			case 'PageDown':	signal(pref + '\x1b[6~');	return true;
-			case 'Enter':		signal(pref + '\r');		return true;
-			case 'Backspace':	signal(pref + bs_sends());	return true;
-			case 'Escape':		signal(pref + '\x1b');		return true;
-			case 'ContextMenu':	signal(pref + '_');		return true;
-			case 'Tab':		signal(pref + '\t');		return true;
-			default:						return false;
+			switch (e.mn) {
+			case 'up': sigapp(pref, 'A');		return true;
+			case 'do': sigapp(pref, 'B');		return true;
+			case 'ri': sigapp(pref, 'C');		return true;
+			case 'le': sigapp(pref, 'D');		return true;
+			case 'nd': sigapp(pref, 'F');		return true;
+			case 'ho': sigapp(pref, 'H');		return true;
+			case 'in': signal(pref + '\x1b[2~');	return true;
+			case 'de': signal(pref + '\x1b[3~');	return true;
+			case 'pu': signal(pref + '\x1b[5~');	return true;
+			case 'pd': signal(pref + '\x1b[6~');	return true;
+			case 'en': signal(pref + '\r');		return true;
+			case 'bs': signal(pref + bs_sends());	return true;
+			case 'es': signal(pref + '\x1b');	return true;
+			case 'me': signal(pref + '_');		return true;
+			case 'ta': signal(pref + '\t');		return true;
+			default:				return false;
 			}
 		}
 
@@ -484,13 +612,13 @@ function term_init()
 		var boxi, box;
 
 		switch (code) {
-		case 'Backspace':	repeater = [0, bs_sends()];	break;
-		case 'Backslash':	repeater = [0, '\x1b[3~'];	break;
-		case 'Enter':		repeater = [0, '\r'];		break;
-		case 'ArrowRight':	repeater = [1, 'C'];		break;
-		case 'ArrowLeft':	repeater = [1, 'D'];		break;
-		case 'ArrowUp':		repeater = [1, 'A'];		break;
-		case 'ArrowDown':	repeater = [1, 'B'];		break;
+		case 'bs': repeater = [0, bs_sends()];	break;
+		case 'vs': repeater = [0, '\x1b[3~'];	break;
+		case 'en': repeater = [0, '\r'];	break;
+		case 'ri': repeater = [1, 'C'];		break;
+		case 'le': repeater = [1, 'D'];		break;
+		case 'up': repeater = [1, 'A'];		break;
+		case 'do': repeater = [1, 'B'];		break;
 
 		default:	return false;
 		}
@@ -505,35 +633,23 @@ function term_init()
 
 	function set_repeat_cnt(code)
 	{
-		var ascii, boxi;
+		var boxi;
 
 		for (boxi = 0; boxi < repeat_boxes.length; boxi++)
 			repeat_boxes[boxi].style.visibility = 'hidden';
 
 		switch (code) {
-		case 'AltRight':	repeat_cnt = 0;		return true;
-		case 'Minus':		repeat_cnt = 25;	return true;
-		case 'BracketLeft':	repeat_cnt = 30;	return true;
-		case 'Semicolon':	repeat_cnt = 34;	return true;
-		case 'Quote':		repeat_cnt = 35;	return true;
-		case 'Comma':		repeat_cnt = 37;	return true;
-		case 'Period':		repeat_cnt = 38;	return true;
-		case 'Slash':		repeat_cnt = 39;	return true;
-		case 'ShiftRight':	repeat_cnt = 40;	return true;
+		case 'ra': repeat_cnt = 0;	return true;
+		case 'rs': repeat_cnt = 40;	return true;
 		}
 
-		if (/^Key[A-Z]$/.test(code))
-			ascii = code[3];
-		else if (/^Digit[0-9]$/.test(code))
-			ascii = code[5];
-		else
-			return false;
+		if (code.charAt(1) != ' ') return false;
 
 		repeat_cnt =
 			//000000000111111111122222222223333333
-			//123456789012345678901234567890123456
-			' 12345QWERTASDFGZXCVB7890 UIOP JKL  M'
-			.indexOf(ascii);
+			//123456789012345678901234567890123456789
+			' 12345QWERTASDFGZXCVB7890-UIOP[JKL;"M,./'
+			.indexOf(code.charAt(0));
 		return repeat_cnt >= 1;
 	}
 
@@ -579,30 +695,30 @@ function term_init()
 	}
 
 	var macro_map = [
-		[['AltLeft', 'KeyI', 'KeyF'], 'git status -s -uno\r'],
-		[['AltLeft', 'KeyI', 'ShiftLeft', 'KeyF'], 'git status -s -uall\r'],
-		[['AltLeft', 'KeyI', 'KeyD'], 'git diff '],
-		[['AltLeft', 'KeyI', 'KeyC', 'KeyO'], 'git checkout '],
-		[['AltLeft', 'KeyI', 'KeyC', 'KeyD'], 'git diff --cached '],
-		[['AltRight', 'KeyS', 'KeyD'], '\x1b:w\r'],
-		[['AltRight', 'KeyS', 'KeyK'], '\x1b:wq\r'],
-		[['AltLeft', 'KeyI', 'KeyL'], 'git log --name-status '],
-		[['AltLeft', 'KeyI', 'KeyC', 'KeyM'], 'git commit '],
-		[['AltLeft', 'KeyI', 'KeyP', 'KeyS'], 'git push '],
-		[['AltLeft', 'KeyI', 'KeyP', 'KeyL'], 'git pull '],
-		[['AltLeft', 'Backslash', 'KeyU'], '| grep '],
-		[['AltRight', 'KeyD', 'KeyG'], 'grep -Irn '],
-		[['AltLeft', 'KeyI', 'KeyS'], 'git show '],
-		[['AltLeft', 'KeyH', 'KeyT'], open_child_term],
-		[['AltLeft', 'Semicolon', 'KeyP'], ':e %:p:h\t'],
-		[['AltLeft', 'Semicolon', 'BracketLeft'], ':e \x12%'],
-		[['AltRight', 'KeyR', 'KeyS', 'KeyE'], 'sudo shutdown -r now; exit\r'],
-		[['AltRight', 'KeyF', 'KeyN', set_font_key], set_font_macro],
-		[['AltRight', 'ShiftLeft', 'KeyE'], '\x1bA'],
-		[['AltRight', 'ShiftLeft', 'KeyI'], '\x1bI'],
+		[['la', 'I ', 'F '], 'git status -s -uno\r'],
+		[['la', 'I ', 'ls', 'F '], 'git status -s -uall\r'],
+		[['la', 'I ', 'D '], 'git diff '],
+		[['la', 'I ', 'C ', 'O '], 'git checkout '],
+		[['la', 'I ', 'C ', 'D '], 'git diff --cached '],
+		[['ra', 'S ', 'D '], '\x1b:w\r'],
+		[['ra', 'S ', 'K '], '\x1b:wq\r'],
+		[['la', 'I ', 'L '], 'git log --name-status '],
+		[['la', 'I ', 'C ', 'M '], 'git commit '],
+		[['la', 'I ', 'P ', 'S '], 'git push '],
+		[['la', 'I ', 'P ', 'L '], 'git pull '],
+		[['la', 'vs', 'U '], '| grep '],
+		[['ra', 'D ', 'G '], 'grep -Irn '],
+		[['la', 'I ', 'S '], 'git show '],
+		[['la', 'H ', 'T '], open_child_term],
+		[['la', '; ', 'P '], ':e %:p:h\t'],
+		[['la', '; ', '[ '], ':e \x12%'],
+		[['ra', 'R ', 'S ', 'E '], 'sudo shutdown -r now; exit\r'],
+		[['ra', 'F ', 'N ', set_font_key], set_font_macro],
+		[['ra', 'ls', 'E '], '\x1bA'],
+		[['ra', 'ls', 'I '], '\x1bI'],
 
-		[['AltRight', set_repeat_key, set_repeat_cnt], repeat_keystroke],
-		[['AltLeft',
+		[['ra', set_repeat_key, set_repeat_cnt], repeat_keystroke],
+		[['la',
 		 set_barrier_dig.bind(0),
 		 set_barrier_dig.bind(1),
 		 set_barrier_dig.bind(2)], show_barrier],
@@ -624,7 +740,7 @@ function term_init()
 		var mi, ki, mch, mk;
 
 		if (!mkeys.length) {
-			if (!/^Alt/.test(e.code)) return false;
+			if (e.mn != 'la' && e.mn != 'ra') return false;
 			got_key_up = false;
 		}
 		else if (!got_key_up && !e.altKey) {
@@ -637,7 +753,7 @@ function term_init()
 			return false;
 		}
 
-		mkeys.push(e.code);
+		mkeys.push(e.mn);
 
 		for (mi = 0; mi < macro_map.length; mi++) {
 			if (macro_map[mi][0].length < mkeys.length) continue;
@@ -676,6 +792,7 @@ function term_init()
 		}
 
 		// Neither a full match nor a prefix match.
+		console.warn('no matching macro');
 		signal('?');
 		mkeys.length = 0;
 		return true;
@@ -683,13 +800,16 @@ function term_init()
 
 	t.getScrollPort().getDocument().body.onkeydown = function(e)
 	{
+		var ce;
+
 		if (log_keys) console.log('scrollport key:', e);
 
-		if (!process_mkey(e)) {
-			push_dead_key_hist(e);
+		ce = cookev(e);
+		if (!process_mkey(ce)) {
+			push_dead_key_hist(ce);
 			dead_key_hist.splice(0, 2);
 
-			if (!process_key_down(e)) return;
+			if (!process_key_down(ce)) return;
 		}
 		e.stopPropagation();
 		e.preventDefault();
@@ -706,14 +826,15 @@ function term_init()
 			return;
 		}
 
+		e = cookev(e);
 		push_dead_key_hist(e);
 		hist = dead_key_hist.join('');
 		dead_key_hist.splice(0, 2);
 
-		if (hist.endsWith('DLSULS') || hist === 'DLSDRSULS' || hist === 'DLSURSULS') signal(')');
-		if (hist.endsWith('DRSURS') || hist === 'DRSULSURS' || hist === 'DRSDLSURS') signal('(');
-		if (hist.endsWith('DRCURC')) signal('$');
-		if (hist.endsWith('DLCULC')) signal('"');
+		if (hist.endsWith('DlsUls') || hist === 'DlsDrsUls' || hist === 'DlsUrsUls') signal(')');
+		if (hist.endsWith('DrsUrs') || hist === 'DrsUlsUrs' || hist === 'DrsDlsUrs') signal('(');
+		if (hist.endsWith('DrcUrc')) signal('$');
+		if (hist.endsWith('DlcUlc')) signal('"');
 	};
 }
 

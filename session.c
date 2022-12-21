@@ -99,7 +99,7 @@ static void parse_query(void)
 
 			free(dtach_check_cmd);
 			xasprintf(&dtach_check_cmd,
-				  "kill -0 `cat /tmp/pid.%s`", val);
+				  "test -S /tmp/dtach.%s", val);
 
 			free(dtach_sock);
 			xasprintf(&dtach_sock, "/tmp/dtach.%s", val);
@@ -155,7 +155,7 @@ static _Noreturn void do_exec()
 	}
 	else {
 		execl(DTACH, DTACH, "-A", dtach_sock,
-		      "-r", "none", "script", "-fa", log, NULL);
+		      "-r", "none", "script", "-qfa", log, NULL);
 		err(1, "execl " DTACH);
 	}
 }
@@ -289,15 +289,15 @@ int main(int argc, char **argv)
 	if (-1 == grantpt(master)) err(1, "grantpt");
 	if (-1 == unlockpt(master)) err(1, "unlockpt");
 
-	child = fork();
-	if (-1 == child) err(1, "fork");
-
 	parse_query();
 
 	if (!system(dtach_check_cmd)) {
 		free(pream);
 		pream = NULL;
 	}
+
+	child = fork();
+	if (-1 == child) err(1, "fork");
 
 	if (!child) do_exec();
 

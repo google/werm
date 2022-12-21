@@ -80,9 +80,10 @@ awk '
 }
 END {
 	for (k in count)
-		printf "%d %s\n", count[k], k;
+		printf "%s %d\n", k, count[k];
 }' |
-while read cnt sess
+sort |
+while read sess cnt
 do
 	att='&nbsp;'
 	test $cnt = 1 || att='*'

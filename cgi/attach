@@ -6,6 +6,9 @@ Content-type: text/html
 
 <!DOCTYPE html>
 <meta charset='utf-8'/>
+<meta http-equiv="expires" content="-1" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Cache-Control" content="no-cache" />
 <html>
 <head>
 	<title>Attach</title>
@@ -69,14 +72,27 @@ cat <<EOF
 <table>
 EOF
 
-ls /tmp/dtach.* | sed 's/^[^.]*[.]//' |
-while read sess
+lsof -Fn /tmp/dtach.* |
+awk '
+/^n/ {
+	sub(/^n\/tmp\/dtach[.]/, "");
+	count[$1] += 1;
+}
+END {
+	for (k in count)
+		printf "%d %s\n", count[k], k;
+}' |
+while read cnt sess
 do
+	att='&nbsp;'
+	test $cnt = 1 || att='*'
 	printf '<tr>
 		<td class="loose">[<strong>%s</strong>]
+		<td>%s
 		<td><a style='font-size:14px' class='restore-link' href="/?termid=%s">%s</a>
 		</tr>\n' \
 		$sess \
+		"$att" \
 		$sess \
 		$sess
 done

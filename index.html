@@ -559,9 +559,9 @@ function term_init()
 	var font_key;
 	function set_font_key(key)
 	{
-		if (!/^Key.$/.test(key)) return false;
+		if (!/^[A-Z] $/.test(key)) return false;
 
-		font_key = key.charCodeAt(3) - 65;
+		font_key = key.charCodeAt(0) - 65;
 		return font_key >= 0 && font_key < fonts.length;
 	}
 	function set_font_macro() { set_font(font_key); }

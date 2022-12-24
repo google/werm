@@ -22,9 +22,6 @@ h1 {
 	padding-bottom:8pt;
 	border-bottom: solid 1px yellow;
 }
-.start-common-group {
-	margin-top: 1em;
-}
 .column {
 	padding-top: 6pt;
 	padding-left: 24pt;
@@ -32,7 +29,7 @@ h1 {
 	border: 2px solid yellow;
 }
 .common-list {
-	margin-top: 0;
+	margin-top: 1em;
 	padding-left: 0;
 	list-style-type: none;
 }
@@ -46,26 +43,34 @@ a {
 <div style="display: flex;">
 <div class=column>
 <h1>Common</h1>
-<ul class=common-list>
 EOF
 
-test -f ~/gum/attach_common && ~/gum/attach_common
-
-termno=1
-start=class=start-common-group
-for dir in werm `sort ~/gum/attach_dirs 2>/dev/null`
+for p in ~/.config/werm/profiles/*
 do
-	termid=`echo $dir | sed 's/^\///; s/\//-/g'`
-
-	printf '
-	<li %s><a href="/?termid=%s&pream=cd%%20%s%%0d">%s</a>
-	'   "$start" $termid $dir $dir
-	start=
+	echo '<ul class=common-list>'
+	sed '
+s,\([^	]*\)	\(.*\),<li><a href="/?termid=\1\&pream=\2%0d">\1</a>,
+:r
+/\( [^ ]*\) /{
+	s//\1%20/
+	br
+}
+:s
+/\(&[^&]*\)&/{
+	s//\1%26/
+	bs
+}
+:t
+/\(?[^?]*\)?/{
+	s//\1%3f/
+	bt
+}
+	' "$p"
+	echo '</ul>'
 done
 
 cat <<EOF
 
-</ul>
 </div>
 <div class=column>
 <h1>Active sessions</h1>

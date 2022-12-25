@@ -6,6 +6,6 @@ env
 websocketd --passenv SHELL \
 	--cgidir=cgi \
 	--staticdir=. \
-	--port=8090 \
+	--port=${port:-8090} \
 	--address=localhost \
 	./session

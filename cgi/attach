@@ -45,7 +45,9 @@ a {
 <h1>Common</h1>
 EOF
 
-for p in ~/.config/werm/profiles/*
+# Relative path to $HOME/.config is a bad hack. But I can't access the real
+# $HOME
+for p in ../../.config/werm/profiles/*
 do
 	echo '<ul class=common-list>'
 	sed '

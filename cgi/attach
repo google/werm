@@ -45,9 +45,9 @@ a {
 <h1>Common</h1>
 EOF
 
-# Relative path to $HOME/.config is a bad hack. But I can't access the real
-# $HOME
-for p in ../../.config/werm/profiles/*
+# werm repo subdir should have profiles to use
+# websocketd doesn't actually pass env vars to CGI scripts
+for p in ../profiles/*
 do
 	echo '<ul class=common-list>'
 	sed '

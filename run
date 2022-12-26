@@ -2,7 +2,8 @@
 
 cd `dirname $0`
 
-websocketd --passenv=HOME,SHELL \
+env
+websocketd --passenv SHELL \
 	--cgidir=cgi \
 	--staticdir=. \
 	--port=8090 \

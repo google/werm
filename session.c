@@ -276,12 +276,12 @@ static _Noreturn void write_to_subproc(void)
 int main(int argc, char **argv)
 {
 	pid_t child;
-	const char *cfg_dir;
+	const char *home;
 
-	cfg_dir = getenv("WORM_CFG_DIR");
+	home = getenv("HOME");
 
-	if (!cfg_dir) warnx("WORM_CFG_DIR is not set");
-	else if (-1 == chdir(cfg_dir)) warn("chdir to cfg_dir: '%s'", cfg_dir);
+	if (!home) warnx("HOME is not set");
+	else if (-1 == chdir(home)) warn("chdir to home: '%s'", home);
 
 	master = posix_openpt(O_RDWR);
 	if (-1 == master) err(1, "posix_openpt");

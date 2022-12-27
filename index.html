@@ -169,7 +169,7 @@ function term_init()
 {
 	var t, pend_send = '', term_ready = false, sock, pend_display = [],
 		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
-		params, dead_key_hist, keep_row_ttl, remote_ttl, row_ttl;
+		params, dead_key_hist, keep_row_ttl, row_ttl;
 
 	function find_row_ttl()
 	{
@@ -182,19 +182,16 @@ function term_init()
 
 	function set_title()
 	{
-		var compons, skip_tid;
+		var compons;
 
 		compons = [];
 		if (termid) compons.push(`[${termid}]`);
-		skip_tid = compons.length;
-		if (remote_ttl) compons.push(remote_ttl);
 
 		row_ttl = find_row_ttl() || row_ttl;
-		if (row_ttl) compons.push('|', row_ttl);
+		if (row_ttl) compons.push(row_ttl);
 
-		document.title = compons.join(' ');
-		localStorage['title-' + termid] =
-			compons.splice(skip_tid).join(' ');
+		document.title = compons.join(' | ');
+		if (row_ttl) localStorage['title-' + termid] = row_ttl;
 	}
 
 	function print(str)
@@ -374,13 +371,11 @@ function term_init()
 	termid = params.get('termid');
 	pream = params.get('pream');
 
-	remote_ttl = localStorage['remote-title-' + termid] || '';
 	if (termid) localStorage['pream-' + termid] = pream || '';
 
 	t.setWindowTitle = function(ttl)
 	{
-		remote_ttl = localStorage['remote-title-' + termid] = ttl;
-		set_title();
+		console.log('remotely-set title: ', ttl);
 	};
 	t.setWindowTitle(cached_title);
 

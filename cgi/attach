@@ -117,7 +117,7 @@ var es, title, pream, i;
 es = document.getElementsByClassName('restore-link');
 
 for (i = 0; i < es.length; i++) {
-	title = localStorage.getItem('title-' + es[i].innerText);
+	title = localStorage.getItem('title-' + es[i].innerText).trim();
 	pream = localStorage.getItem('pream-' + es[i].innerText);
 	if (title) es[i].innerText = title;
 	if (pream) es[i].href += '&pream=' + encodeURIComponent(pream);

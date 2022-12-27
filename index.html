@@ -145,7 +145,8 @@ function cookev(e)
 
 	mn = native_to_mn[e.code];
 	if (!mn) {
-		console.error('no mn available:', e);
+		console.error('no mn available');
+		console.log(e);
 		mn = '??';
 	}
 
@@ -162,7 +163,7 @@ function cookev(e)
 	return ce;
 }
 
-var log_send = 0, log_display = 0, log_keys = 0, test = {};
+var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {};
 
 function term_init()
 {
@@ -562,7 +563,7 @@ function term_init()
 		if (!/^[A-Z] $/.test(key)) return false;
 
 		font_key = key.charCodeAt(0) - 65;
-		return font_key >= 0 && font_key < fonts.length;
+		return (font_key >= 0 && font_key < fonts.length) ? 'm' : 0;
 	}
 	function set_font_macro() { set_font(font_key); }
 
@@ -620,7 +621,7 @@ function term_init()
 		case 'up': repeater = [1, 'A'];		break;
 		case 'do': repeater = [1, 'B'];		break;
 
-		default:	return false;
+		default:	return 0;
 		}
 
 		for (boxi = 0; boxi < REPEAT_BOX_CNT; boxi++) {
@@ -628,7 +629,7 @@ function term_init()
 			repeat_boxes[boxi].style.visibility = 'visible';
 		}
 
-		return true;
+		return 'm';
 	}
 
 	function set_repeat_cnt(code)
@@ -639,18 +640,18 @@ function term_init()
 			repeat_boxes[boxi].style.visibility = 'hidden';
 
 		switch (code) {
-		case 'ra': repeat_cnt = 0;	return true;
-		case 'rs': repeat_cnt = 40;	return true;
+		case 'ra': repeat_cnt = 0;	return 'm';
+		case 'rs': repeat_cnt = 40;	return 'm';
 		}
 
-		if (code.charAt(1) != ' ') return false;
+		if (code.charAt(1) != ' ') return 0;
 
 		repeat_cnt =
 			//000000000111111111122222222223333333
 			//123456789012345678901234567890123456789
 			' 12345QWERTASDFGZXCVB7890-UIOP[JKL;"M,./'
 			.indexOf(code.charAt(0));
-		return repeat_cnt >= 1;
+		return repeat_cnt >= 1 ? 'm' : 0;
 	}
 
 	function repeat_keystroke() {
@@ -666,7 +667,7 @@ function term_init()
 	function set_barrier_dig(code)
 	{
 		barrier_dig[this] = code[1];
-		return /#[0-9]/.test(code);
+		return /#[0-9]/.test(code) ? 'm' : 0;
 	}
 	function show_barrier()
 	{
@@ -693,29 +694,58 @@ function term_init()
 		t.scrollPort_.screen_.appendChild(barrier_div);
 	}
 
+	function match_key(exp, mn)
+	{
+		var res;
+
+		switch (exp.__proto__) {
+		case Function.prototype: return exp(mn);
+		case Array.prototype:
+			res = match_key(exp[0], mn);
+			switch (res) {
+			case 0: return 0;
+			case 'm':
+				exp = exp.slice(1);
+				if (!exp.length) return 'm';
+				break;
+			default:
+				exp = exp.slice();
+				exp[0] = res;
+			}
+			return exp;
+		case String.prototype:
+			if (!exp.startsWith(mn)) return 0;
+			exp = exp.substr(2);
+			if (!exp.length) return 'm';
+			return exp;
+		}
+		console.error('unknown matching kind:');
+		console.log(exp, mn);
+	}
+
 	var macro_map = [
-		[['la', 'I ', 'F '], 'git status -s -uno\r'],
-		[['la', 'I ', 'ls', 'F '], 'git status -s -uall\r'],
-		[['la', 'I ', 'D '], 'git diff '],
-		[['la', 'I ', 'C ', 'O '], 'git checkout '],
-		[['la', 'I ', 'C ', 'D '], 'git diff --cached '],
-		[['ra', 'S ', 'D '], '\x1b:w\r'],
-		[['ra', 'S ', 'K '], '\x1b:wq\r'],
-		[['la', 'I ', 'L '], 'git log --name-status '],
-		[['la', 'I ', 'B ', 'R '], 'git branch '],
-		[['la', 'I ', 'C ', 'M '], 'git commit '],
-		[['la', 'I ', 'P ', 'S '], 'git push '],
-		[['la', 'I ', 'P ', 'L '], 'git pull '],
-		[['la', 'vs', 'U '], '| grep '],
-		[['ra', 'D ', 'G '], 'grep -Irn '],
-		[['la', 'I ', 'S '], 'git show '],
-		[['la', 'H ', 'T '], open_child_term],
-		[['la', '; ', 'P '], ':e %:p:h\t'],
-		[['la', '; ', '[ '], ':e \x12%'],
-		[['ra', 'R ', 'S ', 'E '], 'sudo shutdown -r now; exit\r'],
-		[['ra', 'F ', 'N ', set_font_key], set_font_macro],
-		[['ra', 'ls', 'E '], '\x1bA'],
-		[['ra', 'ls', 'I '], '\x1bI'],
+		['laI F ', 'git status -s -uno\r'],
+		['laI lsF ', 'git status -s -uall\r'],
+		['laI D ', 'git diff '],
+		['laI C O ', 'git checkout '],
+		['laI C D ', 'git diff --cached '],
+		['raS D ', '\x1b:w\r'],
+		['raS K ', '\x1b:wq\r'],
+		['laI L ', 'git log --name-status '],
+		['laI B R ', 'git branch '],
+		['laI C M ', 'git commit '],
+		['laI P S ', 'git push '],
+		['laI P L ', 'git pull '],
+		['lavsU ', '| grep '],
+		['raD G ', 'grep -Irn '],
+		['laI S ', 'git show '],
+		['laH T ', open_child_term],
+		['la; P ', ':e %:p:h\t'],
+		['la; [ ', ':e \x12%'],
+		['raR S E ', 'sudo shutdown -r now; exit\r'],
+		[['raF N ', set_font_key], set_font_macro],
+		['ralsI ', '\x1bI'],
+		['ralsE ', '\x1bA'],
 
 		[['ra', set_repeat_key, set_repeat_cnt], repeat_keystroke],
 		[['la',
@@ -733,15 +763,18 @@ function term_init()
 	collect_macros('gum');
 	collect_macros('local');
 
-	var mkeys = [], got_key_up = false;
+	var got_key_up = false, matching = [];
 
 	function process_mkey(e)
 	{
-		var mi, ki, mch, mk;
+		var mi, mch, mac, save;
 
-		if (!mkeys.length) {
+		if (!matching.length) {
 			if (e.mn != 'la' && e.mn != 'ra') return false;
 			got_key_up = false;
+			matching = [];
+			for (mi = 0; mi < macro_map.length; mi++)
+				matching.push(macro_map[mi].slice());
 		}
 		else if (!got_key_up && !e.altKey) {
 			// We never received Alt release event, but the current
@@ -749,52 +782,38 @@ function term_init()
 			// Chrome may have hid the event from us, indicating an
 			// Ash shortcut was activated, so we don't consider
 			// macros.
-			mkeys.length = 0;
+			matching.length = 0;
 			return false;
 		}
 
-		mkeys.push(e.mn);
-
-		for (mi = 0; mi < macro_map.length; mi++) {
-			if (macro_map[mi][0].length < mkeys.length) continue;
-
-			for (ki = 0; ki < mkeys.length; ki++) {
-				mk = macro_map[mi][0][ki];
-				if (typeof mk === 'string') {
-					if (mkeys[ki] !== mk) break;
-				}
-				else if (typeof mk === 'function') {
-					if (!mk(mkeys[ki])) break;
-				}
-				else {
-					console.log(mi, macro_map[mi], ki, mk);
-					throw 'invalid macro key';
-				}
-			}
-
-			if (ki < mkeys.length) continue;
-
-			if (mkeys.length === macro_map[mi][0].length) {
-				// Full match (not just prefix).
-				mch = macro_map[mi][1];
-
+		for (mi = 0; mi < matching.length; mi++) {
+			mac = matching[mi];
+			if (log_matching) console.log('match against:', mac);
+			switch (mac[0] = match_key(mac[0], e.mn)) {
+			case 0:
+				save = matching.pop();
+				if (mi < matching.length) matching[mi--] = save;
+				break;
+			case 'm':
+				mch = mac[1];
 				if (typeof mch === 'string')
 					signal(escape(mch));
 				else if (typeof mch === 'function')
 					mch();
-				else
-					throw 'unknown mapping type: ' + mch;
-
-				mkeys.length = 0;
+				else {
+					console.error('unknown mapping type:');
+					console.log(mch);
+				}
+				matching.length = 0;
+				return true;
 			}
-
-			return true;
 		}
 
-		// Neither a full match nor a prefix match.
-		console.warn('no matching macro');
-		signal('?');
-		mkeys.length = 0;
+		if (!matching.length) {
+			// Neither a full match nor a prefix match.
+			console.warn('no matching macro');
+			signal('?');
+		}
 		return true;
 	}
 
@@ -825,7 +844,7 @@ function term_init()
 
 		if (log_keys) console.log('scrollport key:', e);
 
-		if (mkeys.length) {
+		if (matching.length) {
 			got_key_up = true;
 			return;
 		}

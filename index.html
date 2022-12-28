@@ -454,6 +454,7 @@ function term_init()
 			if (e.ctrlKey) {
 				switch (e.mn) {
 				case 'bs':	/* consume or else it makes a mess */	return true;
+				case 'de':	/* consume or else it makes a mess */	return true;
 				case 'me':	signal(pref + '\x1f');			return true;
 				default:						return false;
 				}

@@ -2,7 +2,6 @@
 
 cd `dirname $0`
 
-env
 websocketd --passenv HOME,SHELL \
 	--cgidir=cgi \
 	--staticdir=. \

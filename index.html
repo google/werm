@@ -210,7 +210,7 @@ function term_init()
 
 	function display(s)
 	{
-		var next_esc, pend_i, c;
+		var next_esc, pend_i, c, pend_remain;
 
 		function pend(di) { return pend_display[pend_i + di]; }
 		function is_utf_trail(di) {
@@ -276,7 +276,8 @@ function term_init()
 			}
 
 			c = 0;
-			if (pend_display.length < 2) break;
+			pend_remain = pend_display.length - pend_i;
+			if (pend_remain < 2) break;
 			if (!is_utf_trail(1)) continue;
 			c += pend(1) & ~0xc0;
 
@@ -288,7 +289,7 @@ function term_init()
 			}
 
 			c <<= 6;
-			if (pend_display.length < 3) break;
+			if (pend_remain < 3) break;
 			if (!is_utf_trail(2)) continue;
 			c += pend(2) & ~0xc0;
 
@@ -300,7 +301,7 @@ function term_init()
 			}
 
 			c <<= 6;
-			if (pend_display.length < 4) break;
+			if (pend_remain < 4) break;
 			if (!is_utf_trail(3)) continue;
 			c += pend(3) & ~0xc0;
 

@@ -473,8 +473,8 @@ function term_init()
 				}
 
 				switch (e.mn) {
-				case 'bs': signal(pref + '\x17');		return true;	// C+N
-				case 'en': signal(pref + '\x0e');		return true;	// C+W
+				case 'bs': signal(pref + '\x17');		return true;	// C+W
+				case 'en': signal(pref + '\x0e');		return true;	// C+N
 				case 'ta': signal(pref + '\x1b\x5b\x5a');	return true;
 				default:					return false;
 				}

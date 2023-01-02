@@ -2,9 +2,11 @@
 
 cd `dirname $0`
 
-websocketd --passenv HOME,SHELL \
+wsd=$HOME/websocketd/websocketd
+test -f $wsd || wsd=websocketd
+
+$wsd --passenv HOME,SHELL \
 	--cgidir=cgi \
 	--staticdir=. \
-	--port=${port:-8090} \
-	--address=localhost \
+	"$@" \
 	./session

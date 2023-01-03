@@ -515,18 +515,19 @@ function term_init()
 	}
 
 	// [0] font-family, [1] font-size (height), [2] cell-width,
-	// [3] padded-cell-height, [4] allow bold face
+	// [3] padded-cell-height, [4] allow bold face [5] 0-255 bg brightness
+	// [6] 0-255 text brightness.
 	// Small fonts require overriding Chrome's minimum font size setting.
 	var fonts = [
-		['ibm_ega_8x8',		8,	8,	9,	false],
-		['hp_100lx_10x11',	12,	10,	13,	false],
-		['jfdot_7x14',		14,	7,	14,	true],
-		['ibm_vga_8x16',	16,	8,	17,	false],
-		['ibm_vga_9x16',	16,	9,	17,	false],
-		['dos_v_ibm_8x19',	20,	8,	19,	false],
-		['cl_stringray_8x19',	20,	8,	19,	false],
-		['ibm_xga_ai_12x23',	24,	12,	23,	false],
-		['dos_v_re_12x30',	32,	12,	28,	true],
+		['ibm_ega_8x8',		8 ,	8 ,	9 ,	0, 26, 230],
+		['hp_100lx_10x11',	12,	10,	13,	0, 26, 230],
+		['jfdot_7x14',		14,	7,	14,	1, 10, 245],
+		['ibm_vga_8x16',	16,	8,	17,	0, 26, 230],
+		['ibm_vga_9x16',	16,	9,	17,	0, 26, 230],
+		['dos_v_ibm_8x19',	20,	8,	19,	0, 26, 230],
+		['cl_stringray_8x19',	20,	8,	19,	0, 26, 230],
+		['ibm_xga_ai_12x23',	24,	12,	23,	0, 26, 230],
+		['dos_v_re_12x30',	32,	12,	28,	1, 26, 230],
 	];
 
 	function set_font(ndx)
@@ -543,6 +544,11 @@ function term_init()
 		function bolden(scr) { scr.textAttributes.enableBold = f[4]; }
 		bolden(t.primaryScreen_);
 		bolden(t.alternateScreen_);
+
+		t.setRgbColorCssVar('background-color',
+				    `rgb(${f[5]}, ${f[5]}, ${f[5]})`);
+		t.setRgbColorCssVar('foreground-color',
+				    `rgb(${f[6]}, ${f[6]}, ${f[6]})`);
 	};
 
 	fonts.forEach(function(fnt, ndx) {

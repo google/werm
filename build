@@ -8,7 +8,7 @@ echo '{' >| compile_commands.json
 oops () {
 	set -x
 	: 'required Debian pkgs:'
-	: '    libwslay-dev nettle-dev clang pkg-config websocketd'
+	: '    libwslay-dev nettle-dev clang pkg-config websocketd dtach'
 	exit 1
 }
 

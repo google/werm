@@ -149,6 +149,11 @@ static _Noreturn void do_exec()
 	if (!dtach_sock) {
 		shell = getenv("SHELL");
 
+		/* Related to lighttpd, maybe not needed otherwise? */
+		unsetenv("GATEWAY_INTERFACE");
+		unsetenv("SERVER_SOFTWARE");
+		unsetenv("HTTP_UPGRADE");
+
 		execl(shell, shell, NULL);
 		err(1, "execl $SHELL, which is: %s\n",
 		    shell ? shell : "<undef>");

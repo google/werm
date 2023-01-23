@@ -619,6 +619,8 @@ function term_init()
 		case 'bs': repeater = [0, bs_sends()];	break;
 		case 'vs': repeater = [0, '\x1b[3~'];	break;
 		case 'en': repeater = [0, '\r'];	break;
+		case '- ': repeater = [0, '-'];		break;
+		case 'sp': repeater = [0, ' '];		break;
 		case 'ri': repeater = [1, 'C'];		break;
 		case 'le': repeater = [1, 'D'];		break;
 		case 'up': repeater = [1, 'A'];		break;

@@ -146,13 +146,31 @@ static _Noreturn void do_exec()
 
 	setenv("TERM", "xterm-256color", 1);
 
+	/* Set by websocketd and not wanted. CGI-related cruft: */
+	unsetenv("REMOTE_HOST");
+	unsetenv("SERVER_NAME");
+	unsetenv("SERVER_PORT");
+	unsetenv("SERVER_PROTOCOL");
+	unsetenv("SCRIPT_NAME");
+	unsetenv("PATH_INFO");
+	unsetenv("PATH_TRANSLATED");
+	unsetenv("QUERY_STRING");
+	unsetenv("AUTH_TYPE");
+	unsetenv("CONTENT_LENGTH");
+	unsetenv("CONTENT_TYPE");
+	unsetenv("REMOTE_IDENT");
+	unsetenv("REMOTE_USER");
+	unsetenv("UNIQUE_ID");
+	unsetenv("REMOTE_PORT");
+	unsetenv("HTTPS");
+	unsetenv("GATEWAY_INTERFACE");
+	unsetenv("HTTP_UPGRADE");
+	unsetenv("REQUEST_URI");
+	unsetenv("REQUEST_METHOD");
+	unsetenv("REMOTE_ADDR");
+
 	if (!dtach_sock) {
 		shell = getenv("SHELL");
-
-		/* Related to lighttpd, maybe not needed otherwise? */
-		unsetenv("GATEWAY_INTERFACE");
-		unsetenv("SERVER_SOFTWARE");
-		unsetenv("HTTP_UPGRADE");
 
 		execl(shell, shell, NULL);
 		err(1, "execl $SHELL, which is: %s\n",

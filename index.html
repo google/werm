@@ -405,6 +405,14 @@ function term_init()
 			'&pream=' + encodeURIComponent(pream || ''));
 	}
 
+	function open_log_term()
+	{
+		var pream;
+
+		pream = 'source $WERMDIR/clean_script ' + termid + '\r';
+		window.open('/?pream=' + encodeURIComponent(pream));
+	}
+
 	t.onTerminalReady = function()
 	{
 		var io = t.io.push();
@@ -759,6 +767,8 @@ function term_init()
 		 set_barrier_dig.bind(1),
 		 set_barrier_dig.bind(2)], show_barrier],
 	];
+
+	if (termid) macro_map.push(['laH L ', open_log_term]);
 
 	function collect_macros(name)
 	{

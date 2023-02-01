@@ -5,7 +5,7 @@ cd `dirname $0`
 wsd=$HOME/websocketd/websocketd
 test -f $wsd || wsd=websocketd
 
-$wsd --passenv PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR \
+$wsd --passenv DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR\
 	--cgidir=cgi \
 	--staticdir=. \
 	"$@" \

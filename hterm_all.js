@@ -5186,11 +5186,6 @@ hterm.Keyboard = function(terminal) {
   this.terminal = terminal;
 
   /**
-   * The current key map.
-   */
-  this.keyMap = new hterm.Keyboard.KeyMap(this);
-
-  /**
    * Enable/disable application keypad.
    *
    * This changes the way numeric keys are sent from the keyboard.

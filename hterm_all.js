@@ -6311,25 +6311,6 @@ hterm.Screen.prototype.setColumnCount = function(count) {
 };
 
 /**
- * Remove the first row from the screen and return it.
- *
- * @return {!Element} The first row in this screen.
- */
-hterm.Screen.prototype.shiftRow = function() {
-  return this.shiftRows(1)[0];
-};
-
-/**
- * Remove rows from the top of the screen and return them as an array.
- *
- * @param {number} count The number of rows to remove.
- * @return {!Array<!Element>} The selected rows.
- */
-hterm.Screen.prototype.shiftRows = function(count) {
-  return this.rowsArray.splice(0, count);
-};
-
-/**
  * Insert a row at the top of the screen.
  *
  * @param {!Element} row The row to insert.
@@ -9397,8 +9378,7 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // inserted into a document yet, but re-set in decorate().
   this.document_ = window.document;
 
-  // The rows that have scrolled off screen and are no longer addressable.
-  this.scrollbackRows_ = [];
+  this.discarded_rows = 0;
 
   // Saved tab stops.
   this.tabStops_ = [];
@@ -9502,6 +9482,22 @@ hterm.Terminal = function({profileId, storage} = {}) {
 
   this.setProfile(profileId || hterm.Terminal.DEFAULT_PROFILE_ID,
                   function() { this.onTerminalReady(); }.bind(this));
+};
+
+hterm.Terminal.prototype.scroll_rows_off = function(cnt)
+{
+	var rows, i, new_len;
+
+	if (!cnt) return;
+
+	rows = this.screen_.rowsArray;
+
+	new_len = rows.length - cnt;
+	for (i = 0; i < new_len; i++) rows[i] = rows[i+cnt];
+
+	rows.length = new_len;
+
+	this.discarded_rows += cnt;
 };
 
 /**
@@ -10357,7 +10353,7 @@ hterm.Terminal.prototype.realizeHeight_ = function(rowCount) {
     deltaRows *= -1;
     while (deltaRows) {
       const lastRow = this.getRowCount() - 1;
-      if (lastRow - this.scrollbackRows_.length == cursor.row) {
+      if (lastRow - this.discarded_rows == cursor.row) {
         break;
       }
 
@@ -10369,27 +10365,14 @@ hterm.Terminal.prototype.realizeHeight_ = function(rowCount) {
       deltaRows--;
     }
 
-    const ary = this.screen_.shiftRows(deltaRows);
-    this.scrollbackRows_.push.apply(this.scrollbackRows_, ary);
+    this.scroll_rows_off(deltaRows);
 
     // We just removed rows from the top of the screen, we need to update
     // the cursor to match.
     cursor.row = Math.max(cursor.row - deltaRows, 0);
   } else if (deltaRows > 0) {
     // Screen got larger.
-
-    if (deltaRows <= this.scrollbackRows_.length) {
-      const scrollbackCount = Math.min(deltaRows, this.scrollbackRows_.length);
-      const rows = this.scrollbackRows_.splice(
-          this.scrollbackRows_.length - scrollbackCount, scrollbackCount);
-      this.screen_.unshiftRows(rows);
-      deltaRows -= scrollbackCount;
-      cursor.row += scrollbackCount;
-    }
-
-    if (deltaRows) {
-      this.appendRows_(deltaRows);
-    }
+    this.appendRows_(deltaRows);
   }
 
   this.setVTScrollRegion(null, null);
@@ -10460,7 +10443,7 @@ hterm.Terminal.prototype.clearScrollback = function() {
   // We're going to throw it away which would leave the display invalid.
   this.scrollEnd();
 
-  this.scrollbackRows_.length = 0;
+  this.discarded_rows = 0;
   this.scrollPort_.resetCache();
 
   [this.primaryScreen_, this.alternateScreen_].forEach((screen) => {
@@ -10909,6 +10892,14 @@ hterm.Terminal.prototype.blur = function() {
   this.scrollPort_.blur();
 };
 
+hterm.Terminal.prototype.new_row_node = function(index)
+{
+	const row = this.document_.createElement('x-row');
+	row.appendChild(this.document_.createTextNode(''));
+	row.rowIndex = index;
+	return row;
+};
+
 /**
  * Return the HTML Element for a given row index.
  *
@@ -10924,13 +10915,10 @@ hterm.Terminal.prototype.blur = function() {
  * @return {!Element} The 'x-row' element containing for the requested row.
  * @override
  */
-hterm.Terminal.prototype.getRowNode = function(index) {
-  if (index < this.scrollbackRows_.length) {
-    return this.scrollbackRows_[index];
-  }
-
-  const screenIndex = index - this.scrollbackRows_.length;
-  return this.screen_.rowsArray[screenIndex];
+hterm.Terminal.prototype.getRowNode = function(index)
+{
+	if (index < this.discarded_rows) return this.new_row_node(index);
+	return this.screen_.rowsArray[index - this.discarded_rows];
 };
 
 /**
@@ -10989,7 +10977,7 @@ hterm.Terminal.prototype.getRowText = function(index) {
  * @override
  */
 hterm.Terminal.prototype.getRowCount = function() {
-  return this.scrollbackRows_.length + this.screen_.rowsArray.length;
+  return this.discarded_rows + this.screen_.rowsArray.length;
 };
 
 /**
@@ -11010,18 +10998,14 @@ hterm.Terminal.prototype.getRowCount = function() {
  */
 hterm.Terminal.prototype.appendRows_ = function(count) {
   let cursorRow = this.screen_.rowsArray.length;
-  const offset = this.scrollbackRows_.length + cursorRow;
+  const offset = this.discarded_rows + cursorRow;
   for (let i = 0; i < count; i++) {
-    const row = this.document_.createElement('x-row');
-    row.appendChild(this.document_.createTextNode(''));
-    row.rowIndex = offset + i;
-    this.screen_.pushRow(row);
+    this.screen_.pushRow(this.new_row_node(offset + i));
   }
 
   const extraRows = this.screen_.rowsArray.length - this.screenSize.height;
   if (extraRows > 0) {
-    const ary = this.screen_.shiftRows(extraRows);
-    Array.prototype.push.apply(this.scrollbackRows_, ary);
+    this.scroll_rows_off(extraRows);
     if (this.scrollPort_.isScrolledEnd) {
       this.scheduleScrollDown_();
     }
@@ -11046,7 +11030,7 @@ hterm.Terminal.prototype.insertRow_ = function() {
   const row = this.document_.createElement('x-row');
   row.appendChild(this.document_.createTextNode(''));
 
-  this.scrollbackRows_.push(this.screen_.shiftRow());
+  this.scroll_rows_off(1);
 
   const cursorRow = this.screen_.cursorPosition.row;
   this.screen_.insertRow(cursorRow, row);
@@ -11109,9 +11093,8 @@ hterm.Terminal.prototype.renumberRows_ = function(
     screen = this.screen_;
   }
 
-  const offset = this.scrollbackRows_.length;
   for (let i = start; i < end; i++) {
-    screen.rowsArray[i].rowIndex = offset + i;
+    screen.rowsArray[i].rowIndex = this.discarded_rows + i;
   }
 };
 
@@ -12014,10 +11997,10 @@ hterm.Terminal.prototype.setAlternateMode = function(state) {
   newOverrides.forEach((c, i) => this.setRgbColorCssVar(`color-${i}`, c));
 
   if (this.screen_.rowsArray.length &&
-      this.screen_.rowsArray[0].rowIndex != this.scrollbackRows_.length) {
+      this.screen_.rowsArray[0].rowIndex != this.discarded_rows) {
     // If the screen changed sizes while we were away, our rowIndexes may
     // be incorrect.
-    const offset = this.scrollbackRows_.length;
+    const offset = this.discarded_rows;
     const ary = this.screen_.rowsArray;
     for (let i = 0; i < ary.length; i++) {
       ary[i].rowIndex = offset + i;
@@ -12085,8 +12068,7 @@ hterm.Terminal.prototype.setCursorVisible = function(state) {
 hterm.Terminal.prototype.syncCursorPosition_ = function() {
   const topRowIndex = this.scrollPort_.getTopRowIndex();
   const bottomRowIndex = this.scrollPort_.getBottomRowIndex(topRowIndex);
-  const cursorRowIndex = this.scrollbackRows_.length +
-      this.screen_.cursorPosition.row;
+  const cursorRowIndex = this.discarded_rows + this.screen_.cursorPosition.row;
 
   let forceSyncSelection = false;
   if (this.accessibilityReader_.accessibilityEnabled) {
@@ -12199,7 +12181,7 @@ hterm.Terminal.prototype.scheduleSyncCursorPosition_ = function() {
 
   if (this.accessibilityReader_.accessibilityEnabled) {
     // Report the previous position of the cursor for accessibility purposes.
-    const cursorRowIndex = this.scrollbackRows_.length +
+    const cursorRowIndex = this.discarded_rows +
         this.screen_.cursorPosition.row;
     const cursorColumnIndex = this.screen_.cursorPosition.column;
     const cursorLineText =
@@ -12482,7 +12464,7 @@ hterm.Terminal.prototype.displayImage = function(options, onLoad, onError) {
       img.style.position = 'absolute';
       img.style.bottom = 'calc(0px - var(--hterm-charsize-height))';
       div.appendChild(img);
-      const row = this.getRowNode(this.scrollbackRows_.length +
+      const row = this.getRowNode(this.discarded_rows +
                                   this.getCursorRow() - 1);
       row.appendChild(div);
 

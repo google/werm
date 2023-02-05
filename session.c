@@ -176,6 +176,17 @@ static _Noreturn void do_exec()
 	unsetenv("REQUEST_URI");
 	unsetenv("REQUEST_METHOD");
 	unsetenv("REMOTE_ADDR");
+	unsetenv("HTTP_ACCEPT_ENCODING");
+	unsetenv("HTTP_ORIGIN");
+	unsetenv("HTTP_SEC_WEBSOCKET_KEY");
+	unsetenv("HTTP_PRAGMA");
+	unsetenv("HTTP_SEC_WEBSOCKET_VERSION");
+	unsetenv("HTTP_ACCEPT_LANGUAGE");
+	unsetenv("HTTP_CONNECTION");
+	unsetenv("HTTP_USER_AGENT");
+	unsetenv("HTTP_SEC_WEBSOCKET_EXTENSIONS");
+	unsetenv("HTTP_CACHE_CONTROL");
+	unsetenv("SERVER_SOFTWARE");
 
 	if (!dtach_sock) {
 		shell = getenv("SHELL");

@@ -95,8 +95,6 @@ static void parse_query(void)
 
 		val = extract_query_arg(&qs, "termid=");
 		if (val) {
-			setenv("LC_TERMID", val, 1);
-
 			free(dtach_check_cmd);
 			xasprintf(&dtach_check_cmd,
 				  "test -S /tmp/dtach.%s", val);
@@ -147,6 +145,16 @@ static _Noreturn void do_exec()
 	setenv("TERM", "xterm-256color", 1);
 
 	/* Set by websocketd and not wanted. CGI-related cruft: */
+	unsetenv("HTTP_ACCEPT_ENCODING");
+	unsetenv("HTTP_ORIGIN");
+	unsetenv("HTTP_SEC_WEBSOCKET_KEY");
+	unsetenv("HTTP_PRAGMA");
+	unsetenv("HTTP_SEC_WEBSOCKET_VERSION");
+	unsetenv("HTTP_ACCEPT_LANGUAGE");
+	unsetenv("HTTP_CONNECTION");
+	unsetenv("HTTP_USER_AGENT");
+	unsetenv("HTTP_SEC_WEBSOCKET_EXTENSIONS");
+	unsetenv("HTTP_CACHE_CONTROL");
 	unsetenv("REMOTE_HOST");
 	unsetenv("SERVER_NAME");
 	unsetenv("SERVER_PORT");

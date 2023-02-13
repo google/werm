@@ -17,7 +17,7 @@ gl () {
 
 # browse (less) log
 lel () {
-	dl | less
+	dl | less "$@"
 }
 
 # browse binary (xxd | less) log

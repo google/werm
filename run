@@ -6,7 +6,10 @@ export WERMDIR=`pwd`
 wsd=$HOME/websocketd/websocketd
 test -f $wsd || wsd=websocketd
 
-$wsd --passenv WERMDIR,DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR\
+lc_vars=`env | sed '/^\(LC_[A-Z]*\)=.*/!d; s//\1/' | tr '\n' ','`
+
+set -x
+$wsd --passenv WERMDIR,DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR,LANG,LANGUAGE,$lc_vars\
 	--cgidir=cgi \
 	--staticdir=. \
 	"$@" \

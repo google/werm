@@ -7370,7 +7370,8 @@ hterm.ScrollPort = function(rowProvider) {
   this.div_ = null;
   this.document_ = null;
   /** @type {?Element} */
-  this.screen_ = null;
+  this.x_screen = null;
+  this.scroll_top = 0;
 
   // Collection of active timeout handles.
   this.timeouts_ = {};
@@ -7844,21 +7845,18 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   this.userCssLink_ = doc.createElement('link');
   this.userCssLink_.setAttribute('rel', 'stylesheet');
 
-  // TODO(rginda): Sorry, this 'screen_' isn't the same thing as hterm.Screen
-  // from screen.js.  I need to pick a better name for one of them to avoid
-  // the collision.
   // We make this field editable even though we don't actually allow anything
   // to be edited here so that Chrome will do the right thing with virtual
   // keyboards and IMEs.  But make sure we turn off all the input helper logic
   // that doesn't make sense here, and might inadvertently mung or save input.
   // Some of these attributes are standard while others are browser specific,
   // but should be safely ignored by other browsers.
-  this.screen_ = doc.createElement('x-screen');
-  this.screen_.setAttribute('contenteditable', 'true');
-  this.screen_.setAttribute('spellcheck', 'false');
-  this.screen_.setAttribute('autocomplete', 'off');
-  this.screen_.setAttribute('autocorrect', 'off');
-  this.screen_.setAttribute('autocapitalize', 'none');
+  this.x_screen = doc.createElement('x-screen');
+  this.x_screen.setAttribute('contenteditable', 'true');
+  this.x_screen.setAttribute('spellcheck', 'false');
+  this.x_screen.setAttribute('autocomplete', 'off');
+  this.x_screen.setAttribute('autocorrect', 'off');
+  this.x_screen.setAttribute('autocapitalize', 'none');
 
   // In some ways the terminal behaves like a text box but not in all ways. It
   // is not editable in the same ways a text box is editable and the content we
@@ -7868,17 +7866,17 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   // selection changes. The announcements that we want spoken are generated
   // by a separate live region, which gives more control over what will be
   // spoken.
-  this.screen_.setAttribute('role', 'log');
-  this.screen_.setAttribute('aria-live', 'off');
-  this.screen_.setAttribute('aria-roledescription', 'Terminal');
+  this.x_screen.setAttribute('role', 'log');
+  this.x_screen.setAttribute('aria-live', 'off');
+  this.x_screen.setAttribute('aria-roledescription', 'Terminal');
 
   // Set aria-readonly to indicate to the screen reader that the text on the
   // screen is not modifiable by the html cursor. It may be modifiable by
   // sending input to the application running in the terminal, but this is
   // orthogonal to the DOM's notion of modifiable.
-  this.screen_.setAttribute('aria-readonly', 'true');
-  this.screen_.setAttribute('tabindex', '-1');
-  this.screen_.style.cssText = `
+  this.x_screen.setAttribute('aria-readonly', 'true');
+  this.x_screen.setAttribute('tabindex', '-1');
+  this.x_screen.style.cssText = `
       background-color: rgb(var(--hterm-background-color));
       caret-color: transparent;
       color: rgb(var(--hterm-foreground-color));
@@ -7897,15 +7895,15 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
    * @return {!EventListener}
    */
   const el = (f) => /** @type {!EventListener} */ (f);
-  this.screen_.addEventListener('scroll', el(this.onScroll_.bind(this)));
-  this.screen_.addEventListener('wheel', el(this.onScrollWheel_.bind(this)));
-  this.screen_.addEventListener('touchstart', el(this.onTouch_.bind(this)));
-  this.screen_.addEventListener('touchmove', el(this.onTouch_.bind(this)));
-  this.screen_.addEventListener('touchend', el(this.onTouch_.bind(this)));
-  this.screen_.addEventListener('touchcancel', el(this.onTouch_.bind(this)));
-  this.screen_.addEventListener('copy', el(this.onCopy_.bind(this)));
-  this.screen_.addEventListener('paste', el(this.onPaste_.bind(this)));
-  this.screen_.addEventListener('drop', el(this.onDragAndDrop_.bind(this)));
+  this.x_screen.addEventListener('scroll', el(this.onScroll_.bind(this)));
+  this.x_screen.addEventListener('wheel', el(this.onScrollWheel_.bind(this)));
+  this.x_screen.addEventListener('touchstart', el(this.onTouch_.bind(this)));
+  this.x_screen.addEventListener('touchmove', el(this.onTouch_.bind(this)));
+  this.x_screen.addEventListener('touchend', el(this.onTouch_.bind(this)));
+  this.x_screen.addEventListener('touchcancel', el(this.onTouch_.bind(this)));
+  this.x_screen.addEventListener('copy', el(this.onCopy_.bind(this)));
+  this.x_screen.addEventListener('paste', el(this.onPaste_.bind(this)));
+  this.x_screen.addEventListener('drop', el(this.onDragAndDrop_.bind(this)));
 
   // Add buttons to make accessible scrolling through terminal history work
   // well. These are positioned off-screen until they are selected, at which
@@ -7958,7 +7956,7 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
       'click', this.publish.bind(this, 'options'));
 
   doc.body.appendChild(this.scrollUpButton_);
-  doc.body.appendChild(this.screen_);
+  doc.body.appendChild(this.x_screen);
   doc.body.appendChild(this.scrollDownButton_);
   doc.body.appendChild(this.optionsButton_);
 
@@ -8008,7 +8006,7 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
       'position: fixed;' +
       'overflow: hidden;' +
       'user-select: text;');
-  this.screen_.appendChild(this.rowNodes_);
+  this.x_screen.appendChild(this.rowNodes_);
 
   // Two nodes to hold offscreen text during the copy event.
   this.topSelectBag_ = doc.createElement('x-select-bag');
@@ -8044,10 +8042,7 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   // it in the selection when a user 'drag selects' upwards (drag the mouse to
   // select and scroll at the same time).  Without this, the selection gets
   // out of whack.
-  this.scrollArea_ = doc.createElement('div');
-  this.scrollArea_.id = 'hterm:scrollarea';
-  this.scrollArea_.style.cssText = 'visibility: hidden';
-  this.screen_.appendChild(this.scrollArea_);
+  this.scrollHeight_ = 0;
 
   // We send focus to this element just before a paste happens, so we can
   // capture the pasted text and forward it on to someone who cares.
@@ -8064,7 +8059,7 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
     'opacity: 0');
   this.pasteTarget_.contentEditable = true;
 
-  this.screen_.appendChild(this.pasteTarget_);
+  this.x_screen.appendChild(this.pasteTarget_);
   this.pasteTarget_.addEventListener(
       'textInput', this.handlePasteTargetTextInput_.bind(this));
 
@@ -8114,13 +8109,13 @@ hterm.ScrollPort.prototype.scrollPageDown = function() {
 
 /** @return {string} */
 hterm.ScrollPort.prototype.getFontFamily = function() {
-  return this.screen_.style.fontFamily;
+  return this.x_screen.style.fontFamily;
 };
 
 /** Focus. */
 hterm.ScrollPort.prototype.focus = function() {
   this.iframe_.focus();
-  this.screen_.focus();
+  this.x_screen.focus();
   this.publish('focus');
 };
 
@@ -8128,22 +8123,22 @@ hterm.ScrollPort.prototype.focus = function() {
  * Unfocus the scrollport.
  */
 hterm.ScrollPort.prototype.blur = function() {
-  this.screen_.blur();
+  this.x_screen.blur();
 };
 
 /** @param {string} image */
 hterm.ScrollPort.prototype.setBackgroundImage = function(image) {
-  this.screen_.style.backgroundImage = image;
+  this.x_screen.style.backgroundImage = image;
 };
 
 /** @param {string} size */
 hterm.ScrollPort.prototype.setBackgroundSize = function(size) {
-  this.screen_.style.backgroundSize = size;
+  this.x_screen.style.backgroundSize = size;
 };
 
 /** @param {string} position */
 hterm.ScrollPort.prototype.setBackgroundPosition = function(position) {
-  this.screen_.style.backgroundPosition = position;
+  this.x_screen.style.backgroundPosition = position;
 };
 
 /** @param {number} size */
@@ -8165,7 +8160,7 @@ hterm.ScrollPort.prototype.setPasteOnDrop = function(pasteOnDrop) {
  * @return {{height: number, width: number}}
  */
 hterm.ScrollPort.prototype.getScreenSize = function() {
-  const size = this.screen_.getBoundingClientRect();
+  const size = this.x_screen.getBoundingClientRect();
   const rightPadding = Math.max(
       this.screenPaddingSize, this.currentScrollbarWidthPx);
   return {
@@ -8200,7 +8195,7 @@ hterm.ScrollPort.prototype.getScreenHeight = function() {
  * @return {number}
  */
 hterm.ScrollPort.prototype.getScrollbarX = function() {
-  return this.screen_.getBoundingClientRect().width -
+  return this.x_screen.getBoundingClientRect().width -
          this.currentScrollbarWidthPx;
 };
 
@@ -8219,7 +8214,7 @@ hterm.ScrollPort.prototype.getDocument = function() {
  * @return {?Element}
  */
 hterm.ScrollPort.prototype.getScreenNode = function() {
-  return this.screen_;
+  return this.x_screen;
 };
 
 /**
@@ -8292,7 +8287,7 @@ hterm.ScrollPort.prototype.scheduleInvalidate = function() {
  * @return {number}
  */
 hterm.ScrollPort.prototype.getFontSize = function() {
-  return parseInt(this.screen_.style.fontSize, 10);
+  return parseInt(this.x_screen.style.fontSize, 10);
 };
 
 /**
@@ -8374,9 +8369,9 @@ hterm.ScrollPort.prototype.syncRowNodesDimensions_ = function() {
   this.rowNodes_.style.height =
       this.visibleRowsHeight + topFoldOffset + this.screenPaddingSize + 'px';
   this.rowNodes_.style.left =
-      this.screen_.offsetLeft + this.screenPaddingSize + 'px';
+      this.x_screen.offsetLeft + this.screenPaddingSize + 'px';
   this.rowNodes_.style.top =
-      this.screen_.offsetTop - topFoldOffset + 'px';
+      this.x_screen.offsetTop - topFoldOffset + 'px';
 };
 
 /**
@@ -8385,8 +8380,8 @@ hterm.ScrollPort.prototype.syncRowNodesDimensions_ = function() {
  * @private
  */
 hterm.ScrollPort.prototype.syncScrollbarWidth_ = function() {
-  const width = this.screen_.getBoundingClientRect().width -
-                this.screen_.clientWidth;
+  const width = this.x_screen.getBoundingClientRect().width -
+                this.x_screen.clientWidth;
   if (width > 0) {
     this.currentScrollbarWidthPx = width;
   }
@@ -8397,12 +8392,11 @@ hterm.ScrollPort.prototype.syncScrollbarWidth_ = function() {
  */
 hterm.ScrollPort.prototype.syncScrollHeight = function() {
   this.lastRowCount_ = this.rowProvider_.getRowCount();
-  this.scrollArea_.style.height = (this.characterSize.height *
-                                   this.lastRowCount_ +
-                                   (2 * this.screenPaddingSize) +
-                                   this.visibleRowTopMargin +
-                                   this.visibleRowBottomMargin +
-                                   'px');
+  this.scrollHeight_ = (this.characterSize.height *
+                        this.lastRowCount_ +
+                        (2 * this.screenPaddingSize) +
+                        this.visibleRowTopMargin +
+                        this.visibleRowBottomMargin);
 };
 
 /**
@@ -8838,9 +8832,9 @@ hterm.ScrollPort.prototype.selectAll = function() {
  * @return {number}
  */
 hterm.ScrollPort.prototype.getScrollMax_ = function() {
-  return this.scrollArea_.getBoundingClientRect().height +
+  return this.scrollHeight_ +
          this.visibleRowTopMargin + this.visibleRowBottomMargin -
-         this.screen_.getBoundingClientRect().height;
+         this.x_screen.getBoundingClientRect().height;
 };
 
 /**
@@ -8859,20 +8853,23 @@ hterm.ScrollPort.prototype.scrollRowToTop = function(rowIndex) {
   this.isScrolledEnd = (
     rowIndex + this.visibleRowCount >= this.lastRowCount_);
 
-  let scrollTop = rowIndex * this.characterSize.height +
+  let scrotop = rowIndex * this.characterSize.height +
       this.visibleRowTopMargin;
 
   const scrollMax = this.getScrollMax_();
-  if (scrollTop > scrollMax) {
-    scrollTop = scrollMax;
+  if (scrotop > scrollMax) {
+    scrotop = scrollMax;
   }
 
-  if (this.screen_.scrollTop == scrollTop) {
-    return;
-  }
-
-  this.screen_.scrollTop = scrollTop;
+  this.set_scroll_top(scrotop);
   this.scheduleRedraw();
+};
+
+hterm.ScrollPort.prototype.set_scroll_top = function(t) {
+  if (t == this.scroll_top) return;
+
+  this.scroll_top = t;
+  setTimeout(this.onScroll_.bind(this, 'whatever'), 0);
 };
 
 /**
@@ -8902,7 +8899,7 @@ hterm.ScrollPort.prototype.scrollRowToMiddle = function(rowIndex) {
  * @return {number}
  */
 hterm.ScrollPort.prototype.getTopRowIndex = function() {
-  return Math.round(this.screen_.scrollTop / this.characterSize.height);
+  return Math.round(this.scroll_top / this.characterSize.height);
 };
 
 /**
@@ -8921,7 +8918,7 @@ hterm.ScrollPort.prototype.getBottomRowIndex = function(topRowIndex) {
 /**
  * Handler for scroll events.
  *
- * The onScroll event fires when scrollArea's scrollTop property changes.  This
+ * The onScroll event fires when ScrollPort.scroll_top changes.  This
  * may be due to the user manually move the scrollbar, or a programmatic change.
  *
  * @param {!Event} e
@@ -8953,49 +8950,8 @@ hterm.ScrollPort.prototype.onScroll_ = function(e) {
  */
 hterm.ScrollPort.prototype.onScrollWheel = function(e) {};
 
-/**
- * Handler for scroll-wheel events.
- *
- * The onScrollWheel event fires when the user moves their scrollwheel over this
- * hterm.ScrollPort.  Because the frontmost element in the hterm.ScrollPort is
- * a fixed position DIV, the scroll wheel does nothing by default.  Instead, we
- * have to handle it manually.
- *
- * @param {!WheelEvent} e
- */
 hterm.ScrollPort.prototype.onScrollWheel_ = function(e) {
   this.onScrollWheel(e);
-
-  if (e.defaultPrevented) {
-    return;
-  }
-
-  // Figure out how far this event wants us to scroll.
-  const delta = this.scrollWheelDelta(e);
-
-  let top = this.screen_.scrollTop - delta.y;
-  if (top < 0) {
-    top = 0;
-  }
-
-  const scrollMax = this.getScrollMax_();
-  if (top > scrollMax) {
-    top = scrollMax;
-  }
-
-  if (top != this.screen_.scrollTop) {
-    // Moving scrollTop causes a scroll event, which triggers the redraw.
-    this.screen_.scrollTop = top;
-
-    // Only preventDefault when we've actually scrolled.  If there's nothing
-    // to scroll we want to pass the event through so Chrome can detect the
-    // overscroll.
-    e.preventDefault();
-  } else if (e.ctrlKey) {
-    // Holding Contrl while scrolling will trigger zoom events.  Defeat them!
-    // Touchpad pinches also hit here via fake events.  https://crbug.com/289887
-    e.preventDefault();
-  }
 };
 
 /**
@@ -9020,7 +8976,7 @@ hterm.ScrollPort.prototype.scrollWheelDelta = function(e) {
       delta.y = e.deltaY * this.characterSize.height;
       break;
     case WheelEvent.DOM_DELTA_PAGE: {
-      const {width, height} = this.screen_.getBoundingClientRect();
+      const {width, height} = this.x_screen.getBoundingClientRect();
       delta.x = e.deltaX * this.characterSize.width * width;
       delta.y = e.deltaY * this.characterSize.height * height;
       break;
@@ -9110,7 +9066,7 @@ hterm.ScrollPort.prototype.onTouch_ = function(e) {
       // Invert to match the touchscreen scrolling direction of browser windows.
       delta *= -1;
 
-      let top = this.screen_.scrollTop - delta;
+      let top = this.scroll_top - delta;
       if (top < 0) {
         top = 0;
       }
@@ -9120,10 +9076,7 @@ hterm.ScrollPort.prototype.onTouch_ = function(e) {
         top = scrollMax;
       }
 
-      if (top != this.screen_.scrollTop) {
-        // Moving scrollTop causes a scroll event, which triggers the redraw.
-        this.screen_.scrollTop = top;
-      }
+      this.set_scroll_top(top);
       break;
     }
   }
@@ -9286,11 +9239,11 @@ hterm.ScrollPort.prototype.onDragAndDrop_ = function(e) {
  */
 hterm.ScrollPort.prototype.setScrollbarVisible = function(state) {
   if (state) {
-    this.screen_.style.overflowY = 'scroll';
+    this.x_screen.style.overflowY = 'scroll';
     this.currentScrollbarWidthPx = hterm.ScrollPort.DEFAULT_SCROLLBAR_WIDTH;
     this.syncScrollbarWidth_();
   } else {
-    this.screen_.style.overflowY = 'hidden';
+    this.x_screen.style.overflowY = 'hidden';
     this.currentScrollbarWidthPx = 0;
   }
 };
@@ -10035,7 +9988,7 @@ hterm.Terminal.prototype.updateCssCharsize_ = function() {
  * @param {number} px The desired font size, in pixels.
  */
 hterm.Terminal.prototype.setFontSize = function(px) {
-  this.scrollPort_.screen_.style.fontSize = px + 'px';
+  this.scrollPort_.x_screen.style.fontSize = px + 'px';
   this.setCssVar('font-size', `${px}px`);
 };
 
@@ -11186,16 +11139,16 @@ hterm.Terminal.prototype.print = function(str) {
  * local scrollback buffer, which means the scrollbars and shift-pgup/pgdn
  * continue to work as most users would expect.
  *
- * @param {?number} scrollTop The zero-based top of the scroll region.
+ * @param {?number} scrotop The zero-based top of the scroll region.
  * @param {?number} scrollBottom The zero-based bottom of the scroll region,
  *     inclusive.
  */
-hterm.Terminal.prototype.setVTScrollRegion = function(scrollTop, scrollBottom) {
-  this.vtScrollTop_ = scrollTop;
+hterm.Terminal.prototype.setVTScrollRegion = function(scrotop, scrollBottom) {
+  this.vtScrollTop_ = scrotop;
   this.vtScrollBottom_ = scrollBottom;
   if (scrollBottom == this.screenSize.height - 1) {
     this.vtScrollBottom_ = null;
-    if (scrollTop == 0) {
+    if (scrotop == 0) {
       this.vtScrollTop_ = null;
     }
   }
@@ -11300,10 +11253,10 @@ hterm.Terminal.prototype.formFeed = function() {
  * The cursor column is not changed.
  */
 hterm.Terminal.prototype.reverseLineFeed = function() {
-  const scrollTop = this.getVTScrollTop();
+  const scrotop = this.getVTScrollTop();
   const currentRow = this.screen_.cursorPosition.row;
 
-  if (currentRow == scrollTop) {
+  if (currentRow == scrotop) {
     this.insertLines(1);
   } else {
     this.setAbsoluteCursorRow(currentRow - 1);
@@ -11666,8 +11619,8 @@ hterm.Terminal.prototype.setCursorPosition = function(row, column) {
  * @param {number} column
  */
 hterm.Terminal.prototype.setRelativeCursorPosition = function(row, column) {
-  const scrollTop = this.getVTScrollTop();
-  row = lib.f.clamp(row + scrollTop, scrollTop, this.getVTScrollBottom());
+  const scrotop = this.getVTScrollTop();
+  row = lib.f.clamp(row + scrotop, scrotop, this.getVTScrollBottom());
   column = lib.f.clamp(column, 0, this.screenSize.width - 1);
   this.screen_.setCursorPosition(row, column);
 };

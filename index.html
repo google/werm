@@ -542,7 +542,7 @@ function term_init()
 	{
 		var f = fonts[ndx];
 
-		t.scrollPort_.screen_.style.fontFamily = f[0];
+		t.scrollPort_.x_screen.style.fontFamily = f[0];
 		t.setFontSize(f[1]);
 
 		t.scrollPort_.characterSize = {width: f[2], height: f[3]};
@@ -616,7 +616,7 @@ function term_init()
 			${layer*10 - 1} * var(--hterm-charsize-height)
 		)`;
 
-		t.scrollPort_.screen_.appendChild(box);
+		t.scrollPort_.x_screen.appendChild(box);
 	}
 
 	function set_repeat_key(code)
@@ -686,7 +686,7 @@ function term_init()
 	{
 		var col, s;
 
-		if (barrier_div) t.scrollPort_.screen_.removeChild(barrier_div);
+		if (barrier_div) t.scrollPort_.x_screen.removeChild(barrier_div);
 		barrier_div = null;
 
 		col = Number(barrier_dig.join(''));
@@ -704,7 +704,7 @@ function term_init()
 		s.width = 'var(--hterm-charsize-width)'
 		s.top = '0';
 		s.height = '100%';
-		t.scrollPort_.screen_.appendChild(barrier_div);
+		t.scrollPort_.x_screen.appendChild(barrier_div);
 	}
 
 	function match_key(exp, mn)

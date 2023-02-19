@@ -92,20 +92,6 @@ lib.notNull = function(value) {
   lib.assert(value !== null);
   return value;
 };
-
-/**
- * Verify |value| is not undefined and return |value| if so, else throw Error.
- * See lib.assert.
- *
- * @template T
- * @param {T} value A value to check for null.
- * @return {T} A non-undefined |value|.
- * @closurePrimitive {asserts.truthy}
- */
-lib.notUndefined = function(value) {
-  lib.assert(value !== undefined);
-  return value;
-};
 // SOURCE FILE: libdot/js/lib_polyfill.js
 // Copyright 2017 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -761,24 +747,6 @@ lib.colors.normalizeCSS = function(def) {
 };
 
 /**
- * Take any valid CSS color definition and turn it into an hsl or hsla value.
- *
- * @param {string} def The CSS color spec to normalize.
- * @return {?string} The converted value.
- */
-lib.colors.normalizeCSSToHSL = function(def) {
-  if (lib.colors.re_.hslx.test(def)) {
-    return def;
-  }
-
-  const rgb = lib.colors.normalizeCSS(def);
-  if (!rgb) {
-    return rgb;
-  }
-  return lib.colors.rgbToHsl(rgb);
-};
-
-/**
  * Convert a 3 or 4 element array into an rgb(...) or rgba(...) string.
  *
  * @param {?Array<string|number>} ary The RGB or RGBA elements to convert.
@@ -789,18 +757,6 @@ lib.colors.arrayToRGBA = function(ary) {
     return `rgb(${ary[0]}, ${ary[1]}, ${ary[2]})`;
   }
   return `rgba(${ary[0]}, ${ary[1]}, ${ary[2]}, ${ary[3]})`;
-};
-
-/**
- * Convert a 3 or 4 element array into an hsla(...) string.
- *
- * @param {?Array<string|number>} ary The HSL or HSLA elements to convert.
- * @return {string} The normalized CSS color spec.
- */
-lib.colors.arrayToHSLA = function(ary) {
-  const alpha = (ary.length > 3) ? ary[3] : 1;
-  return `hsla(${Math.round(ary[0])}, ${Math.round(ary[1])}%, ` +
-      `${Math.round(ary[2])}%, ${alpha})`;
 };
 
 /**
@@ -2399,17 +2355,6 @@ lib.PreferenceManager.prototype.definePreferences = function(defaults) {
   for (let i = 0; i < defaults.length; i++) {
     this.definePreference(defaults[i][0], defaults[i][1], defaults[i][2]);
   }
-};
-
-/**
- * Register a callback to be invoked when PreferenceManager prefix changes.
- *
- * @param {function(string, !lib.PreferenceManager)} observer The
- *     function to invoke.  It will receive the new prefix, and a reference
- *     to the PreferenceManager as parameters.
- */
-lib.PreferenceManager.prototype.addPrefixObserver = function(observer) {
-  this.prefixObservers_.push(observer);
 };
 
 /**
@@ -4986,184 +4931,6 @@ hterm.ContextMenu.prototype.hide = function() {
 
   this.element_.style.display = 'none';
 };
-// SOURCE FILE: hterm/js/hterm_frame.js
-// Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-/**
- * First draft of the interface between the terminal and a third party dialog.
- *
- * This is rough.  It's just the terminal->dialog layer.  To complete things
- * we'll also need a command->terminal layer.  That will have to facilitate
- * command->terminal->dialog or direct command->dialog communication.
- *
- * I imagine this class will change significantly when that happens.
- */
-
-/**
- * Construct a new frame for the given terminal.
- *
- * @param {!hterm.Terminal} terminal The parent terminal object.
- * @param {string} url The url to load in the frame.
- * @param {!Object=} options Optional options for the frame.  Not implemented.
- * @constructor
- */
-hterm.Frame = function(terminal, url, options = {}) {
-  this.terminal_ = terminal;
-  this.div_ = terminal.div_;
-  this.url = url;
-  this.options = options;
-  this.iframe_ = null;
-  this.container_ = null;
-  this.messageChannel_ = null;
-};
-
-/**
- * Handle messages from the iframe.
- *
- * @param {!MessageEvent} e The message to process.
- */
-hterm.Frame.prototype.onMessage_ = function(e) {
-  switch (e.data.name) {
-    case 'ipc-init-ok':
-      // We get this response after we send them ipc-init and they finish.
-      this.sendTerminalInfo_();
-      return;
-    case 'terminal-info-ok':
-      // We get this response after we send them terminal-info and they finish.
-      // Show the finished frame, and then rebind our message handler to the
-      // callback below.
-      this.container_.style.display = 'flex';
-      this.postMessage('visible');
-      this.messageChannel_.port1.onmessage = this.onMessage.bind(this);
-      this.onLoad();
-      return;
-    default:
-      console.log('Unknown message from frame:', e.data);
-  }
-};
-
-/**
- * Clients could override this, I guess.
- *
- * It doesn't support multiple listeners, but I'm not sure that would make sense
- * here.  It's probably better to speak directly to our parents.
- */
-hterm.Frame.prototype.onMessage = function() {};
-
-/**
- * Handle iframe onLoad event.
- */
-hterm.Frame.prototype.onLoad_ = function() {
-  this.messageChannel_ = new MessageChannel();
-  this.messageChannel_.port1.onmessage = this.onMessage_.bind(this);
-  this.messageChannel_.port1.start();
-  this.iframe_.contentWindow.postMessage(
-      {name: 'ipc-init', argv: [{messagePort: this.messageChannel_.port2}]},
-      this.url, [this.messageChannel_.port2]);
-};
-
-/**
- * Clients may override this.
- */
-hterm.Frame.prototype.onLoad = function() {};
-
-/**
- * Sends the terminal-info message to the iframe.
- */
-hterm.Frame.prototype.sendTerminalInfo_ = function() {
-  lib.i18n.getAcceptLanguages().then((languages) => {
-    this.postMessage('terminal-info', [{
-      acceptLanguages: languages,
-      foregroundColor: this.terminal_.getForegroundColor(),
-      backgroundColor: this.terminal_.getBackgroundColor(),
-      cursorColor: this.terminal_.getCssVar('cursor-color'),
-      fontSize: this.terminal_.getFontSize(),
-      fontFamily: this.terminal_.getFontFamily(),
-      baseURL: lib.f.getURL('/'),
-    }]);
-  });
-};
-
-/**
- * User clicked the close button on the frame decoration.
- */
-hterm.Frame.prototype.onCloseClicked_ = function() {
-  this.close();
-};
-
-/**
- * Close this frame.
- */
-hterm.Frame.prototype.close = function() {
-  if (!this.container_ || !this.container_.parentNode) {
-    return;
-  }
-
-  this.container_.remove();
-  this.onClose();
-};
-
-
-/**
- * Clients may override this.
- */
-hterm.Frame.prototype.onClose = function() {};
-
-/**
- * Send a message to the iframe.
- *
- * @param {string} name The message name.
- * @param {!Array=} argv The message arguments.
- */
-hterm.Frame.prototype.postMessage = function(name, argv) {
-  if (!this.messageChannel_) {
-    throw new Error('Message channel is not set up.');
-  }
-
-  this.messageChannel_.port1.postMessage({name: name, argv: argv});
-};
-
-/**
- * Show the UI for this frame.
- *
- * The iframe src is not loaded until this method is called.
- */
-hterm.Frame.prototype.show = function() {
-  if (this.container_ && this.container_.parentNode) {
-    console.error('Frame already visible');
-    return;
-  }
-
-  const document = this.terminal_.document_;
-
-  const container = this.container_ = document.createElement('div');
-  container.style.cssText = (
-      'position: absolute;' +
-      'display: none;' +
-      'flex-direction: column;' +
-      'top: 10%;' +
-      'left: 4%;' +
-      'width: 90%;' +
-      'height: 80%;' +
-      'min-height: 20%;' +
-      'max-height: 80%;' +
-      'box-shadow: 0 0 2px ' + this.terminal_.getForegroundColor() + ';' +
-      'border: 2px ' + this.terminal_.getForegroundColor() + ' solid;');
-
-  const iframe = this.iframe_ = document.createElement('iframe');
-  iframe.onload = this.onLoad_.bind(this);
-  iframe.style.cssText = (
-      'display: flex;' +
-      'flex: 1;' +
-      'width: 100%');
-  iframe.setAttribute('src', this.url);
-  iframe.setAttribute('seamless', true);
-  container.appendChild(iframe);
-
-  this.div_.appendChild(container);
-};
 // SOURCE FILE: hterm/js/hterm_keyboard.js
 // Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -5613,17 +5380,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `The background color for text with no other color attributes.`,
   ),
 
-  'background-image': hterm.PreferenceManager.definePref_(
-      'Background image',
-      hterm.PreferenceManager.Categories.Appearance,
-      '', 'string',
-      `CSS value of the background image. Leave it blank for no image.\n` +
-      `\n` +
-      `For example:\n` +
-      `  url(https://goo.gl/anedTK)\n` +
-      `  linear-gradient(top bottom, blue, red)`,
-  ),
-
   'background-size': hterm.PreferenceManager.definePref_(
       'Background image size',
       hterm.PreferenceManager.Categories.Appearance,
@@ -5640,14 +5396,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `For example:\n` +
       `  10% 10%\n` +
       `  center`,
-  ),
-
-  'backspace-sends-backspace': hterm.PreferenceManager.definePref_(
-      'Backspace key behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `If true, the Backspace key will send BS ('\\x08', aka ^H). Otherwise ` +
-      `the Backspace key will send '\\x7f'.`,
   ),
 
   'character-map-overrides': hterm.PreferenceManager.definePref_(
@@ -5820,13 +5568,6 @@ hterm.PreferenceManager.defaultPreferences = {
       },
       'value',
       `The initial set of environment variables, as an object.`,
-  ),
-
-  'font-smoothing': hterm.PreferenceManager.definePref_(
-      'Text font smoothing',
-      hterm.PreferenceManager.Categories.Appearance,
-      'antialiased', 'string',
-      `CSS font-smoothing property.`,
   ),
 
   'foreground-color': hterm.PreferenceManager.definePref_(
@@ -6002,25 +5743,11 @@ hterm.PreferenceManager.defaultPreferences = {
       `If false, dropped text will be ignored.`,
   ),
 
-  'scroll-on-keystroke': hterm.PreferenceManager.definePref_(
-      'Scroll to bottom after keystroke',
-      hterm.PreferenceManager.Categories.Scrolling,
-      true, 'bool',
-      `Whether to scroll to the bottom on any keystroke.`,
-  ),
-
   'scroll-on-output': hterm.PreferenceManager.definePref_(
       'Scroll to bottom after new output',
       hterm.PreferenceManager.Categories.Scrolling,
       false, 'bool',
       `Whether to scroll to the bottom on terminal output.`,
-  ),
-
-  'scrollbar-visible': hterm.PreferenceManager.definePref_(
-      'Scrollbar visibility',
-      hterm.PreferenceManager.Categories.Scrolling,
-      true, 'bool',
-      `The vertical scrollbar mode.`,
   ),
 
   'scroll-wheel-may-send-arrow-keys': hterm.PreferenceManager.definePref_(
@@ -6406,22 +6133,6 @@ hterm.Screen.prototype.removeRow = function(index) {
  */
 hterm.Screen.prototype.removeRows = function(index, count) {
   return this.rowsArray.splice(index, count);
-};
-
-/**
- * Invalidate the current cursor position.
- *
- * This sets this.cursorPosition to (0, 0) and clears out some internal
- * data.
- *
- * Attempting to insert or overwrite text while the cursor position is invalid
- * will raise an obscure exception.
- */
-hterm.Screen.prototype.invalidateCursorPosition = function() {
-  this.cursorPosition.move(0, 0);
-  this.cursorRowNode_ = null;
-  this.cursorNode_ = null;
-  this.cursorOffset_ = 0;
 };
 
 /**
@@ -8126,11 +7837,6 @@ hterm.ScrollPort.prototype.blur = function() {
   this.x_screen.blur();
 };
 
-/** @param {string} image */
-hterm.ScrollPort.prototype.setBackgroundImage = function(image) {
-  this.x_screen.style.backgroundImage = image;
-};
-
 /** @param {string} size */
 hterm.ScrollPort.prototype.setBackgroundSize = function(size) {
   this.x_screen.style.backgroundSize = size;
@@ -9233,22 +8939,6 @@ hterm.ScrollPort.prototype.onDragAndDrop_ = function(e) {
 };
 
 /**
- * Set the vertical scrollbar mode of the ScrollPort.
- *
- * @param {boolean} state
- */
-hterm.ScrollPort.prototype.setScrollbarVisible = function(state) {
-  if (state) {
-    this.x_screen.style.overflowY = 'scroll';
-    this.currentScrollbarWidthPx = hterm.ScrollPort.DEFAULT_SCROLLBAR_WIDTH;
-    this.syncScrollbarWidth_();
-  } else {
-    this.x_screen.style.overflowY = 'hidden';
-    this.currentScrollbarWidthPx = 0;
-  }
-};
-
-/**
  * Set scroll wheel multiplier. This alters how much the screen scrolls on
  * mouse wheel events.
  *
@@ -9367,7 +9057,6 @@ hterm.Terminal = function({profileId, storage} = {}) {
   this.screenBorderSize_ = 0;
 
   this.scrollOnOutput_ = null;
-  this.scrollOnKeystroke_ = null;
   this.scrollWheelArrowKeys_ = null;
 
   // True if we should override mouse event reporting to allow local selection.
@@ -9461,15 +9150,6 @@ hterm.Terminal.prototype.scroll_rows_off = function(cnt)
 hterm.Terminal.DEFAULT_PROFILE_ID = 'default';
 
 /**
- * Possible cursor shapes.
- */
-hterm.Terminal.cursorShape = {
-  BLOCK: 'b',
-  BEAM: '|',
-  UNDERLINE: '_',
-};
-
-/**
  * Clients should override this to be notified when the terminal is ready
  * for use.
  *
@@ -9534,10 +9214,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'background-color': (v) => {
       this.setBackgroundColor(v);
-    },
-
-    'background-image': (v) => {
-      this.scrollPort_.setBackgroundImage(v);
     },
 
     'background-size': (v) => {
@@ -9631,13 +9307,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.vt.enableDec12 = !!v;
     },
 
-    'enable-csi-j-3': (v) => {
-      this.vt.enableCsiJ3 = !!v;
-    },
-
-    'font-smoothing': (v) => {
-    },
-
     'foreground-color': (v) => {
       this.setForegroundColor(v);
     },
@@ -9700,16 +9369,8 @@ hterm.Terminal.prototype.setProfile = function(
       this.div_.style.borderColor = v;
     },
 
-    'scroll-on-keystroke': (v) => {
-      this.scrollOnKeystroke_ = v;
-    },
-
     'scroll-on-output': (v) => {
       this.scrollOnOutput_ = v;
-    },
-
-    'scrollbar-visible': (v) => {
-      this.setScrollbarVisible(v);
     },
 
     'scroll-wheel-may-send-arrow-keys': (v) => {
@@ -9792,22 +9453,6 @@ hterm.Terminal.prototype.setCursorColor = function(color) {
  */
 hterm.Terminal.prototype.setSelectionEnabled = function(state) {
   this.enableMouseDragScroll = state;
-};
-
-/**
- * Set the background image.
- *
- * If you want this setting to persist, set it through prefs_, rather than
- * with this method.
- *
- * @param {string=} cssUrl The image to set as a css url.  If not defined, we
- *     reset to the saved user preference.
- */
-hterm.Terminal.prototype.setBackgroundImage = function(cssUrl) {
-  if (cssUrl === undefined) {
-    cssUrl = this.prefs_.getString('background-image');
-  }
-  this.scrollPort_.setBackgroundImage(cssUrl);
 };
 
 /**
@@ -10621,8 +10266,6 @@ hterm.Terminal.prototype.decorate = function(div) {
  * @private
  */
 hterm.Terminal.prototype.setupScrollPort_ = function() {
-  this.scrollPort_.setBackgroundImage(
-      this.prefs_.getString('background-image'));
   this.scrollPort_.setBackgroundSize(this.prefs_.getString('background-size'));
   this.scrollPort_.setBackgroundPosition(
       this.prefs_.getString('background-position'));
@@ -10631,7 +10274,6 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
 
   this.div_.focus = this.focus.bind(this);
 
-  this.setScrollbarVisible(this.prefs_.getBoolean('scrollbar-visible'));
   this.setScrollWheelMoveMultipler(
       this.prefs_.getNumber('scroll-wheel-move-multiplier'));
 
@@ -12954,20 +12596,6 @@ hterm.Terminal.prototype.onResize_ = function() {
 };
 
 /**
- * Set the scrollbar-visible mode bit.
- *
- * If scrollbar-visible is on, the vertical scrollbar will be visible.
- * Otherwise it will not.
- *
- * Defaults to on.
- *
- * @param {boolean} state True to set scrollbar-visible mode, false to unset.
- */
-hterm.Terminal.prototype.setScrollbarVisible = function(state) {
-  this.scrollPort_.setScrollbarVisible(state);
-};
-
-/**
  * Set the scroll wheel move multiplier.  This will affect how fast the page
  * scrolls on wheel events.
  *
@@ -13084,21 +12712,6 @@ hterm.Terminal.IO.prototype.showOverlay = function(
  */
 hterm.Terminal.IO.prototype.hideOverlay = function() {
   this.terminal_.hideOverlay();
-};
-
-/**
- * Open an frame in the current terminal window, pointed to the specified
- * url.
- *
- * Eventually we'll probably need size/position/decoration options.
- * The user should also be able to move/resize the frame.
- *
- * @param {string} url The URL to load in the frame.
- * @param {!Object=} options Optional frame options.  Not implemented.
- * @return {!hterm.Frame}
- */
-hterm.Terminal.IO.prototype.createFrame = function(url, options = undefined) {
-  return new hterm.Frame(this.terminal_, url, options);
 };
 
 /**
@@ -13717,24 +13330,6 @@ hterm.TextAttributes.nodeSubstr = function(node, start, width) {
 };
 
 /**
- * Static method to get the substring based of a node's textContent.  The
- * start index of end index are computed in column width.
- *
- * @param {!Element} node The HTML element to get the substr of textContent
- *     from.
- * @param {number} start The starting offset in column width.
- * @param {number} end The ending offset in column width.
- * @return {string} The extracted substring of the node's textContent.
- */
-hterm.TextAttributes.nodeSubstring = function(node, start, end) {
-  if (!node.asciiNode) {
-    return lib.wc.substring(node.textContent, start, end);
-  } else {
-    return node.textContent.substring(start, end);
-  }
-};
-
-/**
  * Static method to split a string into contiguous runs of single-width
  * characters and runs of double-width characters.
  *
@@ -13868,11 +13463,6 @@ hterm.VT = function(terminal) {
    * the DEC Private mode 12.
    */
   this.enableDec12 = false;
-
-  /**
-   * Respect the host's attempt to clear the scrollback buffer using CSI-J-3.
-   */
-  this.enableCsiJ3 = true;
 
   /**
    * If true, emit warnings when we encounter a control character or escape
@@ -14858,8 +14448,7 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       this.terminal.setCursorVisible(state);
       break;
 
-    case 30:  // Show scrollbar
-      this.terminal.setScrollbarVisible(state);
+    case 30:  // Show scrollbar, but we don't have the feature.
       break;
 
     case 40:  // Allow 80 - 132 (DECCOLM) Mode
@@ -16322,9 +15911,7 @@ hterm.VT.CSI['?J'] = function(parseState) {
   } else if (arg == 2) {
     this.terminal.clear();
   } else if (arg == 3) {
-    if (this.enableCsiJ3) {
-      this.terminal.clearScrollback();
-    }
+    // clear scrollback, but we don't have that feature
   }
 };
 

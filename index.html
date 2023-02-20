@@ -470,20 +470,18 @@ function term_init()
 			}
 
 			if (e.shiftKey) {
-				if (!pref) {
-					// These shortcuts cannot be preceded by Esc as they are not sent to I/O
-					switch (e.mn) {
-					case 'pd': t.scrollPageDown();	return true;
-					case 'pu': t.scrollPageUp();	return true;
-					case 'ho': t.scrollHome();	return true;
-					case 'nd': t.scrollEnd();	return true;
-					}
-				}
-
 				switch (e.mn) {
 				case 'bs': signal(pref + '\x17');		return true;	// C+W
 				case 'en': signal(pref + '\x0e');		return true;	// C+N
 				case 'ta': signal(pref + '\x1b\x5b\x5a');	return true;
+				case 'pu':					return true;
+				case 'pd':					return true;
+				case 'ho':					return true;
+				case 'nd':					return true;
+				case 'up':					return true;
+				case 'do':					return true;
+				case 'le':					return true;
+				case 'ri':					return true;
 				default:					return false;
 				}
 			}

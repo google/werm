@@ -5743,13 +5743,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `If false, dropped text will be ignored.`,
   ),
 
-  'scroll-on-output': hterm.PreferenceManager.definePref_(
-      'Scroll to bottom after new output',
-      hterm.PreferenceManager.Categories.Scrolling,
-      false, 'bool',
-      `Whether to scroll to the bottom on terminal output.`,
-  ),
-
   'scroll-wheel-may-send-arrow-keys': hterm.PreferenceManager.definePref_(
       'Emulate arrow keys with scroll wheel',
       hterm.PreferenceManager.Categories.Scrolling,
@@ -7064,11 +7057,6 @@ hterm.ScrollPort = function(rowProvider) {
   this.screenPaddingSize = 0;
 
   /**
-   * True if the last scroll caused the scrollport to show the final row.
-   */
-  this.isScrolledEnd = true;
-
-  /**
    * A guess at the current scrollbar width, fixed in resize().
    */
   this.currentScrollbarWidthPx = hterm.ScrollPort.DEFAULT_SCROLLBAR_WIDTH;
@@ -7183,45 +7171,6 @@ hterm.ScrollPort.Selection = function(scrollPort) {
    * @type {boolean}
    */
   this.isCollapsed = true;
-
-  /**
-   * @private
-   * @const
-   */
-  this.autoScrollOnMouseMoveBound_ =
-      /** @type {!EventListener} */ (this.autoScrollOnMouseMove_.bind(this));
-
-  /**
-   * True when 'mousedown' event is received for primary button until 'mouseup'
-   * is received for primary button.
-   *
-   * @private {boolean}
-   */
-  this.autoScrollEnabled_ = false;
-
-  /**
-   * Direction of auto scroll. 1 for scrolling down, -1 for scrolling up. Set by
-   * detecting mouse position from 'mousemove' events.
-   *
-   * @private {number}
-   */
-  this.autoScrollDirection_ = 1;
-
-  /**
-   * ID of interval running this.autoScroll_(). Set by startAutoScroll_(),
-   * cleared by stopAutoScroll_().
-   *
-   * @private {?number}
-   */
-  this.autoScrollInterval_ = null;
-
-  /**
-   * Number of rows to scroll at a time. Auto scroll runs at a 200ms interval.
-   * It starts by scrolling 1 row and accelerates by 20% each invocation.
-   *
-   * @private {number}
-   */
-  this.autoScrollDelta_ = 1;
 };
 
 /**
@@ -7252,81 +7201,6 @@ hterm.ScrollPort.Selection.prototype.findFirstChild = function(
   }
 
   return null;
-};
-
-/**
- * Capture mousemove events while auto scroll is enabled. Set scroll direction
- * up if mouse is above midpoint of screen, else set direction down. Start and
- * stop auto scroll when mouse moves above or below rows.
- *
- * @param {!MouseEvent} e
- * @private
- */
-hterm.ScrollPort.Selection.prototype.autoScrollOnMouseMove_ = function(e) {
-  // If mouse is in top half of screen, then direction is up, else down.
-  const screenHeight = this.scrollPort_.lastScreenHeight_;
-  this.autoScrollDirection_ = (e.pageY * 2) < screenHeight ? -1 : 1;
-
-  const padding = this.scrollPort_.screenPaddingSize;
-  if (e.pageY < padding) {
-    // Mouse above rows.
-    this.startAutoScroll_();
-  } else if (e.pageY < (this.scrollPort_.visibleRowsHeight + padding)) {
-    // Mouse inside rows.
-    this.stopAutoScroll_();
-  } else {
-    // Mouse below rows.
-    this.startAutoScroll_();
-  }
-};
-
-/**
- * Enable auto scrolling. True while primary mouse button is down.
- *
- * @param {boolean} enabled
- */
-hterm.ScrollPort.Selection.prototype.setAutoScrollEnabled = function(enabled) {
-  this.autoScrollEnabled_ = enabled;
-  const doc = this.scrollPort_.getDocument();
-  if (enabled) {
-    doc.addEventListener('mousemove', this.autoScrollOnMouseMoveBound_);
-  } else {
-    doc.removeEventListener('mousemove', this.autoScrollOnMouseMoveBound_);
-    this.stopAutoScroll_();
-  }
-};
-
-/**
- * Increase this.autoScrollDelta_ by 20% and scroll.
- *
- * @private
- */
-hterm.ScrollPort.Selection.prototype.autoScroll_ = function() {
-  this.autoScrollDelta_ *= 1.2;
-  const delta = Math.floor(this.autoScrollDelta_) * this.autoScrollDirection_;
-  this.scrollPort_.scrollRowToTop(this.scrollPort_.getTopRowIndex() + delta);
-};
-
-/**
- * Start auto scrolling if primary mouse is down and it is above or below rows.
- *
- * @private
- */
-hterm.ScrollPort.Selection.prototype.startAutoScroll_ = function() {
-  if (this.autoScrollEnabled_ && this.autoScrollInterval_ === null) {
-    this.autoScrollInterval_ = setInterval(this.autoScroll_.bind(this), 200);
-  }
-};
-
-/**
- * Stop auto scrolling called on 'mouseup' or if mouse moves back into rows.
- *
- * @private
- */
-hterm.ScrollPort.Selection.prototype.stopAutoScroll_ = function() {
-  clearInterval(this.autoScrollInterval_);
-  this.autoScrollInterval_ = null;
-  this.autoScrollDelta_ = 1;
 };
 
 /**
@@ -7425,23 +7299,6 @@ hterm.ScrollPort.Selection.prototype.sync = function() {
   if (!focusRow) {
     // Keep existing selection (do not clear()) if focus is not a valid row.
     return;
-  }
-
-  // During auto scroll, if focusRow is one of the selection rows inside the
-  // fold, use adjacent row.
-  if (this.scrollPort_.autoScrollEnabled_) {
-    let node = this.scrollPort_.topFold_;
-    while ((node = node.previousSibling) !== null) {
-      if (node === focusRow) {
-        focusIsStartOfTopRow();
-      }
-    }
-    node = this.scrollPort_.bottomFold_;
-    while ((node = node.nextSibling) !== null) {
-      if (node === focusRow) {
-        focusIsEndOfBottomRow();
-      }
-    }
   }
 
   if (anchorRow.rowIndex < focusRow.rowIndex) {
@@ -7646,7 +7503,6 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   this.scrollUpButton_.setAttribute('role', 'button');
   this.scrollUpButton_.style.cssText = a11yButtonStyle;
   this.scrollUpButton_.style.top = `${-a11yButtonTotalHeight}px`;
-  this.scrollUpButton_.addEventListener('click', this.scrollPageUp.bind(this));
 
   this.scrollDownButton_ = this.document_.createElement('div');
   this.scrollDownButton_.id = 'hterm:a11y:page-down';
@@ -7654,8 +7510,6 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   this.scrollDownButton_.setAttribute('role', 'button');
   this.scrollDownButton_.style.cssText = a11yButtonStyle;
   this.scrollDownButton_.style.bottom = `${-a11yButtonTotalHeight}px`;
-  this.scrollDownButton_.addEventListener(
-      'click', this.scrollPageDown.bind(this));
 
   this.optionsButton_ = this.document_.createElement('div');
   this.optionsButton_.id = 'hterm:a11y:options';
@@ -7786,36 +7640,6 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
 hterm.ScrollPort.prototype.setAccessibilityReader =
     function(accessibilityReader) {
   this.accessibilityReader_ = accessibilityReader;
-};
-
-/**
- * Scroll the terminal one page up (minus one line) relative to the current
- * position.
- */
-hterm.ScrollPort.prototype.scrollPageUp = function() {
-  if (this.getTopRowIndex() == 0) {
-    return;
-  }
-
-  const i = this.getTopRowIndex();
-  this.scrollRowToTop(i - this.visibleRowCount + 1);
-
-  this.assertiveAnnounce_();
-};
-
-/**
- * Scroll the terminal one page down (minus one line) relative to the current
- * position.
- */
-hterm.ScrollPort.prototype.scrollPageDown = function() {
-  if (this.isScrolledEnd) {
-    return;
-  }
-
-  const i = this.getTopRowIndex();
-  this.scrollRowToTop(i + this.visibleRowCount - 1);
-
-  this.assertiveAnnounce_();
 };
 
 /** @return {string} */
@@ -8134,7 +7958,7 @@ hterm.ScrollPort.prototype.updateScrollButtonState_ = function() {
     button.style.opacity = disabled ? 0.5 : 1;
   };
   setButton(this.scrollUpButton_, this.getTopRowIndex() == 0);
-  setButton(this.scrollDownButton_, this.isScrolledEnd);
+  setButton(this.scrollDownButton_, true);
 };
 
 /**
@@ -8167,9 +7991,6 @@ hterm.ScrollPort.prototype.redraw_ = function() {
 
   this.previousRowNodeCache_ = this.currentRowNodeCache_;
   this.currentRowNodeCache_ = null;
-
-  this.isScrolledEnd = (
-    this.getTopRowIndex() + this.visibleRowCount >= this.lastRowCount_);
 
   this.updateScrollButtonState_();
 };
@@ -8555,9 +8376,6 @@ hterm.ScrollPort.prototype.scrollRowToTop = function(rowIndex) {
   }
 
   this.syncScrollHeight();
-
-  this.isScrolledEnd = (
-    rowIndex + this.visibleRowCount >= this.lastRowCount_);
 
   let scrotop = rowIndex * this.characterSize.height +
       this.visibleRowTopMargin;
@@ -9056,8 +8874,7 @@ hterm.Terminal = function({profileId, storage} = {}) {
 
   this.screenBorderSize_ = 0;
 
-  this.scrollOnOutput_ = null;
-  this.scrollWheelArrowKeys_ = null;
+  this.scrollWheelArrowKeys_ = true;
 
   // True if we should override mouse event reporting to allow local selection.
   this.defeatMouseReports_ = false;
@@ -9367,14 +9184,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'screen-border-color': (v) => {
       this.div_.style.borderColor = v;
-    },
-
-    'scroll-on-output': (v) => {
-      this.scrollOnOutput_ = v;
-    },
-
-    'scroll-wheel-may-send-arrow-keys': (v) => {
-      this.scrollWheelArrowKeys_ = v;
     },
 
     'scroll-wheel-move-multiplier': (v) => {
@@ -9992,68 +9801,6 @@ hterm.Terminal.prototype.scrollEnd = function() {
 };
 
 /**
- * Scroll the terminal one page up (minus one line) relative to the current
- * position.
- */
-hterm.Terminal.prototype.scrollPageUp = function() {
-  this.scrollPort_.scrollPageUp();
-};
-
-/**
- * Scroll the terminal one page down (minus one line) relative to the current
- * position.
- */
-hterm.Terminal.prototype.scrollPageDown = function() {
-  this.scrollPort_.scrollPageDown();
-};
-
-/**
- * Scroll the terminal one line up relative to the current position.
- */
-hterm.Terminal.prototype.scrollLineUp = function() {
-  const i = this.scrollPort_.getTopRowIndex();
-  this.scrollPort_.scrollRowToTop(i - 1);
-};
-
-/**
- * Scroll the terminal one line down relative to the current position.
- */
-hterm.Terminal.prototype.scrollLineDown = function() {
-  const i = this.scrollPort_.getTopRowIndex();
-  this.scrollPort_.scrollRowToTop(i + 1);
-};
-
-/**
- * Clear primary screen, secondary screen, and the scrollback buffer.
- */
-hterm.Terminal.prototype.wipeContents = function() {
-  this.clearHome(this.primaryScreen_);
-  this.clearHome(this.alternateScreen_);
-
-  this.clearScrollback();
-};
-
-/**
- * Clear scrollback buffer.
- */
-hterm.Terminal.prototype.clearScrollback = function() {
-  // Move to the end of the buffer in case the screen was scrolled back.
-  // We're going to throw it away which would leave the display invalid.
-  this.scrollEnd();
-
-  this.discarded_rows = 0;
-  this.scrollPort_.resetCache();
-
-  [this.primaryScreen_, this.alternateScreen_].forEach((screen) => {
-    const bottom = screen.getHeight();
-    this.renumberRows_(0, bottom, screen);
-  });
-
-  this.syncCursorPosition_();
-  this.scrollPort_.invalidate();
-};
-
-/**
  * Full terminal reset.
  *
  * Perform a full reset to the default values listed in
@@ -10601,9 +10348,7 @@ hterm.Terminal.prototype.appendRows_ = function(count) {
   const extraRows = this.screen_.rowsArray.length - this.screenSize.height;
   if (extraRows > 0) {
     this.scroll_rows_off(extraRows);
-    if (this.scrollPort_.isScrolledEnd) {
-      this.scheduleScrollDown_();
-    }
+    this.scheduleScrollDown_();
   }
 
   if (cursorRow >= this.screen_.rowsArray.length) {
@@ -10633,9 +10378,7 @@ hterm.Terminal.prototype.insertRow_ = function() {
   this.renumberRows_(cursorRow, this.screen_.rowsArray.length);
 
   this.setAbsoluteCursorPosition(cursorRow, 0);
-  if (this.scrollPort_.isScrolledEnd) {
-    this.scheduleScrollDown_();
-  }
+  this.scheduleScrollDown_();
 };
 
 /**
@@ -10762,10 +10505,6 @@ hterm.Terminal.prototype.print = function(str) {
 
     this.screen_.maybeClipCurrentRow();
     startOffset += count;
-  }
-
-  if (this.scrollOnOutput_) {
-    this.scrollPort_.scrollRowToBottom(this.getRowCount());
   }
 };
 
@@ -12352,11 +12091,6 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
       this.setSelectionEnabled(false);
       e.preventDefault();
     }
-
-    // Primary button 'mousedown'.
-    if (e.button === 0) {
-      this.scrollPort_.selection.setAutoScrollEnabled(true);
-    }
   }
 
   if (!reportMouseEvents) {
@@ -12466,11 +12200,6 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
       // we don't immediately kill the users selection.
       this.defeatMouseReports_ = false;
     }
-
-    // Primary button 'mouseup'.
-    if (e.button === 0) {
-      this.scrollPort_.selection.setAutoScrollEnabled(false);
-    }
   }
 };
 
@@ -12576,7 +12305,6 @@ hterm.Terminal.prototype.onResize_ = function() {
 
   const isNewSize = (columnCount != this.screenSize.width ||
                      rowCount != this.screenSize.height);
-  const wasScrolledEnd = this.scrollPort_.isScrolledEnd;
 
   // We do this even if the size didn't change, just to be sure everything is
   // in sync.
@@ -12590,9 +12318,7 @@ hterm.Terminal.prototype.onResize_ = function() {
   this.restyleCursor_();
   this.scheduleSyncCursorPosition_();
 
-  if (wasScrolledEnd) {
-    this.scrollEnd();
-  }
+  this.scrollEnd();
 };
 
 /**
@@ -14494,7 +14220,7 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       break;
 
     case 1010:  // Scroll to bottom on tty output
-      this.terminal.scrollOnOutput = state;
+      // always true since we don't have scrollback buffer
       break;
 
     case 1011:  // Scroll to bottom on key press

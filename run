@@ -3,8 +3,7 @@
 cd `dirname $0`
 export WERMDIR=`pwd`
 
-wsd=$HOME/websocketd/websocketd
-test -f $wsd || wsd=websocketd
+wsd=$HOME/.local/websocketd/websocketd
 
 lc_vars=`env | sed '/^\(LC_[A-Z]*\)=.*/!d; s//\1/' | tr '\n' ','`
 

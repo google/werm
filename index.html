@@ -783,14 +783,18 @@ function term_init()
 
 	function process_mkey(e)
 	{
-		var mi, mch, mac, save;
+		var mi, mch, mac, save, is_alt;
+
+		is_alt = (e.mn == 'la' || e.mn == 'ra');
 
 		if (!matching.length) {
-			if (e.mn != 'la' && e.mn != 'ra') return false;
+			if (!is_alt) return false;
 			got_key_up = false;
+		}
+		else if (!got_key_up && is_alt) {
+			// Ignore holding down Alt key, or starting a macro
+			// right after an Alt+<ash keybinding>.
 			matching = [];
-			for (mi = 0; mi < macro_map.length; mi++)
-				matching.push(macro_map[mi].slice());
 		}
 		else if (!got_key_up && !e.altKey) {
 			// We never received Alt release event, but the current
@@ -801,6 +805,10 @@ function term_init()
 			matching.length = 0;
 			return false;
 		}
+
+		if (!matching.length)
+			for (mi = 0; mi < macro_map.length; mi++)
+				matching.push(macro_map[mi].slice());
 
 		for (mi = 0; mi < matching.length; mi++) {
 			mac = matching[mi];

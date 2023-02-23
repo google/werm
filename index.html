@@ -647,12 +647,14 @@ function term_init()
 	{
 		var boxi;
 
-		for (boxi = 0; boxi < repeat_boxes.length; boxi++)
+		// 'me' means don't hide the guide boxes, nor repeat
+		boxi = code == 'me' ? 0 : repeat_boxes.length;
+		while (boxi-- > 0)
 			repeat_boxes[boxi].style.visibility = 'hidden';
 
 		switch (code) {
-		case 'ra': repeat_cnt = 0;	return 'm';
-		case 'rs': repeat_cnt = 40;	return 'm';
+		case 'ra': case 'me':	repeat_cnt = 0;		return 'm';
+		case 'rs':		repeat_cnt = 40;	return 'm';
 		}
 
 		if (code.charAt(1) != ' ') return 0;

@@ -11,7 +11,7 @@ Content-type: text/html
 <meta http-equiv="Cache-Control" content="no-cache" />
 <html>
 <head>
-	<title>Attach</title>
+	<title>attach[$SERVER_PORT]</title>
 <style>
 td.loose {
 	padding-right:20pt;

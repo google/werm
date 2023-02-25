@@ -747,6 +747,7 @@ function term_init()
 		['raS D ', '\x1b:w\r'],
 		['raS K ', '\x1b:wq\r'],
 		['laI L ', 'git log --name-status --format=fuller --date=iso-local '],
+		['laI T ', 'git log --format=raw | perl -MTime::Piece -pE \'/^(au|co)[a-z]+r .*<([^<>]+)> ([0-9]+) [-+][0-9]+$/ or next; if($1 eq "au"){$_="";$e=$2}else{$_="@" . localtime($3)->strftime("%F %T") . " "x 40 . "$e $2"}\' | less'],
 		['laI B R ', 'git branch '],
 		['laI C M ', 'git commit '],
 		['laI P S ', 'git push '],

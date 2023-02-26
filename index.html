@@ -747,7 +747,7 @@ function term_init()
 		['raS D ', '\x1b:w\r'],
 		['raS K ', '\x1b:wq\r'],
 		['laI L ', 'git log --name-status '],
-		['laI T ', 'git log --format=raw|perl -pE\'if(/^(au|co)[^ ]+r .*<([^ ]+)> (\\d+) [-+]\\d+$/){$_="";if($1eq"au"){$e=$2}else{say `date -d\\@$3 +"at %F %T %z"`."by $e $2"}}\'|less\r'],
+		['laI T ', 'git log --format=raw|perl -pE\'/^(au|co)[^ ]+r .*<([^ ]+)> (\\d+) [-+]\\d+$/&&($_="",$1ne"au")&&say `date -d\\@$3 +"at %F %T %z"`."by $e $2";$e=$2\'|less\r'],
 		['laI B R ', 'git branch '],
 		['laI C M ', 'git commit '],
 		['laI P S ', 'git push '],

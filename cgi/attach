@@ -24,6 +24,7 @@ h1 {
 }
 .column {
 	padding-top: 6pt;
+	padding-bottom: 6pt;
 	padding-left: 24pt;
 	padding-right: 24pt;
 	border: 2px solid yellow;
@@ -36,12 +37,55 @@ h1 {
 a {
 	color: white;
 	font-size: 14px;
+	text-decoration: none;
+}
+a.scratch-link {
+	text-decoration: none;
+	margin-left: 7pt;
+	font-size:12pt;
 }
 </style>
 </head>
 <body style="font-family: monospace; font-size: 14px;  background-color: black; color: #8f8;">
-<div style="display: flex;">
-<div class=column>
+<table style="border: 2px solid yellow; border-collapse: collapse">
+<tr>
+<td class=column style="vertical-align: middle">
+<h1 style="border: 0px; padding: 0; margin: 0">scratch</h1>
+<td style="padding: 7pt">
+<div style="padding-bottom: 7pt">
+<a href=/?termid=A class=scratch-link>{A}</a>
+<a href=/?termid=B class=scratch-link>{B}</a>
+<a href=/?termid=C class=scratch-link>{C}</a>
+<a href=/?termid=D class=scratch-link>{D}</a>
+<a href=/?termid=E class=scratch-link>{E}</a>
+<a href=/?termid=F class=scratch-link>{F}</a>
+<a href=/?termid=G class=scratch-link>{G}</a>
+<a href=/?termid=H class=scratch-link>{H}</a>
+<a href=/?termid=I class=scratch-link>{I}</a>
+<a href=/?termid=J class=scratch-link>{J}</a>
+<a href=/?termid=K class=scratch-link>{K}</a>
+<a href=/?termid=L class=scratch-link>{L}</a>
+<a href=/?termid=M class=scratch-link>{M}</a>
+</div>
+<div>
+<a href=/?termid=N class=scratch-link>{N}</a>
+<a href=/?termid=O class=scratch-link>{O}</a>
+<a href=/?termid=P class=scratch-link>{P}</a>
+<a href=/?termid=Q class=scratch-link>{Q}</a>
+<a href=/?termid=R class=scratch-link>{R}</a>
+<a href=/?termid=S class=scratch-link>{S}</a>
+<a href=/?termid=T class=scratch-link>{T}</a>
+<a href=/?termid=U class=scratch-link>{U}</a>
+<a href=/?termid=V class=scratch-link>{V}</a>
+<a href=/?termid=W class=scratch-link>{W}</a>
+<a href=/?termid=X class=scratch-link>{X}</a>
+<a href=/?termid=Y class=scratch-link>{Y}</a>
+<a href=/?termid=Z class=scratch-link>{Z}</a>
+</div>
+</tr>
+
+<tr>
+<td class=column style="vertical-align:top">
 <h1>Common</h1>
 EOF
 
@@ -72,8 +116,7 @@ done
 
 cat <<EOF
 
-</div>
-<div class=column>
+<td class=column>
 <h1>Active sessions</h1>
 <table>
 EOF
@@ -106,6 +149,8 @@ done
 
 cat <<EOF
 </table>
+</tr>
+</table>
 
 <script>
 console.log('prep document onload');
@@ -123,8 +168,6 @@ for (i = 0; i < es.length; i++) {
 }
 };
 </script>
-</div>
-</div>
 </body>
 </html>
 EOF

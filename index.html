@@ -586,7 +586,7 @@ function term_init()
 		repeat_boxes[layer] = box = t.document_.createElement('div');
 
 		box.style.position = 'absolute';
-		box.style.opacity = 0.5;
+		box.style.opacity = 'var(--hterm-repeat-box-opacity)';
 		box.style.borderColor = `hsl(
 			${layer*5%REPEAT_BOX_CNT/REPEAT_BOX_CNT * 360},
 			90%, 50%)`
@@ -639,6 +639,7 @@ function term_init()
 			make_repeat_box(boxi);
 			repeat_boxes[boxi].style.visibility = 'visible';
 		}
+		t.setCssVar('repeat-box-opacity', 0.5);
 
 		return 'm';
 	}
@@ -651,6 +652,8 @@ function term_init()
 		boxi = code == 'me' ? 0 : repeat_boxes.length;
 		while (boxi-- > 0)
 			repeat_boxes[boxi].style.visibility = 'hidden';
+		// dim repeat boxes in case they are still visible
+		t.setCssVar('repeat-box-opacity', 0.25);
 
 		switch (code) {
 		case 'ra': case 'me':	repeat_cnt = 0;		return 'm';

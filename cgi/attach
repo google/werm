@@ -17,7 +17,7 @@ td.loose {
 	padding-right:20pt;
 }
 h1 {
-	margin-top:0;
+	margin-top: 7pt;
 	margin-bottom:8pt;
 	padding-bottom:8pt;
 	border-bottom: solid 1px yellow;
@@ -116,7 +116,7 @@ done
 
 cat <<EOF
 
-<td class=column>
+<td class=column style="vertical-align: top">
 <h1>Active sessions</h1>
 <table>
 EOF

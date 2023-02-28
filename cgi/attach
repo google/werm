@@ -46,8 +46,7 @@ a {
 EOF
 
 # werm repo subdir should have profiles to use
-# websocketd doesn't actually pass env vars to CGI scripts
-for p in ../profiles/*
+for p in $WERMDIR/profiles/*
 do
 	echo '<ul class=common-list>'
 	sed '

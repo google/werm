@@ -159,11 +159,12 @@ function cookev(e)
 		altKey:		e.altKey,
 		shiftKey:	e.shiftKey,
 	};
-	if (log_keys>=2) console.log(ce);
+	if (log_mn) console.log(ce);
 	return ce;
 }
 
-var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {};
+var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
+	log_mn = 0;
 
 function term_init()
 {
@@ -874,7 +875,14 @@ function term_init()
 		if (log_keys) console.log('scrollport key:', e);
 
 		if (matching.length) {
-			got_key_up = true;
+			// Don't consider Tab to validate the start of a macro,
+			// as this would only be useful if the user pressed:
+			//	1. AltDown
+			//	2. TabDown
+			//	3. TabUp
+			// But this would just activate the Alt+Tab shortcut to
+			// switch windows.
+			if (e.code != 'Tab') got_key_up = true;
 			return;
 		}
 

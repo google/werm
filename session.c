@@ -315,10 +315,25 @@ static _Noreturn void write_to_subproc(void)
 	}
 }
 
+static void test_main(void)
+{
+	puts("write_to_subproc");
+	/* TODO: test write_to_subproc */
+}
+
 int main(int argc, char **argv)
 {
 	pid_t child;
 	const char *home;
+
+	if (argc < 1) errx(1, "unexpected argc value: %d", argc);
+	argc--;
+	argv++;
+
+	if (1 == argc && !strcmp("test", *argv)) {
+		test_main();
+		exit(0);
+	}
 
 	home = getenv("HOME");
 

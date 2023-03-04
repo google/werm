@@ -25,3 +25,13 @@ build termserv "`pkg-config --libs nettle`  -lwslay"
 build session
 
 echo '}' >> compile_commands.json
+
+echo 'running session test...' >&2
+./session test >|/tmp/testout.$$
+
+if ! diff -u passing_test_output /tmp/testout.$$
+then
+	echo "build succeeded but tests failed; to update:
+	cp /tmp/testout.$$ passing_test_output"
+	exit 1
+fi >&2

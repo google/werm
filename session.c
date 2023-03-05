@@ -232,11 +232,8 @@ static _Noreturn void read_from_subproc(void)
 }
 
 struct write_subproc_st {
-	unsigned readsz;
-	unsigned char readbuf[512];
-
-	unsigned writsz;
-	unsigned char writbuf[512];
+	unsigned bufsz;
+	unsigned char buf[512];
 
 	unsigned sendsigwin : 1, swrow : 16, swcol : 16;
 	unsigned wsi;
@@ -251,8 +248,8 @@ struct write_subproc_st {
 
 static void dump_wts_st(struct write_subproc_st *st)
 {
-	unsigned char *curs = st->writbuf;
-	while (st->writsz--) {
+	unsigned char *curs = st->buf;
+	while (st->bufsz--) {
 		if (*curs >= ' ' && *curs != '\\') putchar(*curs);
 		else printf("\\%03o", *curs);
 
@@ -277,15 +274,14 @@ static void write_all(unsigned char *buf, size_t sz)
 
 static void write_to_subproc_core(struct write_subproc_st *st)
 {
-	unsigned char *curs, byte;
-	int col, row;
+	unsigned char byte;
+	unsigned wi, ri, row, col;
 
 	st->sendsigwin = 0;
-	st->writsz = 0;
 
-	curs = st->readbuf;
-	while (st->readsz--) {
-		byte = *curs++;
+	wi = 0;
+	for (ri = 0; ri < st->bufsz; ri++) {
+		byte = st->buf[ri];
 
 		if (byte == '\n') continue;
 
@@ -294,18 +290,18 @@ static void write_to_subproc_core(struct write_subproc_st *st)
 			if (byte == '\\')
 				st->esc = '1';
 			else
-				st->writbuf[st->writsz++] = byte;
+				st->buf[wi++] = byte;
 			break;
 
 		case '1':
 			switch (byte) {
 			case 'n':
-				st->writbuf[st->writsz++] = '\n';
+				st->buf[wi++] = '\n';
 				st->esc = '0';
 				break;
 
 			case '\\':
-				st->writbuf[st->writsz++] = '\\';
+				st->buf[wi++] = '\\';
 				st->esc = '0';
 				break;
 
@@ -324,7 +320,7 @@ static void write_to_subproc_core(struct write_subproc_st *st)
 			st->winsize[st->wsi++] = byte;
 			if (st->wsi != sizeof(st->winsize)) break;
 
-			if (2 != sscanf(st->winsize, "%4d%4d", &row, &col))
+			if (2 != sscanf(st->winsize, "%4u%4u", &row, &col))
 				warn("invalid winsize");
 			else {
 				st->swrow = row;
@@ -338,6 +334,8 @@ static void write_to_subproc_core(struct write_subproc_st *st)
 		default: errx(1, "unknown escape: %d", st->esc);
 		}
 	}
+
+	st->bufsz = wi;
 }
 
 static _Noreturn void write_to_subproc(void)
@@ -352,13 +350,13 @@ static _Noreturn void write_to_subproc(void)
 
 	st.esc = '0';
 	while (1) {
-		red = read(0, st.readbuf, sizeof(512));
+		red = read(0, st.buf, sizeof(512));
 		if (!red) exit(0);
 		if (red == -1) err(1, "read from stdin");
 
-		st.readsz = red;
+		st.bufsz = red;
 		write_to_subproc_core(&st);
-		write_all(st.writbuf, st.writsz);
+		write_all(st.buf, st.bufsz);
 		if (st.sendsigwin) send_sigwinch(st.swrow, st.swcol);
 	}
 }
@@ -371,59 +369,59 @@ static void test_main(void)
 
 	puts("should ignore newline:");
 	wts.esc = '0';
-	strcpy((char *)wts.readbuf, "hello\n how are you\n");
-	wts.readsz = strlen("hello\n how are you\n");
+	strcpy((char *)wts.buf, "hello\n how are you\n");
+	wts.bufsz = strlen("hello\n how are you\n");
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
 	puts("empty string:");
 	wts.esc = '0';
-	wts.readsz = 0;
+	wts.bufsz = 0;
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
 	puts("missing newline:");
 	wts.esc = '0';
-	strcpy((char *)wts.readbuf, "asdf");
-	wts.readsz = strlen("asdf");
+	strcpy((char *)wts.buf, "asdf");
+	wts.bufsz = strlen("asdf");
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
 	puts("sending sigwinch:");
 	wts.esc = '0';
-	strcpy((char *)wts.readbuf, "about to resize...\\w00910042...all done");
-	wts.readsz = strlen((char *)wts.readbuf);
+	strcpy((char *)wts.buf, "about to resize...\\w00910042...all done");
+	wts.bufsz = strlen((char *)wts.buf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
 	puts("escape seqs:");
 	wts.esc = '0';
-	strcpy((char *)wts.readbuf,
+	strcpy((char *)wts.buf,
 	       "line one\\nline two\\nline 3 \\\\ (reverse solidus)\\n\n");
-	wts.readsz = strlen((char *)wts.readbuf);
+	wts.bufsz = strlen((char *)wts.buf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
 	puts("escape seqs straddling:");
 	wts.esc = '0';
 
-	strcpy((char *)wts.readbuf, "line one\\nline two\\");
-	wts.readsz = strlen((char *)wts.readbuf);
+	strcpy((char *)wts.buf, "line one\\nline two\\");
+	wts.bufsz = strlen((char *)wts.buf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
-	strcpy((char *)wts.readbuf, "nline 3 \\");
-	wts.readsz = strlen((char *)wts.readbuf);
+	strcpy((char *)wts.buf, "nline 3 \\");
+	wts.bufsz = strlen((char *)wts.buf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
-	strcpy((char *)wts.readbuf, "\\ (reverse solidus)\\n\\w012");
-	wts.readsz = strlen((char *)wts.readbuf);
+	strcpy((char *)wts.buf, "\\ (reverse solidus)\\n\\w012");
+	wts.bufsz = strlen((char *)wts.buf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
-	strcpy((char *)wts.readbuf, "00140");
-	wts.readsz = strlen((char *)wts.readbuf);
+	strcpy((char *)wts.buf, "00140");
+	wts.bufsz = strlen((char *)wts.buf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 }

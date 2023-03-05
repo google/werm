@@ -403,6 +403,29 @@ static void test_main(void)
 	wts.readsz = strlen((char *)wts.readbuf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
+
+	puts("escape seqs straddling:");
+	wts.esc = '0';
+
+	strcpy((char *)wts.readbuf, "line one\\nline two\\");
+	wts.readsz = strlen((char *)wts.readbuf);
+	write_to_subproc_core(&wts);
+	dump_wts_st(&wts);
+
+	strcpy((char *)wts.readbuf, "nline 3 \\");
+	wts.readsz = strlen((char *)wts.readbuf);
+	write_to_subproc_core(&wts);
+	dump_wts_st(&wts);
+
+	strcpy((char *)wts.readbuf, "\\ (reverse solidus)\\n\\w012");
+	wts.readsz = strlen((char *)wts.readbuf);
+	write_to_subproc_core(&wts);
+	dump_wts_st(&wts);
+
+	strcpy((char *)wts.readbuf, "00140");
+	wts.readsz = strlen((char *)wts.readbuf);
+	write_to_subproc_core(&wts);
+	dump_wts_st(&wts);
 }
 
 int main(int argc, char **argv)

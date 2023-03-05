@@ -10,3 +10,9 @@ about to resize......all done\<eobuff>
 sigwin r=91 c=42
 escape seqs:
 line one\012line two\012line 3 \134 (reverse solidus)\012\<eobuff>
+escape seqs straddling:
+line one\012line two\<eobuff>
+\012line 3 \<eobuff>
+\134 (reverse solidus)\012\<eobuff>
+\<eobuff>
+sigwin r=120 c=140

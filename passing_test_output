@@ -1,1 +1,12 @@
-write_to_subproc
+WRITE_TO_SUBPROC_CORE
+should ignore newline:
+hello how are you\<eobuff>
+empty string:
+\<eobuff>
+missing newline:
+asdf\<eobuff>
+sending sigwinch:
+about to resize......all done\<eobuff>
+sigwin r=91 c=42
+escape seqs:
+line one\012line two\012line 3 \134 (reverse solidus)\012\<eobuff>

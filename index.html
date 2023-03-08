@@ -170,7 +170,7 @@ function term_init()
 {
 	var t, pend_send = '', term_ready = false, sock, pend_display = [],
 		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
-		params, dead_key_hist, keep_row_ttl, row_ttl;
+		params, dead_key_hist, keep_row_ttl, row_ttl, host;
 
 	function find_row_ttl()
 	{
@@ -181,6 +181,8 @@ function term_init()
 		return txt;
 	}
 
+	host = location.host.replace(/^localhost:/, ':');
+
 	function set_title()
 	{
 		var compons;
@@ -190,6 +192,7 @@ function term_init()
 
 		row_ttl = find_row_ttl() || row_ttl;
 		if (row_ttl) compons.push(row_ttl);
+		compons.push(host);
 
 		document.title = compons.join(' | ');
 		if (row_ttl) localStorage['title-' + termid] = row_ttl;

@@ -21,7 +21,6 @@ build () {
 	rm $cmd_scratch
 }
 
-build termserv "`pkg-config --libs nettle`  -lwslay"
 build session
 
 echo '}' >> compile_commands.json

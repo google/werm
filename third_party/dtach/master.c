@@ -272,6 +272,8 @@ top:
 	if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
 		return;
 
+	tee_tty_content(buf, len);
+
 	/* Send the data out to the clients. */
 	for (p = clients, nclients = 0; p; p = p->next)
 	{

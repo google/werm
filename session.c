@@ -3,6 +3,7 @@
 
 #include "shared.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -13,10 +14,24 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static int master;
-static int argv0sz;
+static int master, argv0sz, logfd;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
 
+void tee_tty_content(const unsigned char *buf, size_t len)
+{
+	ssize_t writn;
+
+	if (logfd < 0) return;
+
+	while (len) {
+		writn = write(logfd, buf, len);
+		if (writn < 0) {
+			if (errno == EINTR) continue; else return;
+		}
+
+		len -= writn;
+	}
+}
 
 static void send_sigwinch(int row, int col)
 {
@@ -56,12 +71,6 @@ static char *extract_query_arg(const char **qs, const char *pref)
 	*bufcur = 0;
 
 	return buf;
-}
-
-void subproc_main(void)
-{
-	execlp("script", "script", "-qfa", logfile, NULL);
-	exit(1);
 }
 
 static int xasprintf(char **strp, const char *format, ...)
@@ -130,10 +139,19 @@ static void parse_query(void)
 	}
 }
 
+void _Noreturn subproc_main(void)
+{
+	const char *shell;
+
+	shell = getenv("SHELL");
+
+	execl(shell, shell, NULL);
+	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
+}
+
 static _Noreturn void do_exec(void)
 {
 	char *slave_name;
-	const char *shell;
 	int slave;
 
 	slave_name = ptsname(master);
@@ -195,15 +213,16 @@ static _Noreturn void do_exec(void)
 	unsetenv("HTTP_CACHE_CONTROL");
 	unsetenv("SERVER_SOFTWARE");
 
-	if (dtach_sock) {
-		snprintf(argv0, argv0sz, "dtach-%s", logfile);
-		dtach_main(dtach_sock);
-	}
+	if (!dtach_sock) subproc_main();
 
-	shell = getenv("SHELL");
+	if (!logfile) errx(1, "expect logfile is set if dtach_sock is set");
 
-	execl(shell, shell, NULL);
-	err(1, "execl $SHELL, which is: %s\n", shell ? shell : "<undef>");
+	logfd = open(logfile, O_WRONLY | O_CREAT, 0600);
+	if (logfd < 0) warn("open %s", logfile);
+	else if (lseek(logfd, 0, SEEK_END) < 0) warn("lseek %s", logfile);
+
+	snprintf(argv0, argv0sz, "dtach-%s", logfile);
+	dtach_main(dtach_sock);
 }
 
 static _Bool send_byte(int b)

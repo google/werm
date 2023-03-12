@@ -53,11 +53,13 @@ static void teettyline(void)
 	linecurs = 0;
 }
 
-#define BACKDEL "\b\x1b\x5b\x4b"
-#define BACKDEL_LEN (sizeof(BACKDEL)-1)
+#define DELLINE "\x1b\x5b\x4b"
+#define DELLINE_LEN (sizeof(DELLINE)-1)
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
+	int pos = linecurs;
+
 	if (logfd < 0) return;
 	if (logfd != STDOUT_FILENO) {
 		/* Not test mode; hacky escape hatch for safe behavior */
@@ -66,16 +68,25 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 
 	while (len) {
 		if (buf[0] == '\r') goto eol;
-		if (len >= BACKDEL_LEN &&
-		    !memcmp((const char *)buf, BACKDEL, BACKDEL_LEN)) {
-			buf += BACKDEL_LEN;
-			len -= BACKDEL_LEN;
-			linecurs--;
+		if (buf[0] == '\b') {
+			pos--;
+			goto eol;
+		}
+		if (len >= DELLINE_LEN && !memcmp(buf, DELLINE, DELLINE_LEN)) {
+			buf += DELLINE_LEN;
+			len -= DELLINE_LEN;
+			linecurs = pos;
 			continue;
 		}
 
-		linebuf[linecurs++] = *buf;
-		if (*buf == '\n' || linecurs == sizeof(linebuf)) teettyline();
+		if (*buf == '\n' || linecurs == sizeof(linebuf)) {
+			teettyline();
+			putchar('\n');
+			goto eol;
+		}
+		linebuf[pos++] = *buf;
+		linecurs = pos;
+		if (linecurs == sizeof(linebuf)) teettyline();
 
 	eol:
 		len--;
@@ -513,6 +524,13 @@ static void test_main(void)
 
 	teetty4test(
 		"abcdef\b\x1b\x5b\x4b\b\x1b\x5b\x4b\b\x1b\x5b\x4bxyz\r\n", -1);
+	teetty4test("abcdef\b\r\n", -1);
+
+	puts("move back x2 and delete to eol");
+	teetty4test("abcdef\b\b\x1b\x5b\x4b\r\n", -1);
+
+	puts("move back x1 and insert");
+	teetty4test("asdf\bxy\r\n", -1);
 }
 
 int main(int argc, char **argv)

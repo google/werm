@@ -16,7 +16,7 @@
 
 static int master, argv0sz, logfd, linecurs;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
-static unsigned char currline[1024];
+static unsigned char linebuf[1024];
 
 static void fullwrite(
 	int fd, const char *desc, const unsigned char *buf, size_t sz)
@@ -37,6 +37,22 @@ static void fullwrite(
 	}
 }
 
+/* This always goes to stdout for now, because it's only for testing */
+static void teettyline(void)
+{
+	int li, c;
+
+	for (li = 0; li < linecurs; li++) {
+		c = linebuf[li];
+		if (c == '\n' || c >= ' ')
+			putchar(c);
+		else
+			printf("\%03o", c);
+	}
+
+	linecurs = 0;
+}
+
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
 	if (logfd < 0) return;
@@ -46,16 +62,10 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 	}
 
 	while (len) {
-		if (len >= 2 && buf[0] == '\r') {
-			len++;
-			buf++;
-		}
+		if (buf[0] == '\r') goto eol;
 
-		currline[linecurs++] = *buf;
-		if (*buf == '\n') {
-			fullwrite(logfd, "logtest", currline, linecurs);
-			linecurs = 0;
-		}
+		linebuf[linecurs++] = *buf;
+		if (*buf == '\n' || linecurs == sizeof(linebuf)) teettyline();
 
 	eol:
 		len--;
@@ -477,12 +487,19 @@ static void test_main(void)
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
 
-	puts("TEE_TTY_CONTENT");	fflush(stdout);
+	puts("TEE_TTY_CONTENT");
 	logfd = STDOUT_FILENO;
 	teetty4test("hello", -1);
-	puts("pending line");		fflush(stdout);
+	puts("pending line");
 	teetty4test("\r\n", -1);
-	puts("finished line");		fflush(stdout);
+	puts("finished line");
+
+	do {
+		int i = 0;
+		while (i++ < sizeof(linebuf)) teetty4test("x", 1);
+		teetty4test("[exceeded]", -1);
+		teetty4test("\r\n", -1);
+	} while (0);
 }
 
 int main(int argc, char **argv)

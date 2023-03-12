@@ -16,3 +16,7 @@ line one\012line two\<eobuff>
 \134 (reverse solidus)\012\<eobuff>
 \<eobuff>
 sigwin r=120 c=140
+TEE_TTY_CONTENT
+pending line
+hello
+finished line

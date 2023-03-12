@@ -14,8 +14,9 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static int master, argv0sz, logfd;
+static int master, argv0sz, logfd, linecurs;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
+static unsigned char currline[1024];
 
 static void fullwrite(
 	int fd, const char *desc, const unsigned char *buf, size_t sz)
@@ -39,8 +40,27 @@ static void fullwrite(
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
 	if (logfd < 0) return;
+	if (logfd != STDOUT_FILENO) {
+		/* Not test mode; hacky escape hatch for safe behavior */
+		fullwrite(logfd, "log", buf, len);
+	}
 
-	fullwrite(logfd, "log", buf, len);
+	while (len) {
+		if (len >= 2 && buf[0] == '\r') {
+			len++;
+			buf++;
+		}
+
+		currline[linecurs++] = *buf;
+		if (*buf == '\n') {
+			fullwrite(logfd, "logtest", currline, linecurs);
+			linecurs = 0;
+		}
+
+	eol:
+		len--;
+		buf++;
+	}
 }
 
 static void send_sigwinch(int row, int col)
@@ -387,6 +407,12 @@ static _Noreturn void write_to_subproc(void)
 	}
 }
 
+static void teetty4test(const char *s, int len)
+{
+	if (-1 == len) len = strlen(s);
+	tee_tty_content((const unsigned char *)s, len);
+}
+
 static void test_main(void)
 {
 	struct write_subproc_st wts;
@@ -450,6 +476,13 @@ static void test_main(void)
 	wts.bufsz = strlen((char *)wts.buf);
 	write_to_subproc_core(&wts);
 	dump_wts_st(&wts);
+
+	puts("TEE_TTY_CONTENT");	fflush(stdout);
+	logfd = STDOUT_FILENO;
+	teetty4test("hello", -1);
+	puts("pending line");		fflush(stdout);
+	teetty4test("\r\n", -1);
+	puts("finished line");		fflush(stdout);
 }
 
 int main(int argc, char **argv)

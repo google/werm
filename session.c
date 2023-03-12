@@ -17,20 +17,30 @@
 static int master, argv0sz, logfd;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
 
-void tee_tty_content(const unsigned char *buf, size_t len)
+static void fullwrite(
+	int fd, const char *desc, const unsigned char *buf, size_t sz)
 {
 	ssize_t writn;
 
+	while (sz) {
+		writn = write(fd, buf, sz);
+		if (!writn) errx(1, "should be blocking: %s", desc);
+		if (writn > 0) {
+			sz -= writn;
+			buf += writn;
+		}
+		else if (errno != EINTR) {
+			warn("write to %s", desc);
+			return;
+		}
+	}
+}
+
+void tee_tty_content(const unsigned char *buf, size_t len)
+{
 	if (logfd < 0) return;
 
-	while (len) {
-		writn = write(logfd, buf, len);
-		if (writn < 0) {
-			if (errno == EINTR) continue; else return;
-		}
-
-		len -= writn;
-	}
+	fullwrite(logfd, "log", buf, len);
 }
 
 static void send_sigwinch(int row, int col)
@@ -285,18 +295,6 @@ static void dump_wts_st(struct write_subproc_st *st)
 	if (st->sendsigwin) printf("sigwin r=%d c=%d\n", st->swrow, st->swcol);
 }
 
-static void write_all(unsigned char *buf, size_t sz)
-{
-	ssize_t writn;
-
-	while (sz) {
-		writn = write(master, buf, sz);
-		if (writn < 0) err(1, "could not write to stdout");
-		sz -= writn;
-		buf += writn;
-	}
-}
-
 static void write_to_subproc_core(struct write_subproc_st *st)
 {
 	unsigned char byte;
@@ -370,9 +368,10 @@ static _Noreturn void write_to_subproc(void)
 	struct write_subproc_st st;
 	ssize_t red;
 
-	if (pream) write_all((unsigned char *)pream, strlen(pream));
+	if (pream)
+		fullwrite(master, "preamble", (unsigned char *)pream,
+			  strlen(pream));
 	free(pream);
-
 	pream = NULL;
 
 	st.esc = '0';
@@ -383,7 +382,7 @@ static _Noreturn void write_to_subproc(void)
 
 		st.bufsz = red;
 		write_to_subproc_core(&st);
-		write_all(st.buf, st.bufsz);
+		fullwrite(master, "subproc", st.buf, st.bufsz);
 		if (st.sendsigwin) send_sigwinch(st.swrow, st.swcol);
 	}
 }

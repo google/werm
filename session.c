@@ -47,11 +47,14 @@ static void teettyline(void)
 		if (c == '\n' || c >= ' ')
 			putchar(c);
 		else
-			printf("\%03o", c);
+			printf("\\%03o", c);
 	}
 
 	linecurs = 0;
 }
+
+#define BACKDEL "\b\x1b\x5b\x4b"
+#define BACKDEL_LEN (sizeof(BACKDEL)-1)
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
@@ -63,6 +66,13 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 
 	while (len) {
 		if (buf[0] == '\r') goto eol;
+		if (len >= BACKDEL_LEN &&
+		    !memcmp((const char *)buf, BACKDEL, BACKDEL_LEN)) {
+			buf += BACKDEL_LEN;
+			len -= BACKDEL_LEN;
+			linecurs--;
+			continue;
+		}
 
 		linebuf[linecurs++] = *buf;
 		if (*buf == '\n' || linecurs == sizeof(linebuf)) teettyline();
@@ -500,6 +510,9 @@ static void test_main(void)
 		teetty4test("[exceeded]", -1);
 		teetty4test("\r\n", -1);
 	} while (0);
+
+	teetty4test(
+		"abcdef\b\x1b\x5b\x4b\b\x1b\x5b\x4b\b\x1b\x5b\x4bxyz\r\n", -1);
 }
 
 int main(int argc, char **argv)

@@ -9,12 +9,8 @@ echo '{' >| compile_commands.json
 	 -o session \
 	 session.c \
 	 third_party/dtach/*.c \
-	 -lutil || (
-		set -x
-		: 'required Debian pkgs:'
-		: '   libwslay-dev nettle-dev clang pkg-config websocketd dtach'
+	 -lutil ||
 		exit 1
-	)
 	cat $cmd_scratch >> compile_commands.json
 	rm $cmd_scratch
 

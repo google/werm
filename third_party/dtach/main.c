@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "dtach.h"
+#include "third_party/dtach/dtach.h"
 
 /*
 ** dtach is a quick hack, since I wanted the detach feature of screen without
@@ -26,8 +26,6 @@
 /* Make sure the binary has a copyright. */
 const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004-2016 Ned T. Crigler";
 
-/* argv[0] from the program */
-char *progname;
 /* The name of the passed in socket. */
 char *sockname;
 /* The character used for detaching. Defaults to '^\' */
@@ -43,241 +41,29 @@ int redraw_method = REDRAW_UNSPEC;
 ** it to restore the original settings.
 */
 struct termios orig_term;
-int dont_have_tty;
 
-static void
-usage()
+void _Noreturn
+dtach_main(const char *socket)
 {
-	printf(
-		"dtach - version %s, compiled on %s at %s.\n"
-		"Usage: dtach -a <socket> <options>\n"
-		"       dtach -A <socket> <options> <command...>\n"
-		"       dtach -c <socket> <options> <command...>\n"
-		"       dtach -n <socket> <options> <command...>\n"
-		"       dtach -N <socket> <options> <command...>\n"
-		"       dtach -p <socket>\n"
-		"Modes:\n"
-		"  -a\t\tAttach to the specified socket.\n"
-		"  -A\t\tAttach to the specified socket, or create it if it\n"
-		"\t\t  does not exist, running the specified command.\n"
-		"  -c\t\tCreate a new socket and run the specified command.\n"
-		"  -n\t\tCreate a new socket and run the specified command "
-		"detached.\n"
-		"  -N\t\tCreate a new socket and run the specified command "
-		"detached,\n"
-		"\t\t  and have dtach run in the foreground.\n"
-		"  -p\t\tCopy the contents of standard input to the specified\n"
-		"\t\t  socket.\n"
-		"Options:\n"
-		"  -e <char>\tSet the detach character to <char>, defaults "
-		"to ^\\.\n"
-		"  -E\t\tDisable the detach character.\n"
-		"  -r <method>\tSet the redraw method to <method>. The "
-		"valid methods are:\n"
-		"\t\t     none: Don't redraw at all.\n"
-		"\t\t   ctrl_l: Send a Ctrl L character to the program.\n"
-		"\t\t    winch: Send a WINCH signal to the program.\n"
-		"  -z\t\tDisable processing of the suspend key.\n"
-		"\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
-		PACKAGE_VERSION, __DATE__, __TIME__);
-	exit(0);
-}
-
-int
-main(int argc, char **argv)
-{
-	int mode = 0;
-
-	/* Save the program name */
-	progname = argv[0];
-	++argv; --argc;
-
 	/* Parse the arguments */
-	if (argc >= 1 && **argv == '-')
-	{
-		if (strncmp(*argv, "--help", strlen(*argv)) == 0)
-			usage();
-		else if (strncmp(*argv, "--version", strlen(*argv)) == 0)
-		{
-			printf("dtach - version %s, compiled on %s at %s.\n",
-				PACKAGE_VERSION, __DATE__, __TIME__);
-			return 0;
-		}
+	sockname = strdup(socket);
 
-		mode = argv[0][1];
-		if (mode == '?')
-			usage();
-		else if (mode != 'a' && mode != 'c' && mode != 'n' &&
-			 mode != 'A' && mode != 'N' && mode != 'p')
-		{
-			printf("%s: Invalid mode '-%c'\n", progname, mode);
-			printf("Try '%s --help' for more information.\n",
-				progname);
-			return 1;
-		}
-	}
-	if (!mode)
-	{
-		printf("%s: No mode was specified.\n", progname);
-		printf("Try '%s --help' for more information.\n",
-			progname);
-		return 1;
-	}
-	++argv; --argc;
-
-	if (argc < 1)
-	{
-		printf("%s: No socket was specified.\n", progname);
-		printf("Try '%s --help' for more information.\n",
-			progname);
-		return 1;
-	}
-	sockname = *argv;
-	++argv; --argc;
-
-	if (mode == 'p')
-	{
-		if (argc > 0)
-		{
-			printf("%s: Invalid number of arguments.\n",
-				progname);
-			printf("Try '%s --help' for more information.\n",
-				progname);
-			return 1;
-		}
-		return push_main();
-	}
-
-	while (argc >= 1 && **argv == '-')
-	{
-		char *p;
-
-		for (p = argv[0] + 1; *p; ++p)
-		{
-			if (*p == 'E')
-				detach_char = -1;
-			else if (*p == 'z')
-				no_suspend = 1;
-			else if (*p == 'e')
-			{
-				++argv; --argc;
-				if (argc < 1)
-				{
-					printf("%s: No escape character "
-						"specified.\n", progname);	
-					printf("Try '%s --help' for more "
-						"information.\n", progname);
-					return 1;
-				}
-				if (argv[0][0] == '^' && argv[0][1])
-				{
-					if (argv[0][1] == '?')
-						detach_char = '\177';
-					else
-						detach_char = argv[0][1] & 037;
-				}
-				else
-					detach_char = argv[0][0];
-				break;
-			}
-			else if (*p == 'r')
-			{
-				++argv; --argc;
-				if (argc < 1)
-				{
-					printf("%s: No redraw method "
-						"specified.\n", progname);	
-					printf("Try '%s --help' for more "
-						"information.\n", progname);
-					return 1;
-				}
-				if (strcmp(argv[0], "none") == 0)
-					redraw_method = REDRAW_NONE;
-				else if (strcmp(argv[0], "ctrl_l") == 0)
-					redraw_method = REDRAW_CTRL_L;
-				else if (strcmp(argv[0], "winch") == 0)
-					redraw_method = REDRAW_WINCH;
-				else
-				{
-					printf("%s: Invalid redraw method "
-						"specified.\n", progname);	
-					printf("Try '%s --help' for more "
-						"information.\n", progname);
-					return 1;
-				}
-				break;
-			}
-			else
-			{
-				printf("%s: Invalid option '-%c'\n",
-					progname, *p);
-				printf("Try '%s --help' for more information.\n",
-					progname);
-				return 1;
-			}
-		}
-		++argv; --argc;
-	}
-
-	if (mode != 'a' && argc < 1)
-	{
-		printf("%s: No command was specified.\n", progname);
-		printf("Try '%s --help' for more information.\n",
-			progname);
-		return 1;
-	}
+	redraw_method = REDRAW_NONE;
 
 	/* Save the original terminal settings. */
-	if (tcgetattr(0, &orig_term) < 0)
-	{
-		memset(&orig_term, 0, sizeof(struct termios));
-		dont_have_tty = 1;
-	}
+	if (tcgetattr(0, &orig_term) < 0) errx(1, "dtach: requires a terminal");
 
-	if (dont_have_tty && mode != 'n' && mode != 'N')
+	/* Try to attach first. If that doesn't work, create a new socket. */
+	if (attach_main(1) != 0)
 	{
-		printf("%s: Attaching to a session requires a terminal.\n",
-			progname);
-		return 1;
-	}
-
-	if (mode == 'a')
-	{
-		if (argc > 0)
+		if (errno == ECONNREFUSED || errno == ENOENT)
 		{
-			printf("%s: Invalid number of arguments.\n",
-				progname);
-			printf("Try '%s --help' for more information.\n",
-				progname);
-			return 1;
+			if (errno == ECONNREFUSED)
+				unlink(sockname);
+			if (master_main(1, 0) != 0)
+				exit(1);
 		}
-		return attach_main(0);
+		exit(attach_main(0));
 	}
-	else if (mode == 'n')
-		return master_main(argv, 0, 0);
-	else if (mode == 'N')
-		return master_main(argv, 0, 1);
-	else if (mode == 'c')
-	{
-		if (master_main(argv, 1, 0) != 0)
-			return 1;
-		return attach_main(0);
-	}
-	else if (mode == 'A')
-	{
-		/* Try to attach first. If that doesn't work, create a new
-		** socket. */
-		if (attach_main(1) != 0)
-		{
-			if (errno == ECONNREFUSED || errno == ENOENT)
-			{
-				if (errno == ECONNREFUSED)
-					unlink(sockname);
-				if (master_main(argv, 1, 0) != 0)
-					return 1;
-			}
-			return attach_main(0);
-		}
-	}
-	return 0;
+	exit(0);
 }

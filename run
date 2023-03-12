@@ -12,4 +12,4 @@ $wsd --passenv WERMDIR,DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNT
 	--cgidir=cgi \
 	--staticdir=. \
 	"$@" \
-	./session
+	"$PWD/session"

@@ -1,6 +1,8 @@
 #define _XOPEN_SOURCE 600
 #define _GNU_SOURCE
 
+#include "shared.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -12,6 +14,9 @@
 #include <err.h>
 
 static int master;
+static int argv0sz;
+static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
+
 
 static void send_sigwinch(int row, int col)
 {
@@ -53,7 +58,13 @@ static char *extract_query_arg(const char **qs, const char *pref)
 	return buf;
 }
 
-int xasprintf(char **strp, const char *format, ...)
+void subproc_main(void)
+{
+	execlp("script", "script", "-qfa", logfile, NULL);
+	exit(1);
+}
+
+static int xasprintf(char **strp, const char *format, ...)
 {
 	int res;
 
@@ -73,8 +84,6 @@ int xasprintf(char **strp, const char *format, ...)
 
 	return res;
 }
-
-static char *dtach_check_cmd, *dtach_sock, *log, *pream;
 
 static void parse_query(void)
 {
@@ -102,8 +111,8 @@ static void parse_query(void)
 			free(dtach_sock);
 			xasprintf(&dtach_sock, "/tmp/dtach.%s", val);
 
-			free(log);
-			xasprintf(&log, "/tmp/log.%s", val);
+			free(logfile);
+			xasprintf(&logfile, "/tmp/log.%s", val);
 
 			continue;
 		}
@@ -121,9 +130,7 @@ static void parse_query(void)
 	}
 }
 
-#define DTACH "/bin/dtach"
-
-static _Noreturn void do_exec()
+static _Noreturn void do_exec(void)
 {
 	char *slave_name;
 	const char *shell;
@@ -188,18 +195,15 @@ static _Noreturn void do_exec()
 	unsetenv("HTTP_CACHE_CONTROL");
 	unsetenv("SERVER_SOFTWARE");
 
-	if (!dtach_sock) {
-		shell = getenv("SHELL");
+	if (dtach_sock) {
+		snprintf(argv0, argv0sz, "dtach-%s", logfile);
+		dtach_main(dtach_sock);
+	}
 
-		execl(shell, shell, NULL);
-		err(1, "execl $SHELL, which is: %s\n",
-		    shell ? shell : "<undef>");
-	}
-	else {
-		execl(DTACH, DTACH, "-A", dtach_sock,
-		      "-r", "none", "script", "-qfa", log, NULL);
-		err(1, "execl " DTACH);
-	}
+	shell = getenv("SHELL");
+
+	execl(shell, shell, NULL);
+	err(1, "execl $SHELL, which is: %s\n", shell ? shell : "<undef>");
 }
 
 static _Bool send_byte(int b)
@@ -215,6 +219,8 @@ static _Noreturn void read_from_subproc(void)
 {
 	unsigned char read_buf[512], *curs;
 	ssize_t b;
+
+	snprintf(argv0, argv0sz, "read_subproc-%s", logfile);
 
 	while (1) {
 		b = read(master, read_buf, sizeof(read_buf));
@@ -276,6 +282,8 @@ static void write_to_subproc_core(struct write_subproc_st *st)
 {
 	unsigned char byte;
 	unsigned wi, ri, row, col;
+
+	snprintf(argv0, argv0sz, "write_subproc-%s", logfile);
 
 	st->sendsigwin = 0;
 
@@ -430,6 +438,9 @@ int main(int argc, char **argv)
 {
 	pid_t child;
 	const char *home;
+
+	argv0 = argv[0];
+	argv0sz = strlen(argv0)+1;
 
 	if (argc < 1) errx(1, "unexpected argc value: %d", argc);
 	argc--;

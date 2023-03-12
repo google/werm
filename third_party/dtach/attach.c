@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "dtach.h"
+#include "third_party/dtach/dtach.h"
 
 #ifndef VDISABLE
 #ifdef _POSIX_VDISABLE
@@ -180,8 +180,8 @@ attach_main(int noerror)
 	if (s < 0)
 	{
 		if (!noerror)
-			printf("%s: %s: %s\n", progname, sockname,
-				strerror(errno));
+			printf("dtach connect_socket: %s: %s\n",
+			       sockname, strerror(errno));
 		return 1;
 	}
 
@@ -290,71 +290,4 @@ attach_main(int noerror)
 		}
 	}
 	return 0;
-}
-
-int
-push_main()
-{
-	struct packet pkt;
-	int s;
-
-	/* Attempt to open the socket. */
-	s = connect_socket(sockname);
-	if (s < 0 && errno == ENAMETOOLONG)
-	{
-		char *slash = strrchr(sockname, '/');
-
-		/* Try to shorten the socket's path name by using chdir. */
-		if (slash)
-		{
-			int dirfd = open(".", O_RDONLY);
-
-			if (dirfd >= 0)
-			{
-				*slash = '\0';
-				if (chdir(sockname) >= 0)
-				{
-					s = connect_socket(slash + 1);
-					fchdir(dirfd);
-				}
-				*slash = '/';
-				close(dirfd);
-			}
-		}
-	}
-	if (s < 0)
-	{
-		printf("%s: %s: %s\n", progname, sockname, strerror(errno));
-		return 1;
-	}
-
-	/* Set some signals. */
-	signal(SIGPIPE, SIG_IGN);
-
-	/* Push the contents of standard input to the socket. */
-	pkt.type = MSG_PUSH;
-	for (;;)
-	{
-		ssize_t len;
-
-		memset(pkt.u.buf, 0, sizeof(pkt.u.buf));
-		len = read(0, pkt.u.buf, sizeof(pkt.u.buf));
-
-		if (len == 0)
-			return 0;
-		else if (len < 0)
-		{
-			printf("%s: %s: %s\n", progname, sockname,
-			       strerror(errno));
-			return 1;
-		}
-
-		pkt.len = len;
-		if (write(s, &pkt, sizeof(struct packet)) < 0)
-		{
-			printf("%s: %s: %s\n", progname, sockname,
-			       strerror(errno));
-			return 1;
-		}
-	}
 }

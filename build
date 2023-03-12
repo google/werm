@@ -5,23 +5,18 @@ cmd_scratch=/tmp/compile_commands_$$.json
 cd `dirname $0`
 echo '{' >| compile_commands.json
 
-oops () {
-	set -x
-	: 'required Debian pkgs:'
-	: '    libwslay-dev nettle-dev clang pkg-config websocketd dtach'
-	exit 1
-}
-
-build () {
-	mod="$1"
-	libs="$2"
-	clang -x c -std=c99 -MJ $cmd_scratch -o $mod $mod.c $libs ||
-		oops
+	clang -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L -MJ $cmd_scratch \
+	 -o session \
+	 session.c \
+	 third_party/dtach/*.c \
+	 -lutil || (
+		set -x
+		: 'required Debian pkgs:'
+		: '   libwslay-dev nettle-dev clang pkg-config websocketd dtach'
+		exit 1
+	)
 	cat $cmd_scratch >> compile_commands.json
 	rm $cmd_scratch
-}
-
-build session
 
 echo '}' >> compile_commands.json
 

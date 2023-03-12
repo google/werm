@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "dtach.h"
+#include "third_party/dtach/dtach.h"
 
 /* The pty struct - The pty information is stored here. */
 struct pty
@@ -105,7 +105,7 @@ setnonblocking(int fd)
 
 /* Initialize the pty structure. */
 static int
-init_pty(char **argv, int statusfd)
+init_pty(int statusfd)
 {
 	/* Use the original terminal's settings. We don't have to set the
 	** window size here, because the attacher will send it in a packet. */
@@ -113,29 +113,12 @@ init_pty(char **argv, int statusfd)
 	memset(&the_pty.ws, 0, sizeof(struct winsize));
 
 	/* Create the pty process */
-	if (!dont_have_tty)
-		the_pty.pid = forkpty(&the_pty.fd, NULL, &the_pty.term, NULL);
-	else
-		the_pty.pid = forkpty(&the_pty.fd, NULL, NULL, NULL);
+	the_pty.pid = forkpty(&the_pty.fd, NULL, &the_pty.term, NULL);
 	if (the_pty.pid < 0)
 		return -1;
 	else if (the_pty.pid == 0)
-	{
-		/* Child.. Execute the program. */
-		execvp(*argv, argv);
-
-		/* Report the error to statusfd if we can, or stdout if we
-		** can't. */
-		if (statusfd != -1)
-			dup2(statusfd, 1);
-		else
-			printf(EOS "\r\n");
-
-		printf("%s: could not execute %s: %s\r\n", progname,
-		       *argv, strerror(errno));
-		fflush(stdout);
-		_exit(127);
-	}
+		/* Child.. Execute the program. Will not return. */
+		subproc_main();
 	/* Parent.. Finish up and return */
 #ifdef BROKEN_MASTER
 	{
@@ -432,7 +415,7 @@ client_activity(struct client *p)
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
 static void
-master_process(int s, char **argv, int waitattach, int statusfd)
+master_process(int s, int waitattach, int statusfd)
 {
 	struct client *p, *next;
 	fd_set readfds;
@@ -450,14 +433,14 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 
 	/* Create a pty in which the process is running. */
 	signal(SIGCHLD, die);
-	if (init_pty(argv, statusfd) < 0)
+	if (init_pty(statusfd) < 0)
 	{
 		if (statusfd != -1)
 			dup2(statusfd, 1);
 		if (errno == ENOENT)
-			printf("%s: Could not find a pty.\n", progname);
+			puts("dtach: Could not find a pty.");
 		else
-			printf("%s: init_pty: %s\n", progname, strerror(errno));
+			printf("dtach: init_pty: %s\n", strerror(errno));
 		exit(1);
 	}
 
@@ -551,7 +534,7 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 }
 
 int
-master_main(char **argv, int waitattach, int dontfork)
+master_main(int waitattach, int dontfork)
 {
 	int fd[2] = {-1, -1};
 	int s;
@@ -587,7 +570,8 @@ master_main(char **argv, int waitattach, int dontfork)
 	}
 	if (s < 0)
 	{
-		printf("%s: %s: %s\n", progname, sockname, strerror(errno));
+		printf("dtach create_socket: %s: %s\n",
+		       sockname, strerror(errno));
 		return 1;
 	}
 
@@ -619,7 +603,7 @@ master_main(char **argv, int waitattach, int dontfork)
 
 	if (dontfork)
 	{
-		master_process(s, argv, waitattach, fd[1]);
+		master_process(s, waitattach, fd[1]);
 		return 0;
 	}
 
@@ -627,7 +611,7 @@ master_main(char **argv, int waitattach, int dontfork)
 	pid = fork();
 	if (pid < 0)
 	{
-		printf("%s: fork: %s\n", progname, strerror(errno));
+		printf("dtach: fork: %s\n", strerror(errno));
 		unlink_socket();
 		return 1;
 	}
@@ -636,7 +620,7 @@ master_main(char **argv, int waitattach, int dontfork)
 		/* Child - this becomes the master */
 		if (fd[0] != -1)
 			close(fd[0]);
-		master_process(s, argv, waitattach, fd[1]);
+		master_process(s, waitattach, fd[1]);
 		return 0;
 	}
 	/* Parent - just return. */

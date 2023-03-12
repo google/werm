@@ -18,14 +18,18 @@
 #ifndef dtach_h
 #define dtach_h
 
-#include <config.h>
+#include "third_party/dtach/config.h"
+#include "shared.h"
 
 #include <errno.h>
+#include <err.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <sys/types.h>
 
 #if TIME_WITH_SYS_TIME
 #include <sys/time.h>
@@ -80,10 +84,9 @@
 #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 #endif
 
-extern char *progname, *sockname;
+extern char *sockname;
 extern int detach_char, no_suspend, redraw_method;
 extern struct termios orig_term;
-extern int dont_have_tty;
 
 enum
 {
@@ -127,7 +130,7 @@ struct packet
 #define EOS "\033[999H"
 
 int attach_main(int noerror);
-int master_main(char **argv, int waitattach, int dontfork);
+int master_main(int waitattach, int dontfork);
 int push_main(void);
 
 #ifdef sun

@@ -14,19 +14,20 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static int master, argv0sz, logfd;
+static int master, argv0sz;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
 static unsigned char linebuf[1024];
 
+static FILE *loghndl;
+
 static unsigned linesz, linepos;
 
-static void fullwrite(
-	int fd, const char *desc, const unsigned char *buf, size_t sz)
+static void fullwrite(const char *desc, const unsigned char *buf, size_t sz)
 {
 	ssize_t writn;
 
 	while (sz) {
-		writn = write(fd, buf, sz);
+		writn = write(master, buf, sz);
 		if (!writn) errx(1, "should be blocking: %s", desc);
 		if (writn > 0) {
 			sz -= writn;
@@ -39,7 +40,6 @@ static void fullwrite(
 	}
 }
 
-/* This always goes to stdout for now, because it's only for testing */
 static void teettyline(void)
 {
 	unsigned li;
@@ -47,11 +47,13 @@ static void teettyline(void)
 
 	for (li = 0; li < linesz; li++) {
 		c = linebuf[li % sizeof(linebuf)];
-		if (c == '\n' || c >= ' ')
-			putchar(c);
+		if (c == '\n' || c >= ' ' || loghndl != stdout)
+			fputc(c, loghndl);
 		else
-			printf("\\%03o", c);
+			/* This only happens in tests, for now */
+			fprintf(loghndl, "\\%03o", c);
 	}
+	fflush(loghndl);
 
 	linesz = 0;
 	linepos = 0;
@@ -71,11 +73,7 @@ static _Bool consume(const char *pref, size_t preflen, const unsigned char **buf
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
-	if (logfd < 0) return;
-	if (logfd != STDOUT_FILENO) {
-		/* Not test mode; hacky escape hatch for safe behavior */
-		fullwrite(logfd, "log", buf, len);
-	}
+	if (!loghndl) return;
 
 	while (len) {
 		if (buf[0] == '\r') goto eol;
@@ -97,7 +95,7 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 
 		if (*buf == '\n' || linesz == sizeof(linebuf)) {
 			teettyline();
-			putchar('\n');
+			fputc('\n', loghndl);
 			goto eol;
 		}
 		linebuf[linepos++ % sizeof(linebuf)] = *buf;
@@ -294,9 +292,12 @@ static _Noreturn void do_exec(void)
 
 	if (!logfile) errx(1, "expect logfile is set if dtach_sock is set");
 
-	logfd = open(logfile, O_WRONLY | O_CREAT, 0600);
-	if (logfd < 0) warn("open %s", logfile);
-	else if (lseek(logfd, 0, SEEK_END) < 0) warn("lseek %s", logfile);
+	if (0 > mknod(logfile, 0600, 0) && errno != EEXIST)
+		warn("mknod %s", logfile);
+	else {
+		loghndl = fopen(logfile, "a");
+		if (0 > fseek(loghndl, 0, SEEK_END)) warn("fseek %s", logfile);
+	}
 
 	snprintf(argv0, argv0sz, "dtach-%s", logfile);
 	dtach_main(dtach_sock);
@@ -435,9 +436,7 @@ static _Noreturn void write_to_subproc(void)
 	struct write_subproc_st st;
 	ssize_t red;
 
-	if (pream)
-		fullwrite(master, "preamble", (unsigned char *)pream,
-			  strlen(pream));
+	if (pream) fullwrite("preamble", (unsigned char *)pream, strlen(pream));
 	free(pream);
 	pream = NULL;
 
@@ -449,7 +448,7 @@ static _Noreturn void write_to_subproc(void)
 
 		st.bufsz = red;
 		write_to_subproc_core(&st);
-		fullwrite(master, "subproc", st.buf, st.bufsz);
+		fullwrite("subproc", st.buf, st.bufsz);
 		if (st.sendsigwin) send_sigwinch(st.swrow, st.swcol);
 	}
 }
@@ -525,7 +524,7 @@ static void test_main(void)
 	dump_wts_st(&wts);
 
 	puts("TEE_TTY_CONTENT");
-	logfd = STDOUT_FILENO;
+	loghndl = stdout;
 	teetty4test("hello", -1);
 	puts("pending line");
 	teetty4test("\r\n", -1);

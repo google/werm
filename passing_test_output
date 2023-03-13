@@ -33,3 +33,5 @@ move back x2 and forward x1, then del to EOL
 asd
 as above, but in separate calls
 asd
+move left x3, move right x2, del EOL; 'right' seq in sep calls
+123 UI

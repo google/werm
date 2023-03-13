@@ -16,11 +16,13 @@
 
 static int master, argv0sz;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
-static unsigned char linebuf[1024];
+
+#define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
+static unsigned char linebuf[1024], escbuf[1024];
 
 static FILE *loghndl;
 
-static unsigned linesz, linepos;
+static unsigned linesz, linepos, escsz;
 
 static void fullwrite(const char *desc, const unsigned char *buf, size_t sz)
 {
@@ -46,7 +48,7 @@ static void teettyline(void)
 	int c;
 
 	for (li = 0; li < linesz; li++) {
-		c = linebuf[li % sizeof(linebuf)];
+		c = *SAFEPTR(linebuf, li, 1);
 		if (c == '\n' || c >= ' ' || loghndl != stdout)
 			fputc(c, loghndl);
 		else
@@ -59,17 +61,15 @@ static void teettyline(void)
 	linepos = 0;
 }
 
-static _Bool consume(const char *pref, size_t preflen, const unsigned char **buf, size_t *len)
+static _Bool consumeesc(const char *pref, size_t preflen)
 {
-	if (*len < preflen) return 0;
-	if (memcmp(pref, *buf, preflen)) return 0;
-
-	*len -= preflen;
-	*buf += preflen;
+	if (escsz != preflen) return 0;
+	if (memcmp(pref, SAFEPTR(escbuf, 0, preflen), preflen)) return 0;
+	escsz = 0;
 	return 1;
 }
 
-#define CONSUME(pref, ...) consume(pref, sizeof(pref)-1, __VA_ARGS__)
+#define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
@@ -82,12 +82,12 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 			linepos--;
 			goto eol;
 		}
-		if (CONSUME("\x1b\x5b\x4b", &buf, &len)) {
+		if (CONSUMEESC("\x1b\x5b\x4b")) {
 			/* delete to EOL */
 			linesz = linepos;
 			continue;
 		}
-		if (CONSUME("\x1b\x5b\x43", &buf, &len)) {
+		if (CONSUMEESC("\x1b\x5b\x43")) {
 			/* move right */
 			linepos++;
 			continue;
@@ -98,8 +98,14 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 			fputc('\n', loghndl);
 			goto eol;
 		}
-		linebuf[linepos++ % sizeof(linebuf)] = *buf;
-		linesz = linepos;
+		if (buf[0] == '\x1b' || escsz) {
+			*SAFEPTR(escbuf, escsz, 1) = *buf;
+			escsz++;
+		}
+		else {
+			*SAFEPTR(linebuf, linepos, 1) = *buf;
+			linesz = ++linepos;
+		}
 		if (linesz == sizeof(linebuf)) teettyline();
 
 	eol:
@@ -556,6 +562,13 @@ static void test_main(void)
 	puts("as above, but in separate calls");
 	teetty4test("asdf\b\b", -1);
 	teetty4test("\x1b\x5b\x43", -1);
+	teetty4test("\x1b\x5b\x4b", -1);
+	teetty4test("\r\n", -1);
+
+	puts("move left x3, move right x2, del EOL; 'right' seq in sep calls");
+	teetty4test("123 UIO\b\b\b" "\x1b\x5b", -1);
+	teetty4test("\x43" "\x1b", -1);
+	teetty4test("\x5b\x43", -1);
 	teetty4test("\x1b\x5b\x4b", -1);
 	teetty4test("\r\n", -1);
 }

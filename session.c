@@ -86,6 +86,12 @@ case 0:
 			linepos--;
 			goto eol;
 		}
+
+		/* start/stop? bracketed paste mode. The first one has \r at the
+		 * end usually. */
+		if (CONSUMEESC("\x1b[?2004l")) continue;
+		if (CONSUMEESC("\x1b[?2004h")) continue;
+
 		if (CONSUMEESC("\x1b\x5b\x4b")) {
 			/* delete to EOL */
 			linesz = linepos;
@@ -596,6 +602,12 @@ static void test_main(void)
 	puts("drop console title escape seq; separate calls");
 	teetty4test("abc\x1b]0;ti", -1);
 	teetty4test("tle\x07xyz\r\n", -1);
+
+	puts("bracketed paste mode");
+	/* https://github.com/pexpect/pexpect/issues/669 */
+	teetty4test("before (", -1);
+	teetty4test("\x1b[?2004l\rhello\x1b[?2004h", -1);
+	teetty4test(") after\r\n", -1);
 }
 
 int main(int argc, char **argv)

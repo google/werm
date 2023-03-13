@@ -41,3 +41,5 @@ abcxyz
 123456
 drop console title escape seq; separate calls
 abcxyz
+bracketed paste mode
+before (hello) after

@@ -22,6 +22,6 @@ echo 'running session test...' >&2
 if ! diff -u passing_test_output /tmp/testout.$$
 then
 	echo "build succeeded but tests failed; to update:
-	cp /tmp/testout.$$ passing_test_output"
+	cp /tmp/testout.$$ $PWD/passing_test_output"
 	exit 1
 fi >&2

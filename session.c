@@ -14,9 +14,11 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static int master, argv0sz, logfd, linecurs;
+static int master, argv0sz, logfd;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
 static unsigned char linebuf[1024];
+
+static unsigned linecurs;
 
 static void fullwrite(
 	int fd, const char *desc, const unsigned char *buf, size_t sz)
@@ -40,10 +42,11 @@ static void fullwrite(
 /* This always goes to stdout for now, because it's only for testing */
 static void teettyline(void)
 {
-	int li, c;
+	unsigned li;
+	int c;
 
 	for (li = 0; li < linecurs; li++) {
-		c = linebuf[li];
+		c = linebuf[li % sizeof(linebuf)];
 		if (c == '\n' || c >= ' ')
 			putchar(c);
 		else
@@ -67,7 +70,7 @@ static _Bool consume(const char *pref, size_t preflen, const unsigned char **buf
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
-	int pos = linecurs;
+	unsigned pos = linecurs;
 
 	if (logfd < 0) return;
 	if (logfd != STDOUT_FILENO) {
@@ -78,6 +81,7 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 	while (len) {
 		if (buf[0] == '\r') goto eol;
 		if (buf[0] == '\b') {
+			/* move left */
 			pos--;
 			goto eol;
 		}
@@ -97,7 +101,7 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 			putchar('\n');
 			goto eol;
 		}
-		linebuf[pos++] = *buf;
+		linebuf[pos++ % sizeof(linebuf)] = *buf;
 		linecurs = pos;
 		if (linecurs == sizeof(linebuf)) teettyline();
 

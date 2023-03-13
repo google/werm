@@ -87,21 +87,31 @@ case 0:
 			goto eol;
 		}
 
-		/* start/stop? bracketed paste mode. The first one has \r at the
-		 * end usually. */
-		if (CONSUMEESC("\x1b[?2004l")) continue;
-		if (CONSUMEESC("\x1b[?2004h")) continue;
+		if (CONSUMEESC("\x1b[")) {
+			if (*buf == 0x4b) {
+				/* delete to EOL */
+				linesz = linepos;
+				goto eol;
+			}
 
-		if (CONSUMEESC("\x1b\x5b\x4b")) {
-			/* delete to EOL */
-			linesz = linepos;
-			continue;
+			if (*buf == 0x43) {
+				/* move right */
+				linepos++;
+				goto eol;
+			}
+
+			teest = 'c';
+case 'c':
+			while (1) {
+				if (!len) return;
+				if (*buf >= 'a' && *buf <= 'z') break;
+				buf++;
+				len--;
+			}
+			teest = 0;
+			goto eol;
 		}
-		if (CONSUMEESC("\x1b\x5b\x43")) {
-			/* move right */
-			linepos++;
-			continue;
-		}
+
 		if (CONSUMEESC("\x1b]")) {
 			teest = 't';
 case 't':
@@ -608,6 +618,20 @@ static void test_main(void)
 	teetty4test("before (", -1);
 	teetty4test("\x1b[?2004l\rhello\x1b[?2004h", -1);
 	teetty4test(") after\r\n", -1);
+
+	puts("drop color and font");
+	teetty4test("before : ", -1);
+	teetty4test("\x1b[1;35mafter\r\n", -1);
+
+	/* split between calls */
+	teetty4test("before : ", -1);
+	teetty4test("\x1b[1;", -1);
+	teetty4test("35mafter\r\n", -1);
+
+	teetty4test("before : \x1b[36mAfter\r\n", -1);
+
+	teetty4test("first ;; \x1b[1;31msecond\r\n", -1);
+
 }
 
 int main(int argc, char **argv)

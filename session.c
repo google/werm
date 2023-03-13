@@ -53,8 +53,17 @@ static void teettyline(void)
 	linecurs = 0;
 }
 
-#define DELLINE "\x1b\x5b\x4b"
-#define DELLINE_LEN (sizeof(DELLINE)-1)
+static _Bool consume(const char *pref, size_t preflen, const unsigned char **buf, size_t *len)
+{
+	if (*len < preflen) return 0;
+	if (memcmp(pref, *buf, preflen)) return 0;
+
+	*len -= preflen;
+	*buf += preflen;
+	return 1;
+}
+
+#define CONSUME(pref, ...) consume(pref, sizeof(pref)-1, __VA_ARGS__)
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
@@ -72,10 +81,14 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 			pos--;
 			goto eol;
 		}
-		if (len >= DELLINE_LEN && !memcmp(buf, DELLINE, DELLINE_LEN)) {
-			buf += DELLINE_LEN;
-			len -= DELLINE_LEN;
+		if (CONSUME("\x1b\x5b\x4b", &buf, &len)) {
+			/* delete to EOL */
 			linecurs = pos;
+			continue;
+		}
+		if (CONSUME("\x1b\x5b\x43", &buf, &len)) {
+			/* move right */
+			pos++;
 			continue;
 		}
 
@@ -531,6 +544,12 @@ static void test_main(void)
 
 	puts("move back x1 and insert");
 	teetty4test("asdf\bxy\r\n", -1);
+
+	puts("move back and forward");
+	teetty4test("asdf\b\x1b\x5b\x43\r\n", -1);
+
+	puts("move back x2 and forward x1, then del to EOL");
+	teetty4test("asdf\b\b" "\x1b\x5b\x43" "\x1b\x5b\x4b" "\r\n", -1);
 }
 
 int main(int argc, char **argv)

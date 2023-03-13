@@ -27,3 +27,7 @@ move back x2 and delete to eol
 abcd
 move back x1 and insert
 asdxy
+move back and forward
+asdf
+move back x2 and forward x1, then del to EOL
+asd

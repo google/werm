@@ -35,3 +35,9 @@ as above, but in separate calls
 asd
 move left x3, move right x2, del EOL; 'right' seq in sep calls
 123 UI
+drop console title escape seq
+abcxyz
+abcxyz
+123456
+drop console title escape seq; separate calls
+abcxyz

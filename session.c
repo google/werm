@@ -24,6 +24,8 @@ static FILE *loghndl;
 
 static unsigned linesz, linepos, escsz;
 
+static char teest;
+
 static void fullwrite(const char *desc, const unsigned char *buf, size_t sz)
 {
 	ssize_t writn;
@@ -76,6 +78,8 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 	if (!loghndl) return;
 
 	while (len) {
+switch (teest) {
+case 0:
 		if (buf[0] == '\r') goto eol;
 		if (buf[0] == '\b') {
 			/* move left */
@@ -92,6 +96,17 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 			linepos++;
 			continue;
 		}
+		if (CONSUMEESC("\x1b]")) {
+			teest = 't';
+case 't':
+			while (*buf != 0x07 && len) {
+				buf++;
+				len--;
+			}
+			if (!len) return;
+			teest = 0;
+			goto eol;
+		}
 
 		if (*buf == '\n' || linesz == sizeof(linebuf)) {
 			teettyline();
@@ -107,7 +122,7 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 			linesz = ++linepos;
 		}
 		if (linesz == sizeof(linebuf)) teettyline();
-
+}
 	eol:
 		len--;
 		buf++;
@@ -571,6 +586,16 @@ static void test_main(void)
 	teetty4test("\x5b\x43", -1);
 	teetty4test("\x1b\x5b\x4b", -1);
 	teetty4test("\r\n", -1);
+
+	puts("drop console title escape seq");
+	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
+	teetty4test("abc\x1b]0;title\x07xyz\r\n", -1);
+	teetty4test("abc\x1b]1;title\x07xyz\r\n", -1);
+	teetty4test("123\x1b]2;title\x07" "456\r\n", -1);
+
+	puts("drop console title escape seq; separate calls");
+	teetty4test("abc\x1b]0;ti", -1);
+	teetty4test("tle\x07xyz\r\n", -1);
 }
 
 int main(int argc, char **argv)

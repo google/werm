@@ -18,7 +18,7 @@ static int master, argv0sz, logfd;
 static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
 static unsigned char linebuf[1024];
 
-static unsigned linecurs;
+static unsigned linesz, linepos;
 
 static void fullwrite(
 	int fd, const char *desc, const unsigned char *buf, size_t sz)
@@ -45,7 +45,7 @@ static void teettyline(void)
 	unsigned li;
 	int c;
 
-	for (li = 0; li < linecurs; li++) {
+	for (li = 0; li < linesz; li++) {
 		c = linebuf[li % sizeof(linebuf)];
 		if (c == '\n' || c >= ' ')
 			putchar(c);
@@ -53,7 +53,8 @@ static void teettyline(void)
 			printf("\\%03o", c);
 	}
 
-	linecurs = 0;
+	linesz = 0;
+	linepos = 0;
 }
 
 static _Bool consume(const char *pref, size_t preflen, const unsigned char **buf, size_t *len)
@@ -70,8 +71,6 @@ static _Bool consume(const char *pref, size_t preflen, const unsigned char **buf
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
-	unsigned pos = linecurs;
-
 	if (logfd < 0) return;
 	if (logfd != STDOUT_FILENO) {
 		/* Not test mode; hacky escape hatch for safe behavior */
@@ -82,28 +81,28 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 		if (buf[0] == '\r') goto eol;
 		if (buf[0] == '\b') {
 			/* move left */
-			pos--;
+			linepos--;
 			goto eol;
 		}
 		if (CONSUME("\x1b\x5b\x4b", &buf, &len)) {
 			/* delete to EOL */
-			linecurs = pos;
+			linesz = linepos;
 			continue;
 		}
 		if (CONSUME("\x1b\x5b\x43", &buf, &len)) {
 			/* move right */
-			pos++;
+			linepos++;
 			continue;
 		}
 
-		if (*buf == '\n' || linecurs == sizeof(linebuf)) {
+		if (*buf == '\n' || linesz == sizeof(linebuf)) {
 			teettyline();
 			putchar('\n');
 			goto eol;
 		}
-		linebuf[pos++ % sizeof(linebuf)] = *buf;
-		linecurs = pos;
-		if (linecurs == sizeof(linebuf)) teettyline();
+		linebuf[linepos++ % sizeof(linebuf)] = *buf;
+		linesz = linepos;
+		if (linesz == sizeof(linebuf)) teettyline();
 
 	eol:
 		len--;
@@ -554,6 +553,12 @@ static void test_main(void)
 
 	puts("move back x2 and forward x1, then del to EOL");
 	teetty4test("asdf\b\b" "\x1b\x5b\x43" "\x1b\x5b\x4b" "\r\n", -1);
+
+	puts("as above, but in separate calls");
+	teetty4test("asdf\b\b", -1);
+	teetty4test("\x1b\x5b\x43", -1);
+	teetty4test("\x1b\x5b\x4b", -1);
+	teetty4test("\r\n", -1);
 }
 
 int main(int argc, char **argv)

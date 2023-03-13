@@ -31,3 +31,5 @@ move back and forward
 asdf
 move back x2 and forward x1, then del to EOL
 asd
+as above, but in separate calls
+asd

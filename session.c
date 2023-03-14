@@ -53,10 +53,9 @@ static void teettyline(void)
 
 	for (li = 0; li < linesz; li++) {
 		c = *SAFEPTR(linebuf, li, 1);
-		if (c == '\n' || c >= ' ' || loghndl != stdout)
+		if (c == '\t' || c >= ' ')
 			fputc(c, loghndl);
 		else
-			/* This only happens in tests, for now */
 			fprintf(loghndl, "\\%03o", c);
 	}
 	fflush(loghndl);

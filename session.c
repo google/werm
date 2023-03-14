@@ -21,17 +21,19 @@ static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
 static unsigned char linebuf[1024], escbuf[1024];
 
 static FILE *loghndl;
+static int rawlogfd;
 
 static unsigned linesz, linepos, escsz;
 
 static char teest;
 
-static void fullwrite(const char *desc, const unsigned char *buf, size_t sz)
+static void fullwrite(
+	int fd, const char *desc, const unsigned char *buf, size_t sz)
 {
 	ssize_t writn;
 
 	while (sz) {
-		writn = write(master, buf, sz);
+		writn = write(fd, buf, sz);
 		if (!writn) errx(1, "should be blocking: %s", desc);
 		if (writn > 0) {
 			sz -= writn;
@@ -75,6 +77,7 @@ static _Bool consumeesc(const char *pref, size_t preflen)
 
 void tee_tty_content(const unsigned char *buf, size_t len)
 {
+	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
 	if (!loghndl) return;
 
 	while (len) {
@@ -263,7 +266,7 @@ void _Noreturn subproc_main(void)
 
 static _Noreturn void do_exec(void)
 {
-	char *slave_name;
+	char *slave_name, *rawlogfn;
 	int slave;
 
 	slave_name = ptsname(master);
@@ -328,6 +331,15 @@ static _Noreturn void do_exec(void)
 	if (!dtach_sock) subproc_main();
 
 	if (!logfile) errx(1, "expect logfile is set if dtach_sock is set");
+
+	xasprintf(&rawlogfn, "%s.raw", logfile);
+
+	/* Do not bother appending. */
+	rawlogfd = open(rawlogfn, O_WRONLY | O_CREAT | O_APPEND, 0600);
+	if (rawlogfd < 0) {
+		rawlogfd = 0;
+		warn("open %s", rawlogfn);
+	}
 
 	if (0 > mknod(logfile, 0600, 0) && errno != EEXIST)
 		warn("mknod %s", logfile);
@@ -473,7 +485,9 @@ static _Noreturn void write_to_subproc(void)
 	struct write_subproc_st st;
 	ssize_t red;
 
-	if (pream) fullwrite("preamble", (unsigned char *)pream, strlen(pream));
+	if (pream)
+		fullwrite(master, "preamble", (unsigned char *)pream,
+			  strlen(pream));
 	free(pream);
 	pream = NULL;
 
@@ -485,7 +499,7 @@ static _Noreturn void write_to_subproc(void)
 
 		st.bufsz = red;
 		write_to_subproc_core(&st);
-		fullwrite("subproc", st.buf, st.bufsz);
+		fullwrite(master, "subproc", st.buf, st.bufsz);
 		if (st.sendsigwin) send_sigwinch(st.swrow, st.swcol);
 	}
 }

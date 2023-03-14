@@ -43,9 +43,12 @@ abcxyz
 drop console title escape seq; separate calls
 abcxyz
 bracketed paste mode
+hello) after
 before (hello) after
 drop color and font
 before : after
 before : after
 before : After
 first ;; second
+\r to move to start of line
+XYZ123

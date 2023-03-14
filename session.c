@@ -84,7 +84,11 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 	while (len) {
 switch (teest) {
 case 0:
-		if (buf[0] == '\r') goto eol;
+		if (buf[0] == '\r') {
+			linepos = 0;
+			goto eol;
+		}
+
 		if (buf[0] == '\b') {
 			/* move left */
 			linepos--;
@@ -138,7 +142,7 @@ case 't':
 		}
 		else {
 			*SAFEPTR(linebuf, linepos, 1) = *buf;
-			linesz = ++linepos;
+			if (linesz < ++linepos) linesz = linepos;
 		}
 		if (linesz == sizeof(linebuf)) teettyline();
 }
@@ -629,8 +633,15 @@ static void test_main(void)
 
 	puts("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
+
+	/* \r after paste mode off */
 	teetty4test("before (", -1);
 	teetty4test("\x1b[?2004l\rhello\x1b[?2004h", -1);
+	teetty4test(") after\r\n", -1);
+
+	/* no \r after paste mode off */
+	teetty4test("before (", -1);
+	teetty4test("\x1b[?2004lhello\x1b[?2004h", -1);
 	teetty4test(") after\r\n", -1);
 
 	puts("drop color and font");
@@ -646,6 +657,8 @@ static void test_main(void)
 
 	teetty4test("first ;; \x1b[1;31msecond\r\n", -1);
 
+	puts("\\r to move to start of line");
+	teetty4test("xyz123\rXYZ\r\n", -1);
 }
 
 int main(int argc, char **argv)

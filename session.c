@@ -58,6 +58,8 @@ static void teettyline(void)
 		else
 			fprintf(loghndl, "\\%03o", c);
 	}
+
+	fputc('\n', loghndl);
 	fflush(loghndl);
 
 	linesz = 0;
@@ -128,7 +130,6 @@ case 't':
 
 		if (*buf == '\n' || linesz == sizeof(linebuf)) {
 			teettyline();
-			fputc('\n', loghndl);
 			goto eol;
 		}
 		if (buf[0] == '\x1b' || escsz) {

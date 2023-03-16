@@ -85,6 +85,7 @@ void tee_tty_content(const unsigned char *buf, size_t len)
 switch (teest) {
 case 0:
 		if (buf[0] == '\r') {
+			escsz = 0;
 			linepos = 0;
 			goto eol;
 		}
@@ -137,6 +138,7 @@ case 't':
 			goto eol;
 		}
 		if (buf[0] == '\x1b' || escsz) {
+			if (buf[0] == '\x1b') escsz = 0;
 			*SAFEPTR(escbuf, escsz, 1) = *buf;
 			escsz++;
 		}
@@ -593,32 +595,32 @@ static void test_main(void)
 	} while (0);
 
 	teetty4test(
-		"abcdef\b\x1b\x5b\x4b\b\x1b\x5b\x4b\b\x1b\x5b\x4bxyz\r\n", -1);
+		"abcdef\b\x1b[\x4b\b\x1b[\x4b\b\x1b[\x4bxyz\r\n", -1);
 	teetty4test("abcdef\b\r\n", -1);
 
 	puts("move back x2 and delete to eol");
-	teetty4test("abcdef\b\b\x1b\x5b\x4b\r\n", -1);
+	teetty4test("abcdef\b\b\x1b[\x4b\r\n", -1);
 
 	puts("move back x1 and insert");
 	teetty4test("asdf\bxy\r\n", -1);
 
 	puts("move back and forward");
-	teetty4test("asdf\b\x1b\x5b\x43\r\n", -1);
+	teetty4test("asdf\b\x1b[\x43\r\n", -1);
 
 	puts("move back x2 and forward x1, then del to EOL");
-	teetty4test("asdf\b\b" "\x1b\x5b\x43" "\x1b\x5b\x4b" "\r\n", -1);
+	teetty4test("asdf\b\b" "\x1b[\x43" "\x1b[\x4b" "\r\n", -1);
 
 	puts("as above, but in separate calls");
 	teetty4test("asdf\b\b", -1);
-	teetty4test("\x1b\x5b\x43", -1);
-	teetty4test("\x1b\x5b\x4b", -1);
+	teetty4test("\x1b[\x43", -1);
+	teetty4test("\x1b[\x4b", -1);
 	teetty4test("\r\n", -1);
 
 	puts("move left x3, move right x2, del EOL; 'right' seq in sep calls");
-	teetty4test("123 UIO\b\b\b" "\x1b\x5b", -1);
+	teetty4test("123 UIO\b\b\b" "\x1b[", -1);
 	teetty4test("\x43" "\x1b", -1);
-	teetty4test("\x5b\x43", -1);
-	teetty4test("\x1b\x5b\x4b", -1);
+	teetty4test("[\x43", -1);
+	teetty4test("\x1b[\x4b", -1);
 	teetty4test("\r\n", -1);
 
 	puts("drop console title escape seq");
@@ -659,6 +661,21 @@ static void test_main(void)
 
 	puts("\\r to move to start of line");
 	teetty4test("xyz123\rXYZ\r\n", -1);
+
+	puts("something makes the logs stop");
+	teetty4test(
+	"\x1b[\x3f\x32\x30\x30\x34\x68[\x30]\x7e\x24\x20\x6c\x08"
+	"\x1b[\x4b\x73\x65\x71\x20\x31\x20\x7c less\r"
+	"\x0a\x1b[\x3f\x32\x30\x30\x34\x6c\r\x1b[\x3f\x31\x30\x34"
+	"\x39\x68\x1b[\x32\x32\x3b\x30\x3b\x30\x74\x1b[\x3f\x31\x68"
+	"\x1b\x3d\r\x31\r\x0a\x1b[\x37\x6d\x28\x45\x4e\x44\x29\x1b"
+	"[\x32\x37\x6d\x1b[\x4b\r\x1b[\x4b\x1b[\x3f\x31\x6c"
+	"\x1b\x3e\x1b[\x3f\x31\x30\x34\x39\x6c\x1b[\x32\x33\x3b\x30"
+	"\x3b\x30\x74\x1b[\x3f\x32\x30\x30\x34\x68[\x30]\x7e\x24"
+	"\x20\x23\x20\x61\x73\x64\x66\r\x0a\x1b[\x3f\x32\x30\x30\x34"
+	"\x6c\r\x1b[\x3f\x32\x30\x30\x34\x68[\x30]\x7e\x24\x20"
+	, -1);
+	
 }
 
 int main(int argc, char **argv)

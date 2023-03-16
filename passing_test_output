@@ -52,3 +52,7 @@ before : After
 first ;; second
 \r to move to start of line
 XYZ123
+something makes the logs stop
+[0]~$ seq 1 | less
+1
+[0]~$ # asdf

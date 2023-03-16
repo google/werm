@@ -96,7 +96,7 @@ case 0:
 			goto eol;
 		}
 
-		if (CONSUMEESC("\x1b[")) {
+		if (CONSUMEESC("\033[")) {
 			if (*buf == 0x4b) {
 				/* delete to EOL */
 				linesz = linepos;
@@ -121,7 +121,7 @@ case 'c':
 			goto eol;
 		}
 
-		if (CONSUMEESC("\x1b]")) {
+		if (CONSUMEESC("\033]")) {
 			teest = 't';
 case 't':
 			while (*buf != 0x07 && len) {
@@ -137,8 +137,8 @@ case 't':
 			teettyline();
 			goto eol;
 		}
-		if (buf[0] == '\x1b' || escsz) {
-			if (buf[0] == '\x1b') escsz = 0;
+		if (buf[0] == '\033' || escsz) {
+			if (buf[0] == '\033') escsz = 0;
 			*SAFEPTR(escbuf, escsz, 1) = *buf;
 			escsz++;
 		}
@@ -595,85 +595,85 @@ static void test_main(void)
 	} while (0);
 
 	teetty4test(
-		"abcdef\b\x1b[\x4b\b\x1b[\x4b\b\x1b[\x4bxyz\r\n", -1);
+		"abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
 	teetty4test("abcdef\b\r\n", -1);
 
 	puts("move back x2 and delete to eol");
-	teetty4test("abcdef\b\b\x1b[\x4b\r\n", -1);
+	teetty4test("abcdef\b\b\033[K\r\n", -1);
 
 	puts("move back x1 and insert");
 	teetty4test("asdf\bxy\r\n", -1);
 
 	puts("move back and forward");
-	teetty4test("asdf\b\x1b[\x43\r\n", -1);
+	teetty4test("asdf\b\033[C\r\n", -1);
 
 	puts("move back x2 and forward x1, then del to EOL");
-	teetty4test("asdf\b\b" "\x1b[\x43" "\x1b[\x4b" "\r\n", -1);
+	teetty4test("asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
 
 	puts("as above, but in separate calls");
 	teetty4test("asdf\b\b", -1);
-	teetty4test("\x1b[\x43", -1);
-	teetty4test("\x1b[\x4b", -1);
+	teetty4test("\033[C", -1);
+	teetty4test("\033[K", -1);
 	teetty4test("\r\n", -1);
 
 	puts("move left x3, move right x2, del EOL; 'right' seq in sep calls");
-	teetty4test("123 UIO\b\b\b" "\x1b[", -1);
-	teetty4test("\x43" "\x1b", -1);
-	teetty4test("[\x43", -1);
-	teetty4test("\x1b[\x4b", -1);
+	teetty4test("123 UIO\b\b\b" "\033[", -1);
+	teetty4test("C" "\033", -1);
+	teetty4test("[C", -1);
+	teetty4test("\033[K", -1);
 	teetty4test("\r\n", -1);
 
 	puts("drop console title escape seq");
 	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
-	teetty4test("abc\x1b]0;title\x07xyz\r\n", -1);
-	teetty4test("abc\x1b]1;title\x07xyz\r\n", -1);
-	teetty4test("123\x1b]2;title\x07" "456\r\n", -1);
+	teetty4test("abc\033]0;title\007xyz\r\n", -1);
+	teetty4test("abc\033]1;title\007xyz\r\n", -1);
+	teetty4test("123\033]2;title\007" "456\r\n", -1);
 
 	puts("drop console title escape seq; separate calls");
-	teetty4test("abc\x1b]0;ti", -1);
-	teetty4test("tle\x07xyz\r\n", -1);
+	teetty4test("abc\033]0;ti", -1);
+	teetty4test("tle\007xyz\r\n", -1);
 
 	puts("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
 
 	/* \r after paste mode off */
 	teetty4test("before (", -1);
-	teetty4test("\x1b[?2004l\rhello\x1b[?2004h", -1);
+	teetty4test("\033[?2004l\rhello\033[?2004h", -1);
 	teetty4test(") after\r\n", -1);
 
 	/* no \r after paste mode off */
 	teetty4test("before (", -1);
-	teetty4test("\x1b[?2004lhello\x1b[?2004h", -1);
+	teetty4test("\033[?2004lhello\033[?2004h", -1);
 	teetty4test(") after\r\n", -1);
 
 	puts("drop color and font");
 	teetty4test("before : ", -1);
-	teetty4test("\x1b[1;35mafter\r\n", -1);
+	teetty4test("\033[1;35mafter\r\n", -1);
 
 	/* split between calls */
 	teetty4test("before : ", -1);
-	teetty4test("\x1b[1;", -1);
+	teetty4test("\033[1;", -1);
 	teetty4test("35mafter\r\n", -1);
 
-	teetty4test("before : \x1b[36mAfter\r\n", -1);
+	teetty4test("before : \033[36mAfter\r\n", -1);
 
-	teetty4test("first ;; \x1b[1;31msecond\r\n", -1);
+	teetty4test("first ;; \033[1;31msecond\r\n", -1);
 
 	puts("\\r to move to start of line");
 	teetty4test("xyz123\rXYZ\r\n", -1);
 
 	puts("something makes the logs stop");
 	teetty4test(
-	"\x1b[\x3f\x32\x30\x30\x34\x68[\x30]\x7e\x24\x20\x6c\x08"
-	"\x1b[\x4b\x73\x65\x71\x20\x31\x20\x7c less\r"
-	"\x0a\x1b[\x3f\x32\x30\x30\x34\x6c\r\x1b[\x3f\x31\x30\x34"
-	"\x39\x68\x1b[\x32\x32\x3b\x30\x3b\x30\x74\x1b[\x3f\x31\x68"
-	"\x1b\x3d\r\x31\r\x0a\x1b[\x37\x6d\x28\x45\x4e\x44\x29\x1b"
-	"[\x32\x37\x6d\x1b[\x4b\r\x1b[\x4b\x1b[\x3f\x31\x6c"
-	"\x1b\x3e\x1b[\x3f\x31\x30\x34\x39\x6c\x1b[\x32\x33\x3b\x30"
-	"\x3b\x30\x74\x1b[\x3f\x32\x30\x30\x34\x68[\x30]\x7e\x24"
-	"\x20\x23\x20\x61\x73\x64\x66\r\x0a\x1b[\x3f\x32\x30\x30\x34"
-	"\x6c\r\x1b[\x3f\x32\x30\x30\x34\x68[\x30]\x7e\x24\x20"
+	"\033[?2004h[0]~$ l\b"
+	"\033[Kseq 1 | less\r"
+	"\n\033[?2004l\r\033[?104"
+	"9h\033[22;0;0t\033[?1h"
+	"\033=\r1\r\n\033[7m(END)\033"
+	"[27m\033[K\r\033[K\033[?1l"
+	"\033>\033[?1049l\033[23;0"
+	";0t\033[?2004h[0]~$"
+	" # asdf\r\n\033[?2004"
+	"l\r\033[?2004h[0]~$ "
 	, -1);
 	
 }

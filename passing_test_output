@@ -56,3 +56,5 @@ something makes the logs stop
 [0]~$ seq 1 | less
 1
 [0]~$ # asdf
+\r then delete line
+foo

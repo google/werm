@@ -675,7 +675,9 @@ static void test_main(void)
 	" # asdf\r\n\033[?2004"
 	"l\r\033[?2004h[0]~$ "
 	, -1);
-	
+
+	puts("\\r then delete line");
+	teetty4test("abc\r\033[Kfoo\r\n", -1);
 }
 
 int main(int argc, char **argv)

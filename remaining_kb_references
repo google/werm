@@ -1,4 +1,0 @@
-#!/bin/sh
-
-cd `dirname $0`
-sed 's/hterm.PreferenceManager.Categories.Keyboard//; s/Keyboard.KeyActions//; /Keyboard/!d; /^hterm.Keyboard/d; /^ *[*] @*\(typedef\|param\|return\|    \)/d' third_party/hterm_all.js 

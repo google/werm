@@ -1,18 +1,4 @@
-$ sed 's/hterm.PreferenceManager.Categories.Keyboard//; s/Keyboard.KeyAct
-ions//; /Keyboard/!d; /^hterm.Keyboard/d; /^ *[*] @*\(typedef\|param\|return\|    \)/d' hterm_all.js 
- * Keyboard handler.
-  this.keyMap = new hterm.Keyboard.KeyMap(this);
-/** @typedef {!hterm.Keyboard.KeyAction|!hterm.Keyboard.KeyBindingFunction} */
- * definition tells the hterm.Keyboard class how to handle keycodes.
-  /** @type {!Object<number, !hterm.Keyboard.KeyDef>} */
-      const keyDefFn = /** @type {!hterm.Keyboard.KeyDefFunction} */ (action);
-    // https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/keyCode
-  hterm.Keyboard.KeyPattern.modifiers.forEach(function(mod) {
-  hterm.Keyboard.KeyPattern.modifiers.forEach(function(mod) {
- * Return true if the given hterm.Keyboard.KeyPattern is exactly the same as
-  Keyboard: 'Keyboard',
-    text: 'Keyboard'},
-  this.keyboard = new hterm.Keyboard(this);
-      /** @type {!EventListener} */ (this.onKeyboardActivity_.bind(this)));
-hterm.Terminal.prototype.onKeyboardActivity_ = function(e) {
- * 26 - Report Keyboard status as CSI ? 2 7 ; 1 ; 0 ; 0 n (North American).
+#!/bin/sh
+
+cd `dirname $0`
+sed 's/hterm.PreferenceManager.Categories.Keyboard//; s/Keyboard.KeyActions//; /Keyboard/!d; /^hterm.Keyboard/d; /^ *[*] @*\(typedef\|param\|return\|    \)/d' third_party/hterm_all.js 

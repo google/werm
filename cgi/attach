@@ -90,7 +90,7 @@ a.scratch-link {
 EOF
 
 # werm repo subdir should have profiles to use
-for p in $WERMDIR/profiles/*
+for p in $WERMDIR/profiles/* $HOME/.config/werm/profiles/*
 do
 	echo '<ul class=common-list>'
 	sed '

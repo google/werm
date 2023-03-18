@@ -4931,38 +4931,7 @@ hterm.ContextMenu.prototype.hide = function() {
 
   this.element_.style.display = 'none';
 };
-// SOURCE FILE: hterm/js/hterm_keyboard.js
-// Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
 
-// Keyboard state
-hterm.Keyboard = function(terminal) {
-  // The parent vt interpreter.
-  this.terminal = terminal;
-
-  /**
-   * Enable/disable application keypad.
-   *
-   * This changes the way numeric keys are sent from the keyboard.
-   */
-  this.applicationKeypad = false;
-
-  /**
-   * Enable/disable the application cursor mode.
-   *
-   * This changes the way cursor keys are sent from the keyboard.
-   */
-  this.applicationCursor = false;
-
-  /**
-   * If true, the backspace should send BS ('\x08', aka ^H).  Otherwise
-   * the backspace key should send '\x7f'.
-   */
-  this.backspaceSendsBackspace = false;
-};
-
-/**
 // SOURCE FILE: hterm/js/hterm_notifications.js
 // Copyright 2020 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -8789,8 +8758,28 @@ hterm.Terminal = function({profileId, storage} = {}) {
 
   this.saveCursorAndState(true);
 
-  // The keyboard handler.
-  this.keyboard = new hterm.Keyboard(this);
+  // The keyboard state.
+  this.keyboard = {
+    /**
+     * Enable/disable application keypad.
+     *
+     * This changes the way numeric keys are sent from the keyboard.
+     */
+    applicationKeypad: false,
+
+    /**
+     * Enable/disable the application cursor mode.
+     *
+     * This changes the way cursor keys are sent from the keyboard.
+     */
+    applicationCursor: false,
+
+    /**
+     * If true, the backspace should send BS ('\x08', aka ^H).  Otherwise
+     * the backspace key should send '\x7f'.
+     */
+    backspaceSendsBackspace: false,
+  };
 
   // General IO interface that can be given to third parties without exposing
   // the entire terminal object.

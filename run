@@ -5,10 +5,21 @@ export WERMDIR=`pwd`
 
 wsd=$HOME/.local/websocketd/websocketd
 
-lc_vars=`env | sed '/^\(LC_[A-Z]*\)=.*/!d; s//\1/' | tr '\n' ','`
+passenv=/tmp/werm_passenv.$$
+
+cat >| $passenv << EOF
+WERMDIR,DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR,LANG
+LANGUAGE
+EOF
+
+env | sed '
+	/^\(LC_[A-Z]*\)=.*/!d
+	s//\1/
+' >> $passenv
 
 set -x
-$wsd --passenv WERMDIR,DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR,LANG,LANGUAGE,$lc_vars\
+third_party/websocketd/websocketd \
+	--passenv `tr '\n' , <$passenv` \
 	--cgidir=cgi \
 	--staticdir=. \
 	"$@" \

@@ -270,7 +270,7 @@ void _Noreturn subproc_main(void)
 	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
 }
 
-static _Noreturn void do_exec(void)
+static _Noreturn void execdtach(void)
 {
 	char *slave_name, *rawlogfn;
 	int slave;
@@ -717,7 +717,7 @@ int main(int argc, char **argv)
 	child = fork();
 	if (-1 == child) err(1, "fork");
 
-	if (!child) do_exec();
+	if (!child) execdtach();
 
 	child = fork();
 	if (-1 == child) err(1, "fork 2");

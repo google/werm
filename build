@@ -19,6 +19,12 @@ echo '{' >| compile_commands.json
 
 echo '}' >> compile_commands.json
 
+# if ! ctags=`which ctags-exuberant`; then
+# 	echo '`sudo apt install exuberant-ctags` to make tags file' 2>&1
+# else
+# 	$ctags --format=1 -R .
+# fi
+
 echo 'running session test...' >&2
 ./session test >|/tmp/testout.$$
 

@@ -417,18 +417,18 @@ client_activity(struct client *p)
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
 static void
-master_process(int s, int waitattach, int statusfd)
+master_process(int s, int statusfd)
 {
 	struct client *p, *next;
 	fd_set readfds;
 	int highest_fd;
-	int nullfd;
+	int nullfd, waitattach;
 
 	int has_attached_client = 0;
 
 	/* Okay, disassociate ourselves from the original terminal, as we
 	** don't care what happens to it. */
-	setsid();
+	if (!dtach_ephem) setsid();
 
 	/* Set a trap to unlink the socket when we die. */
 	atexit(unlink_socket);
@@ -449,7 +449,7 @@ master_process(int s, int waitattach, int statusfd)
 	/* Set up some signals. */
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGXFSZ, SIG_IGN);
-	signal(SIGHUP, SIG_IGN);
+	signal(SIGHUP, dtach_ephem ? die : SIG_IGN);
 	signal(SIGTTIN, SIG_IGN);
 	signal(SIGTTOU, SIG_IGN);
 	signal(SIGINT, die);
@@ -468,6 +468,7 @@ master_process(int s, int waitattach, int statusfd)
 	if (nullfd > 2)
 		close(nullfd);
 
+	waitattach = 1;
 	/* Loop forever. */
 	while (1)
 	{
@@ -536,7 +537,7 @@ master_process(int s, int waitattach, int statusfd)
 }
 
 int
-master_main(int waitattach, int dontfork)
+master_main(void)
 {
 	int fd[2] = {-1, -1};
 	int s;
@@ -582,16 +583,7 @@ master_main(int waitattach, int dontfork)
 
 	/* If FD_CLOEXEC works, create a pipe and use it to report any errors
 	** that occur while trying to execute the program. */
-	if (dontfork)
-	{
-		fd[1] = dup(2);
-		if (fcntl(fd[1], F_SETFD, FD_CLOEXEC) < 0)
-		{
-			close(fd[1]);
-			fd[1] = -1;
-		}
-	}
-	else if (pipe(fd) >= 0)
+	if (pipe(fd) >= 0)
 	{
 		if (fcntl(fd[0], F_SETFD, FD_CLOEXEC) < 0 ||
 		    fcntl(fd[1], F_SETFD, FD_CLOEXEC) < 0)
@@ -602,12 +594,6 @@ master_main(int waitattach, int dontfork)
 		}
 	}
 #endif
-
-	if (dontfork)
-	{
-		master_process(s, waitattach, fd[1]);
-		return 0;
-	}
 
 	/* Fork off so we can daemonize and such */
 	pid = fork();
@@ -622,7 +608,7 @@ master_main(int waitattach, int dontfork)
 		/* Child - this becomes the master */
 		if (fd[0] != -1)
 			close(fd[0]);
-		master_process(s, waitattach, fd[1]);
+		master_process(s, fd[1]);
 		return 0;
 	}
 	/* Parent - just return. */

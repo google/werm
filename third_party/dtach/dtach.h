@@ -129,7 +129,7 @@ struct packet
 #define EOS "\033[999H"
 
 int attach_main(int noerror);
-int master_main(int waitattach, int dontfork);
+int master_main(void);
 int push_main(void);
 
 #ifdef sun

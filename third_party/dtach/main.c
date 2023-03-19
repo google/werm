@@ -41,7 +41,7 @@ int redraw_method = REDRAW_UNSPEC;
 struct termios orig_term;
 
 void _Noreturn
-dtach_daemonized(void)
+dtach_main(void)
 {
 	if (!dtach_sock) errx(1, "dtach_sock must be set");
 
@@ -57,7 +57,7 @@ dtach_daemonized(void)
 		{
 			if (errno == ECONNREFUSED)
 				unlink(dtach_sock);
-			if (master_main(1, 0) != 0)
+			if (master_main() != 0)
 				exit(1);
 		}
 		exit(attach_main(0));

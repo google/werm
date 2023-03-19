@@ -359,15 +359,15 @@ static _Noreturn void dtachorshell(void)
 	unsetenv("HTTP_CACHE_CONTROL");
 	unsetenv("SERVER_SOFTWARE");
 
-	if (!dtach_sock) {
+	dtach_ephem = !dtach_sock;
+
+	if (dtach_sock) openlogs();
+	else
 		xasprintf(&dtach_sock, "/tmp/werm.ephem.%lld",
 			  (long long) getpid());
-		subproc_main();
-	}
-	else {
-		openlogs();
-		dtach_daemonized();
-	}
+
+
+	dtach_main();
 }
 
 static _Bool send_byte(int b)

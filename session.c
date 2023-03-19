@@ -15,7 +15,7 @@
 #include <err.h>
 
 static int master, argv0sz;
-static char *argv0, *dtach_check_cmd, *dtach_sock, *logfile, *pream;
+static char *argv0, *dtach_check_cmd, *logfile, *pream;
 
 #define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
 static unsigned char linebuf[1024], escbuf[1024];
@@ -270,10 +270,35 @@ void _Noreturn subproc_main(void)
 	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
 }
 
-static _Noreturn void execdtach(void)
+static void openlogs(void)
 {
-	char *slave_name, *rawlogfn;
-	int slave;
+	char *rawlogfn;
+
+	if (!logfile) errx(1, "expect logfile is set if dtach_sock is set");
+
+	xasprintf(&rawlogfn, "%s.raw", logfile);
+
+	rawlogfd = open(rawlogfn, O_WRONLY | O_CREAT | O_APPEND, 0600);
+	if (rawlogfd < 0) {
+		rawlogfd = 0;
+		warn("open %s", rawlogfn);
+	}
+	free(rawlogfn); rawlogfn = NULL;
+
+	if (0 > mknod(logfile, 0600, 0) && errno != EEXIST)
+		warn("mknod %s", logfile);
+	else {
+		loghndl = fopen(logfile, "a");
+		if (0 > fseek(loghndl, 0, SEEK_END)) warn("fseek %s", logfile);
+	}
+
+	snprintf(argv0, argv0sz, "dtach-%s", logfile);
+}
+
+static _Noreturn void dtachorshell(void)
+{
+	char *slave_name;
+	int slave, dontfork;
 
 	slave_name = ptsname(master);
 	if (!slave_name) err(1, "ptsname");
@@ -334,28 +359,15 @@ static _Noreturn void execdtach(void)
 	unsetenv("HTTP_CACHE_CONTROL");
 	unsetenv("SERVER_SOFTWARE");
 
-	if (!dtach_sock) subproc_main();
-
-	if (!logfile) errx(1, "expect logfile is set if dtach_sock is set");
-
-	xasprintf(&rawlogfn, "%s.raw", logfile);
-
-	/* Do not bother appending. */
-	rawlogfd = open(rawlogfn, O_WRONLY | O_CREAT | O_APPEND, 0600);
-	if (rawlogfd < 0) {
-		rawlogfd = 0;
-		warn("open %s", rawlogfn);
+	if (!dtach_sock) {
+		xasprintf(&dtach_sock, "/tmp/werm.ephem.%lld",
+			  (long long) getpid());
+		subproc_main();
 	}
-
-	if (0 > mknod(logfile, 0600, 0) && errno != EEXIST)
-		warn("mknod %s", logfile);
 	else {
-		loghndl = fopen(logfile, "a");
-		if (0 > fseek(loghndl, 0, SEEK_END)) warn("fseek %s", logfile);
+		openlogs();
+		dtach_daemonized();
 	}
-
-	snprintf(argv0, argv0sz, "dtach-%s", logfile);
-	dtach_main(dtach_sock);
 }
 
 static _Bool send_byte(int b)
@@ -664,16 +676,16 @@ static void test_main(void)
 
 	puts("something makes the logs stop");
 	teetty4test(
-	"\033[?2004h[0]~$ l\b"
-	"\033[Kseq 1 | less\r"
-	"\n\033[?2004l\r\033[?104"
-	"9h\033[22;0;0t\033[?1h"
-	"\033=\r1\r\n\033[7m(END)\033"
-	"[27m\033[K\r\033[K\033[?1l"
-	"\033>\033[?1049l\033[23;0"
-	";0t\033[?2004h[0]~$"
-	" # asdf\r\n\033[?2004"
-	"l\r\033[?2004h[0]~$ "
+		"\033[?2004h[0]~$ l\b"
+		"\033[Kseq 1 | less\r"
+		"\n\033[?2004l\r\033[?104"
+		"9h\033[22;0;0t\033[?1h"
+		"\033=\r1\r\n\033[7m(END)\033"
+		"[27m\033[K\r\033[K\033[?1l"
+		"\033>\033[?1049l\033[23;0"
+		";0t\033[?2004h[0]~$"
+		" # asdf\r\n\033[?2004"
+		"l\r\033[?2004h[0]~$ "
 	, -1);
 
 	puts("\\r then delete line");
@@ -717,7 +729,7 @@ int main(int argc, char **argv)
 	child = fork();
 	if (-1 == child) err(1, "fork");
 
-	if (!child) execdtach();
+	if (!child) dtachorshell();
 
 	child = fork();
 	if (-1 == child) err(1, "fork 2");

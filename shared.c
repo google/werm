@@ -1,0 +1,1 @@
+char *dtach_sock;

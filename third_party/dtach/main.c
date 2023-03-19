@@ -26,8 +26,6 @@
 /* Make sure the binary has a copyright. */
 const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004-2016 Ned T. Crigler";
 
-/* The name of the passed in socket. */
-char *sockname;
 /* The character used for detaching. Defaults to '^\' */
 int detach_char = '\\' - 64;
 /* 1 if we should not interpret the suspend character. */
@@ -43,10 +41,9 @@ int redraw_method = REDRAW_UNSPEC;
 struct termios orig_term;
 
 void _Noreturn
-dtach_main(const char *socket)
+dtach_daemonized(void)
 {
-	/* Parse the arguments */
-	sockname = strdup(socket);
+	if (!dtach_sock) errx(1, "dtach_sock must be set");
 
 	redraw_method = REDRAW_NONE;
 
@@ -59,7 +56,7 @@ dtach_main(const char *socket)
 		if (errno == ECONNREFUSED || errno == ENOENT)
 		{
 			if (errno == ECONNREFUSED)
-				unlink(sockname);
+				unlink(dtach_sock);
 			if (master_main(1, 0) != 0)
 				exit(1);
 		}

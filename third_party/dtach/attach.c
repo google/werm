@@ -154,10 +154,10 @@ attach_main(int noerror)
 
 	/* Attempt to open the socket. Don't display an error if noerror is 
 	** set. */
-	s = connect_socket(sockname);
+	s = connect_socket(dtach_sock);
 	if (s < 0 && errno == ENAMETOOLONG)
 	{
-		char *slash = strrchr(sockname, '/');
+		char *slash = strrchr(dtach_sock, '/');
 
 		/* Try to shorten the socket's path name by using chdir. */
 		if (slash)
@@ -167,7 +167,7 @@ attach_main(int noerror)
 			if (dirfd >= 0)
 			{
 				*slash = '\0';
-				if (chdir(sockname) >= 0)
+				if (chdir(dtach_sock) >= 0)
 				{
 					s = connect_socket(slash + 1);
 					fchdir(dirfd);
@@ -181,7 +181,7 @@ attach_main(int noerror)
 	{
 		if (!noerror)
 			printf("dtach connect_socket: %s: %s\n",
-			       sockname, strerror(errno));
+			       dtach_sock, strerror(errno));
 		return 1;
 	}
 

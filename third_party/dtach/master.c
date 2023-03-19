@@ -62,7 +62,7 @@ pid_t forkpty(int *amaster, char *name, struct termios *termp,
 static void
 unlink_socket(void)
 {
-	unlink(sockname);
+	unlink(dtach_sock);
 }
 
 /* Signal */
@@ -209,7 +209,7 @@ update_socket_modes(int exec)
 	struct stat st;
 	mode_t newmode;
 
-	if (stat(sockname, &st) < 0)
+	if (stat(dtach_sock, &st) < 0)
 		return;
 
 	if (exec)
@@ -218,7 +218,7 @@ update_socket_modes(int exec)
 		newmode = st.st_mode & ~S_IXUSR;
 
 	if (st.st_mode != newmode)
-		chmod(sockname, newmode);
+		chmod(dtach_sock, newmode);
 }
 
 /* Process activity on the pty - Input and terminal changes are sent out to
@@ -547,10 +547,10 @@ master_main(int waitattach, int dontfork)
 		redraw_method = REDRAW_CTRL_L;
 
 	/* Create the unix domain socket. */
-	s = create_socket(sockname);
+	s = create_socket(dtach_sock);
 	if (s < 0 && errno == ENAMETOOLONG)
 	{
-		char *slash = strrchr(sockname, '/');
+		char *slash = strrchr(dtach_sock, '/');
 
 		/* Try to shorten the socket's path name by using chdir. */
 		if (slash)
@@ -560,7 +560,7 @@ master_main(int waitattach, int dontfork)
 			if (dirfd >= 0)
 			{
 				*slash = '\0';
-				if (chdir(sockname) >= 0)
+				if (chdir(dtach_sock) >= 0)
 				{
 					s = create_socket(slash + 1);
 					fchdir(dirfd);
@@ -573,7 +573,7 @@ master_main(int waitattach, int dontfork)
 	if (s < 0)
 	{
 		printf("dtach create_socket: %s: %s\n",
-		       sockname, strerror(errno));
+		       dtach_sock, strerror(errno));
 		return 1;
 	}
 

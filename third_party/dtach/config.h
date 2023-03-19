@@ -10,9 +10,6 @@
 /* Define to 1 if you have the <fcntl.h> header file. */
 #define HAVE_FCNTL_H 1
 
-/* Define to 1 if you have the `forkpty' function. */
-#define HAVE_FORKPTY 1
-
 /* Define to 1 if you have the `grantpt' function. */
 #define HAVE_GRANTPT 1
 
@@ -34,14 +31,8 @@
 /* Define to 1 if you have the `memset' function. */
 #define HAVE_MEMSET 1
 
-/* Define to 1 if you have the `openpty' function. */
-#define HAVE_OPENPTY 1
-
 /* Define to 1 if you have the `ptsname' function. */
 #define HAVE_PTSNAME 1
-
-/* Define to 1 if you have the <pty.h> header file. */
-#define HAVE_PTY_H 1
 
 /* Define to 1 if you have the `select' function. */
 #define HAVE_SELECT 1

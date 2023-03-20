@@ -290,7 +290,6 @@ static _Noreturn void dtachorshell(void)
 		err(1, "dup2");
 
 	if (-1 == setsid()) warn("setsid");
-	if (-1 == ioctl(0, TIOCSCTTY, 1)) warn("ioctl");
 
 	setenv("TERM", "xterm-256color", 1);
 

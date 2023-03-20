@@ -19,6 +19,7 @@
 #define dtach_h
 
 #include "third_party/dtach/config.h"
+#include "third_party/dtach/pkt.h"
 #include "shared.h"
 
 #include <errno.h>
@@ -83,16 +84,6 @@
 #endif
 
 extern int detach_char, no_suspend, redraw_method;
-extern struct termios orig_term;
-
-enum
-{
-	MSG_PUSH	= 0,
-	MSG_ATTACH	= 1,
-	MSG_DETACH	= 2,
-	MSG_WINCH	= 3,
-	MSG_REDRAW	= 4,
-};
 
 enum
 {
@@ -100,18 +91,6 @@ enum
 	REDRAW_NONE	= 1,
 	REDRAW_CTRL_L	= 2,
 	REDRAW_WINCH	= 3,
-};
-
-/* The client to master protocol. */
-struct packet
-{
-	unsigned char type;
-	unsigned char len;
-	union
-	{
-		unsigned char buf[sizeof(struct winsize)];
-		struct winsize ws;
-	} u;
 };
 
 /*

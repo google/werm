@@ -33,22 +33,12 @@ int no_suspend;
 /* The default redraw method. Initially set to unspecified. */
 int redraw_method = REDRAW_UNSPEC;
 
-/*
-** The original terminal settings. Shared between the master and attach
-** processes. The master uses it to initialize the pty, and the attacher uses
-** it to restore the original settings.
-*/
-struct termios orig_term;
-
 void _Noreturn
 dtach_main(void)
 {
 	if (!dtach_sock) errx(1, "dtach_sock must be set");
 
 	redraw_method = REDRAW_NONE;
-
-	/* Save the original terminal settings. */
-	if (tcgetattr(0, &orig_term) < 0) errx(1, "dtach: requires a terminal");
 
 	/* Try to attach first. If that doesn't work, create a new socket. */
 	if (attach_main(1) != 0)

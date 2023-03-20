@@ -104,17 +104,20 @@ init_pty(int statusfd)
 {
 	/* Use the original terminal's settings. We don't have to set the
 	** window size here, because the attacher will send it in a packet. */
-	the_pty.term = orig_term;
 	memset(&the_pty.ws, 0, sizeof(struct winsize));
 
 	/* Create the pty process */
-	the_pty.pid = forkpty(&the_pty.fd, NULL, &the_pty.term, NULL);
+	the_pty.pid = forkpty(&the_pty.fd, NULL, NULL, NULL);
 	if (the_pty.pid < 0)
 		return -1;
 	else if (the_pty.pid == 0)
 		/* Child.. Execute the program. Will not return. */
 		subproc_main();
+
 	/* Parent.. Finish up and return */
+
+	if (tcgetattr(the_pty.fd, &the_pty.term) < 0) return -1;
+
 #ifdef BROKEN_MASTER
 	{
 		char *buf;
@@ -335,10 +338,10 @@ static void
 client_activity(struct client *p)
 {
 	ssize_t len;
-	struct packet pkt;
+	struct dtach_pkt pkt;
 
 	/* Read the activity. */
-	len = read(p->fd, &pkt, sizeof(struct packet));
+	len = read(p->fd, &pkt, sizeof(struct dtach_pkt));
 	if (len < 0 && (errno == EAGAIN || errno == EINTR))
 		return;
 

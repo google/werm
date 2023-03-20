@@ -14,23 +14,23 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static int master, argv0sz;
+static int argv0sz;
 static char *argv0, *dtach_check_cmd, *logfile, *pream;
 
 #define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
 static unsigned char linebuf[1024], escbuf[1024];
 
 static FILE *loghndl;
-static int rawlogfd;
+static int rawlogfd, childoup[2];
 
 static unsigned linesz, linepos, escsz;
 
 static char teest;
 
-static void fullwrite(
-	int fd, const char *desc, const unsigned char *buf, size_t sz)
+static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 {
 	ssize_t writn;
+	const unsigned char *buf = buf_;
 
 	while (sz) {
 		writn = write(fd, buf, sz);
@@ -152,16 +152,6 @@ case 't':
 		len--;
 		buf++;
 	}
-}
-
-static void send_sigwinch(int row, int col)
-{
-	struct winsize ws = {
-		.ws_row = (unsigned short) row,
-		.ws_col = (unsigned short) col,
-	};
-
-	if (-1 == ioctl(master, TIOCSWINSZ, &ws)) warn("ioctl for winsz");
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)
@@ -291,23 +281,12 @@ static void openlogs(void)
 		loghndl = fopen(logfile, "a");
 		if (0 > fseek(loghndl, 0, SEEK_END)) warn("fseek %s", logfile);
 	}
-
-	snprintf(argv0, argv0sz, "dtach-%s", logfile);
 }
 
 static _Noreturn void dtachorshell(void)
 {
-	char *slave_name;
-	int slave, dontfork;
-
-	slave_name = ptsname(master);
-	if (!slave_name) err(1, "ptsname");
-	slave = open(slave_name, O_RDWR);
-
-	close(master);
-	if (-1 == dup2(slave, 0) ||
-	    -1 == dup2(slave, 1) ||
-	    -1 == dup2(slave, 2))
+	if (-1 == dup2(childoup[1], 1) ||
+	    -1 == dup2(childoup[1], 2))
 		err(1, "dup2");
 
 	if (-1 == setsid()) warn("setsid");
@@ -366,7 +345,7 @@ static _Noreturn void dtachorshell(void)
 		xasprintf(&dtach_sock, "/tmp/werm.ephem.%lld",
 			  (long long) getpid());
 
-
+	snprintf(argv0, argv0sz, "dtach-%s", logfile);
 	dtach_main();
 }
 
@@ -387,7 +366,7 @@ static _Noreturn void read_from_subproc(void)
 	snprintf(argv0, argv0sz, "read_subproc-%s", logfile);
 
 	while (1) {
-		b = read(master, read_buf, sizeof(read_buf));
+		b = read(childoup[0], read_buf, sizeof(read_buf));
 		if (!b) exit(0);
 		if (b == -1) err(1, "read from subproc");
 
@@ -434,8 +413,6 @@ static void write_to_subproc_core(struct write_subproc_st *st)
 {
 	unsigned char byte;
 	unsigned wi, ri, row, col;
-
-	snprintf(argv0, argv0sz, "write_subproc-%s", logfile);
 
 	st->sendsigwin = 0;
 
@@ -498,28 +475,49 @@ static void write_to_subproc_core(struct write_subproc_st *st)
 	st->bufsz = wi;
 }
 
-static _Noreturn void write_to_subproc(void)
+static void push(int sock, unsigned char *buf, unsigned len)
 {
-	struct write_subproc_st st;
-	ssize_t red;
+	struct dtach_pkt p = {.type = MSG_PUSH};
 
-	if (pream)
-		fullwrite(master, "preamble", (unsigned char *)pream,
-			  strlen(pream));
-	free(pream);
-	pream = NULL;
-
-	st.esc = '0';
-	while (1) {
-		red = read(0, st.buf, sizeof(512));
-		if (!red) exit(0);
-		if (red == -1) err(1, "read from stdin");
-
-		st.bufsz = red;
-		write_to_subproc_core(&st);
-		fullwrite(master, "subproc", st.buf, st.bufsz);
-		if (st.sendsigwin) send_sigwinch(st.swrow, st.swcol);
+	while (len--) {
+		p.u.buf[p.len++] = *buf++;
+		if (!len || p.len == sizeof(p.u.buf)) {
+			fullwrite(sock, "keystroke packet", &p, sizeof(p));
+			p.len = 0;
+		}
 	}
+}
+
+void process_kbd(int sock)
+{
+	ssize_t red;
+	static struct write_subproc_st st = {
+		.esc = '0',
+	};
+	struct dtach_pkt winsz = {.type = MSG_WINCH};
+
+	if (pream) {
+		push(sock, (unsigned char *)pream, strlen(pream));
+		free(pream);
+		pream = NULL;
+	}
+
+	red = read(0, st.buf, sizeof(512));
+	if (!red) {
+		warnx("nothing on stdin");
+		return;
+	}
+	if (red == -1) err(1, "read from stdin");
+
+	st.bufsz = red;
+	write_to_subproc_core(&st);
+	push(sock, st.buf, st.bufsz);
+
+	if (!st.sendsigwin) return;
+
+	winsz.u.ws.ws_row = st.swrow;
+	winsz.u.ws.ws_col = st.swcol;
+	fullwrite(sock, "window size pkt", &winsz, sizeof(winsz));
 }
 
 static void teetty4test(const char *s, int len)
@@ -714,11 +712,6 @@ int main(int argc, char **argv)
 	if (!home) warnx("HOME is not set");
 	else if (-1 == chdir(home)) warn("chdir to home: '%s'", home);
 
-	master = posix_openpt(O_RDWR);
-	if (-1 == master) err(1, "posix_openpt");
-	if (-1 == grantpt(master)) err(1, "grantpt");
-	if (-1 == unlockpt(master)) err(1, "unlockpt");
-
 	parse_query();
 
 	if (!system(dtach_check_cmd)) {
@@ -726,13 +719,12 @@ int main(int argc, char **argv)
 		pream = NULL;
 	}
 
+	if (pipe(childoup) < 0) err(1, "child pipes");
+
 	child = fork();
 	if (-1 == child) err(1, "fork");
 
 	if (!child) dtachorshell();
 
-	child = fork();
-	if (-1 == child) err(1, "fork 2");
-
-	if (child) read_from_subproc(); else write_to_subproc();
+	read_from_subproc();
 }

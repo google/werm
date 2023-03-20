@@ -41,16 +41,14 @@ dtach_main(void)
 	redraw_method = REDRAW_NONE;
 
 	/* Try to attach first. If that doesn't work, create a new socket. */
-	if (attach_main(1) != 0)
+	if (!attach_main(1)) exit(0);
+
+	if (errno == ECONNREFUSED || errno == ENOENT)
 	{
-		if (errno == ECONNREFUSED || errno == ENOENT)
-		{
-			if (errno == ECONNREFUSED)
-				unlink(dtach_sock);
-			if (master_main() != 0)
-				exit(1);
-		}
-		exit(attach_main(0));
+		if (errno == ECONNREFUSED)
+			unlink(dtach_sock);
+		if (master_main() != 0)
+			exit(1);
 	}
-	exit(0);
+	exit(attach_main(0));
 }

@@ -502,10 +502,7 @@ void process_kbd(int sock)
 	}
 
 	red = read(0, st.buf, sizeof(512));
-	if (!red) {
-		warnx("nothing on stdin");
-		return;
-	}
+	if (!red) errx(1, "nothing on stdin");
 	if (red == -1) err(1, "read from stdin");
 
 	st.bufsz = red;

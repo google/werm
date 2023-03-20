@@ -18,7 +18,7 @@ env | sed '
 ' >> $passenv
 
 set -x
-third_party/websocketd/websocketd \
+exec third_party/websocketd/websocketd \
 	--passenv `tr '\n' , <$passenv` \
 	--cgidir=cgi \
 	--staticdir=. \

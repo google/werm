@@ -414,8 +414,8 @@ client_activity(struct client *p)
 
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
-static void
-master_process(int s, int statusfd)
+static _Noreturn void
+masterprocess(int s, int statusfd)
 {
 	struct client *p, *next;
 	fd_set readfds;
@@ -606,8 +606,7 @@ master_main(void)
 		/* Child - this becomes the master */
 		if (fd[0] != -1)
 			close(fd[0]);
-		master_process(s, fd[1]);
-		return 0;
+		masterprocess(s, fd[1]);
 	}
 	/* Parent - just return. */
 

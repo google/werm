@@ -3,8 +3,6 @@
 cd `dirname $0`
 export WERMDIR=`pwd`
 
-wsd=$HOME/.local/websocketd/websocketd
-
 passenv=/tmp/werm_passenv.$$
 
 cat >| $passenv << EOF

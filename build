@@ -4,8 +4,6 @@ cmd_scratch=/tmp/compile_commands_$$.json
 
 cd `dirname $0`
 
-make -C third_party/websocketd
-
 echo '{' >| compile_commands.json
 
 	clang -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L -MJ $cmd_scratch \
@@ -39,3 +37,5 @@ then
 	cp /tmp/testout.$$ $PWD/passing_test_output"
 	exit 1
 fi >&2
+
+make -C third_party/websocketd

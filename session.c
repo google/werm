@@ -368,6 +368,8 @@ void process_tty_out(
 {
 	size_t needsz;
 
+	teettycontent(buf, len);
+
 	/* At worst every byte needs escaping, plus trailing newline. */
 	needsz = len*3 + 1;
 	if (theroutsz < needsz) {

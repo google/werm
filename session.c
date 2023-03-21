@@ -14,14 +14,13 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static int argv0sz;
-static char *argv0, *dtach_check_cmd, *logfile, *pream;
+static char *dtach_check_cmd, *logfile, *pream;
 
 #define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
 static unsigned char linebuf[1024], escbuf[1024];
 
 static FILE *loghndl;
-static int rawlogfd, childoup[2];
+static int rawlogfd;
 
 static unsigned linesz, linepos, escsz;
 
@@ -76,7 +75,7 @@ static _Bool consumeesc(const char *pref, size_t preflen)
 
 #define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
-void tee_tty_content(const unsigned char *buf, size_t len)
+static void teettycontent(const unsigned char *buf, size_t len)
 {
 	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
 	if (!loghndl) return;
@@ -285,10 +284,6 @@ static void openlogs(void)
 
 static _Noreturn void dtachorshell(void)
 {
-	if (-1 == dup2(childoup[1], 1) ||
-	    -1 == dup2(childoup[1], 2))
-		err(1, "dup2");
-
 	if (-1 == setsid()) warn("setsid");
 
 	setenv("TERM", "xterm-256color", 1);
@@ -344,39 +339,49 @@ static _Noreturn void dtachorshell(void)
 		xasprintf(&dtach_sock, "/tmp/werm.ephem.%lld",
 			  (long long) getpid());
 
-	snprintf(argv0, argv0sz, "dtach-%s", logfile);
 	dtach_main();
 }
 
-static _Bool send_byte(int b)
+static unsigned char *theroutbuf;
+static size_t theroutsz, theroutlen;
+
+static int hexdig(int v)
 {
-	if (b < 0) errx(1, "got negative byte: %d", b);
-
-	if (b == '\\' || b < ' ' || b > '~') return 3 == printf("\\%02x", b);
-
-	return 0 <= putchar(b);
+	v &= 0x0f;
+	return v + (v < 10 ? '0' : 'W');
 }
 
-static _Noreturn void read_from_subproc(void)
+static void putrout(int b)
 {
-	unsigned char read_buf[512], *curs;
-	ssize_t b;
+	b &= 0xff;
 
-	snprintf(argv0, argv0sz, "read_subproc-%s", logfile);
-
-	while (1) {
-		b = read(childoup[0], read_buf, sizeof(read_buf));
-		if (!b) exit(0);
-		if (b == -1) err(1, "read from subproc");
-
-		curs = read_buf;
-		do {
-			if (!send_byte(*curs++)) err(1, "send_byte");
-		} while (--b);
-
-		putchar('\n');
-		fflush(stdout);
+	if (b == '\\' || b < ' ' || b > '~') {
+		theroutbuf[theroutlen++] = '\\';
+		theroutbuf[theroutlen++] = hexdig(b >> 4);
+		theroutbuf[theroutlen++] = hexdig(b);
 	}
+	else theroutbuf[theroutlen++] = b;
+}
+
+void process_tty_out(
+        const unsigned char *buf, size_t len, struct raw_tty_out *rout)
+{
+	size_t needsz;
+
+	/* At worst every byte needs escaping, plus trailing newline. */
+	needsz = len*3 + 1;
+	if (theroutsz < needsz) {
+		theroutsz = needsz;
+		theroutbuf = realloc(theroutbuf, theroutsz);
+		if (!theroutbuf) errx(1, "even realloc knows: out of mem");
+	}
+
+	theroutlen = 0;
+	while (len--) putrout(*buf++);
+	theroutbuf[theroutlen++] = '\n';
+
+	rout->buf = theroutbuf;
+	rout->len = theroutlen;
 }
 
 struct write_subproc_st {
@@ -519,7 +524,7 @@ void process_kbd(int sock)
 static void teetty4test(const char *s, int len)
 {
 	if (-1 == len) len = strlen(s);
-	tee_tty_content((const unsigned char *)s, len);
+	teettycontent((const unsigned char *)s, len);
 }
 
 static void test_main(void)
@@ -688,11 +693,7 @@ static void test_main(void)
 
 int main(int argc, char **argv)
 {
-	pid_t child;
 	const char *home;
-
-	argv0 = argv[0];
-	argv0sz = strlen(argv0)+1;
 
 	if (argc < 1) errx(1, "unexpected argc value: %d", argc);
 	argc--;
@@ -715,12 +716,5 @@ int main(int argc, char **argv)
 		pream = NULL;
 	}
 
-	if (pipe(childoup) < 0) err(1, "child pipes");
-
-	child = fork();
-	if (-1 == child) err(1, "fork");
-
-	if (!child) dtachorshell();
-
-	read_from_subproc();
+	dtachorshell();
 }

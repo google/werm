@@ -224,17 +224,18 @@ update_socket_modes(int exec)
 static void
 pty_activity(int s)
 {
-	unsigned char buf[BUFSIZE];
-	ssize_t len;
+	unsigned char preprocb[BUFSIZE], *routcurs;
+	ssize_t preproclen, writn, routrema;
 	struct client *p;
 	fd_set readfds, writefds;
 	int highest_fd, nclients;
+	struct raw_tty_out rout;
 
 	/* Read the pty activity */
-	len = read(the_pty.fd, buf, sizeof(buf));
+	preproclen = read(the_pty.fd, preprocb, sizeof(preprocb));
 
 	/* Error -> die */
-	if (len <= 0)
+	if (preproclen <= 0)
 		exit(1);
 
 #ifdef BROKEN_MASTER
@@ -270,33 +271,33 @@ top:
 	if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
 		return;
 
-	tee_tty_content(buf, len);
+	process_tty_out(preprocb, preproclen, &rout);
 
 	/* Send the data out to the clients. */
 	for (p = clients, nclients = 0; p; p = p->next)
 	{
-		ssize_t written;
-
 		if (!FD_ISSET(p->fd, &writefds))
 			continue;
 
-		written = 0;
-		while (written < len)
+		routrema = rout.len;
+		routcurs = rout.buf;
+		while (routrema)
 		{
-			ssize_t n = write(p->fd, buf + written, len - written);
+			writn = write(p->fd, routcurs, routrema);
 
-			if (n > 0)
+			if (writn > 0)
 			{
-				written += n;
+				routrema -= writn;
+				routcurs += writn;
 				continue;
 			}
-			else if (n < 0 && errno == EINTR)
+			else if (writn < 0 && errno == EINTR)
 				continue;
-			else if (n < 0 && errno != EAGAIN)
+			else if (writn < 0 && errno != EAGAIN)
 				nclients = -1;
 			break;
 		}
-		if (nclients != -1 && written == len)
+		if (nclients != -1 && !routrema)
 			nclients++;
 	}
 

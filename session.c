@@ -14,7 +14,7 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static char *dtach_check_cmd, *logfile, *pream, *argv0, *termid;
+static char *dtach_check_cmd, *pream, *argv0, *termid;
 
 static size_t argv0sz;
 
@@ -232,12 +232,6 @@ static void parse_query(void)
 			xasprintf(&dtach_check_cmd,
 				  "test -S /tmp/dtach.%s", val);
 
-			free(dtach_sock);
-			xasprintf(&dtach_sock, "/tmp/dtach.%s", val);
-
-			free(logfile);
-			xasprintf(&logfile, "/tmp/log.%s", val);
-
 			continue;
 		}
 
@@ -266,25 +260,28 @@ void _Noreturn subproc_main(void)
 
 static void openlogs(void)
 {
-	char *rawlogfn;
+	char *rawlogfn, *logfn;
 
-	if (!logfile) errx(1, "expect logfile is set if dtach_sock is set");
+	if (!termid) return;
 
-	xasprintf(&rawlogfn, "%s.raw", logfile);
+	xasprintf(&rawlogfn, "/tmp/log.%s.raw", termid);
+	xasprintf(&logfn, "/tmp/log.%s", termid);
 
 	rawlogfd = open(rawlogfn, O_WRONLY | O_CREAT | O_APPEND, 0600);
 	if (rawlogfd < 0) {
 		rawlogfd = 0;
 		warn("open %s", rawlogfn);
 	}
-	free(rawlogfn); rawlogfn = NULL;
 
-	if (0 > mknod(logfile, 0600, 0) && errno != EEXIST)
-		warn("mknod %s", logfile);
+	if (0 > mknod(logfn, 0600, 0) && errno != EEXIST)
+		warn("mknod %s", logfn);
 	else {
-		loghndl = fopen(logfile, "a");
-		if (0 > fseek(loghndl, 0, SEEK_END)) warn("fseek %s", logfile);
+		loghndl = fopen(logfn, "a");
+		if (0 > fseek(loghndl, 0, SEEK_END)) warn("fseek %s", logfn);
 	}
+
+	free(rawlogfn);
+	free(logfn);
 }
 
 static _Noreturn void dtachorshell(void)
@@ -337,12 +334,14 @@ static _Noreturn void dtachorshell(void)
 	unsetenv("HTTP_CACHE_CONTROL");
 	unsetenv("SERVER_SOFTWARE");
 
-	dtach_ephem = !dtach_sock;
+	dtach_ephem = !termid;
+	openlogs();
 
-	if (dtach_sock) openlogs();
-	else
+	if (!termid)
 		xasprintf(&dtach_sock, "/tmp/werm.ephem.%lld",
 			  (long long) getpid());
+	else
+		xasprintf(&dtach_sock, "/tmp/dtach.%s", termid);
 
 	dtach_main();
 }

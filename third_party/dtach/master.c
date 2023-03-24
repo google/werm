@@ -445,10 +445,9 @@ masterprocess(int s, int statusfd)
 		** When waitattach is set, wait until the client attaches
 		** before trying to read from the pty.
 		*/
-		if (waitattach)
-		{
-			if (clients && clients->attached)
-				waitattach = 0;
+		if (waitattach && clients && clients->attached) {
+			waitattach = 0;
+			send_pream(the_pty.fd);
 		}
 
 		if (!waitattach)

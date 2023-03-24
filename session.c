@@ -14,7 +14,7 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static char *dtach_check_cmd, *pream, *argv0, *termid;
+static char *pream, *argv0, *termid;
 
 static size_t argv0sz;
 
@@ -227,11 +227,6 @@ static void parse_query(void)
 		if (val) {
 			free(termid);
 			termid = strdup(val);
-
-			free(dtach_check_cmd);
-			xasprintf(&dtach_check_cmd,
-				  "test -S /tmp/dtach.%s", val);
-
 			continue;
 		}
 
@@ -365,6 +360,17 @@ static void putrout(int b)
 		theroutbuf[theroutlen++] = hexdig(b);
 	}
 	else theroutbuf[theroutlen++] = b;
+}
+
+void send_pream(int fd)
+{
+	if (!pream) return;
+	fullwrite(fd, "pream", pream, strlen(pream));
+
+	/* Theoretically unneeded as send_pream is never called more than
+	 * once: */
+	free(pream);
+	pream = NULL;
 }
 
 void process_tty_out(
@@ -505,12 +511,6 @@ void process_kbd(int sock)
 		.esc = '0',
 	};
 	struct dtach_pkt winsz = {.type = MSG_WINCH};
-
-	if (pream) {
-		push(sock, (unsigned char *)pream, strlen(pream));
-		free(pream);
-		pream = NULL;
-	}
 
 	red = read(0, st.buf, sizeof(512));
 	if (!red) errx(1, "nothing on stdin");
@@ -725,11 +725,6 @@ int main(int argc, char **argv)
 	else if (-1 == chdir(home)) warn("chdir to home: '%s'", home);
 
 	parse_query();
-
-	if (!system(dtach_check_cmd)) {
-		free(pream);
-		pream = NULL;
-	}
 
 	dtachorshell();
 }

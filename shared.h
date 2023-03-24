@@ -17,3 +17,6 @@ void process_tty_out(
 void process_kbd(int sock);
 
 void set_argv0(const char *role);
+
+/* Called if the process was attached to for the first time. */
+void send_pream(int fd);

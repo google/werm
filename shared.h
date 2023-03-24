@@ -15,3 +15,5 @@ void process_tty_out(
 	const unsigned char *buf, size_t len, struct raw_tty_out *rout);
 
 void process_kbd(int sock);
+
+void set_argv0(const char *role);

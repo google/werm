@@ -605,6 +605,7 @@ master_main(void)
 	else if (pid == 0)
 	{
 		/* Child - this becomes the master */
+		set_argv0("master");
 		if (fd[0] != -1)
 			close(fd[0]);
 		masterprocess(s, fd[1]);

@@ -14,7 +14,9 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
-static char *dtach_check_cmd, *logfile, *pream;
+static char *dtach_check_cmd, *logfile, *pream, *argv0, *termid;
+
+static size_t argv0sz;
 
 #define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
 static unsigned char linebuf[1024], escbuf[1024];
@@ -223,6 +225,9 @@ static void parse_query(void)
 
 		val = extract_query_arg(&qs, "termid=");
 		if (val) {
+			free(termid);
+			termid = strdup(val);
+
 			free(dtach_check_cmd);
 			xasprintf(&dtach_check_cmd,
 				  "test -S /tmp/dtach.%s", val);
@@ -693,9 +698,18 @@ static void test_main(void)
 	teetty4test("abc\r\033[Kfoo\r\n", -1);
 }
 
+void set_argv0(const char *role)
+{
+	snprintf(argv0, argv0sz, "werm.%s.%s", termid, role);
+}
+
 int main(int argc, char **argv)
 {
 	const char *home;
+
+	argv0 = argv[0];
+	argv0sz = strlen(argv0)+1;
+	memset(argv0, ' ', argv0sz-1);
 
 	if (argc < 1) errx(1, "unexpected argc value: %d", argc);
 	argc--;

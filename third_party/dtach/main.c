@@ -30,15 +30,11 @@ const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004-2
 int detach_char = '\\' - 64;
 /* 1 if we should not interpret the suspend character. */
 int no_suspend;
-/* The default redraw method. Initially set to unspecified. */
-int redraw_method = REDRAW_UNSPEC;
 
 void _Noreturn
 dtach_main(void)
 {
 	if (!dtach_sock) errx(1, "dtach_sock must be set");
-
-	redraw_method = REDRAW_NONE;
 
 	/* Try to attach first. If that doesn't work, create a new socket. */
 	if (!attach_main(1)) exit(0);

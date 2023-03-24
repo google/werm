@@ -7,9 +7,7 @@ enum
 {
 	MSG_PUSH	= 0,
 	MSG_ATTACH	= 1,
-	MSG_DETACH	= 2,
 	MSG_WINCH	= 3,
-	MSG_REDRAW	= 4,
 };
 
 /* The client to master protocol. */

@@ -367,49 +367,12 @@ client_activity(struct client *p)
 	/* Attach or detach from the program. */
 	else if (pkt.type == MSG_ATTACH)
 		p->attached = 1;
-	else if (pkt.type == MSG_DETACH)
-		p->attached = 0;
 
 	/* Window size change request, without a forced redraw. */
 	else if (pkt.type == MSG_WINCH)
 	{
 		the_pty.ws = pkt.u.ws;
 		ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
-	}
-
-	/* Force a redraw using a particular method. */
-	else if (pkt.type == MSG_REDRAW)
-	{
-		int method = pkt.len;
-
-		/* If the client didn't specify a particular method, use
-		** whatever we had on startup. */
-		if (method == REDRAW_UNSPEC)
-			method = redraw_method;
-		if (method == REDRAW_NONE)
-			return;
-
-		/* Set the window size. */
-		the_pty.ws = pkt.u.ws;
-		ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
-
-		/* Send a ^L character if the terminal is in no-echo and
-		** character-at-a-time mode. */
-		if (method == REDRAW_CTRL_L)
-		{
-			char c = '\f';
-
-                	if (((the_pty.term.c_lflag & (ECHO|ICANON)) == 0) &&
-                        	(the_pty.term.c_cc[VMIN] == 1))
-			{
-				write(the_pty.fd, &c, 1);
-			}
-		}
-		/* Send a WINCH signal to the program. */
-		else if (method == REDRAW_WINCH)
-		{
-			killpty(&the_pty, SIGWINCH);
-		}
 	}
 }
 
@@ -541,10 +504,6 @@ master_main(void)
 	int fd[2] = {-1, -1};
 	int s;
 	pid_t pid;
-
-	/* Use a default redraw method if one hasn't been specified yet. */
-	if (redraw_method == REDRAW_UNSPEC)
-		redraw_method = REDRAW_CTRL_L;
 
 	/* Create the unix domain socket. */
 	s = create_socket(dtach_sock);

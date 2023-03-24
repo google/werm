@@ -119,17 +119,12 @@ attach_main(int noerror)
 	signal(SIGQUIT, die);
 
 	/* Clear the screen. This assumes VT100. */
+	/* TODO: this is not needed for werm I bet */
 	write(1, "\33[H\33[J", 6);
 
 	/* Tell the master that we want to attach. */
 	memset(&pkt, 0, sizeof(struct dtach_pkt));
 	pkt.type = MSG_ATTACH;
-	write(s, &pkt, sizeof(struct dtach_pkt));
-
-	/* We would like a redraw, too. */
-	pkt.type = MSG_REDRAW;
-	pkt.len = redraw_method;
-	ioctl(0, TIOCGWINSZ, &pkt.u.ws);
 	write(s, &pkt, sizeof(struct dtach_pkt));
 
 	/* Wait for things to happen */

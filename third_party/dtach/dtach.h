@@ -83,15 +83,7 @@
 #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 #endif
 
-extern int detach_char, no_suspend, redraw_method;
-
-enum
-{
-	REDRAW_UNSPEC	= 0,
-	REDRAW_NONE	= 1,
-	REDRAW_CTRL_L	= 2,
-	REDRAW_WINCH	= 3,
-};
+extern int detach_char, no_suspend;
 
 /*
 ** The master sends a simple stream of text to the attaching clients, without

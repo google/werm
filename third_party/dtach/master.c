@@ -450,7 +450,8 @@ masterprocess(int s, int statusfd)
 			if (clients && clients->attached)
 				waitattach = 0;
 		}
-		else
+
+		if (!waitattach)
 		{
 			FD_SET(the_pty.fd, &readfds);
 			if (the_pty.fd > highest_fd)

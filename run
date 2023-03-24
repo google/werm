@@ -7,7 +7,7 @@ passenv=/tmp/werm_passenv.$$
 
 cat >| $passenv << EOF
 WERMDIR,DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR,LANG
-LANGUAGE
+LANGUAGE,USER
 EOF
 
 env | sed '

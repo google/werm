@@ -525,10 +525,9 @@ void process_kbd(int sock)
 	fullwrite(sock, "window size pkt", &winsz, sizeof(winsz));
 }
 
-static void teetty4test(const char *s, int len)
+static void teetty0term(const char *s)
 {
-	if (-1 == len) len = strlen(s);
-	teettycontent((const unsigned char *)s, len);
+	teettycontent((const unsigned char *)s, strlen(s));
 }
 
 static void testreset(void)
@@ -599,88 +598,87 @@ static void test_main(void)
 
 	puts("TEE_TTY_CONTENT");
 	loghndl = stdout;
-	teetty4test("hello", -1);
+	teetty0term("hello");
 	puts("pending line");
-	teetty4test("\r\n", -1);
+	teetty0term("\r\n");
 	puts("finished line");
 
 	do {
 		int i = 0;
-		while (i++ < sizeof(linebuf)) teetty4test("x", 1);
-		teetty4test("[exceeded]", -1);
-		teetty4test("\r\n", -1);
+		while (i++ < sizeof(linebuf)) teetty0term("x");
+		teetty0term("[exceeded]");
+		teetty0term("\r\n");
 	} while (0);
 
-	teetty4test(
-		"abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
-	teetty4test("abcdef\b\r\n", -1);
+	teetty0term("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n");
+	teetty0term("abcdef\b\r\n");
 
 	puts("move back x2 and delete to eol");
-	teetty4test("abcdef\b\b\033[K\r\n", -1);
+	teetty0term("abcdef\b\b\033[K\r\n");
 
 	puts("move back x1 and insert");
-	teetty4test("asdf\bxy\r\n", -1);
+	teetty0term("asdf\bxy\r\n");
 
 	puts("move back and forward");
-	teetty4test("asdf\b\033[C\r\n", -1);
+	teetty0term("asdf\b\033[C\r\n");
 
 	puts("move back x2 and forward x1, then del to EOL");
-	teetty4test("asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
+	teetty0term("asdf\b\b" "\033[C" "\033[K" "\r\n");
 
 	puts("as above, but in separate calls");
-	teetty4test("asdf\b\b", -1);
-	teetty4test("\033[C", -1);
-	teetty4test("\033[K", -1);
-	teetty4test("\r\n", -1);
+	teetty0term("asdf\b\b");
+	teetty0term("\033[C");
+	teetty0term("\033[K");
+	teetty0term("\r\n");
 
 	puts("move left x3, move right x2, del EOL; 'right' seq in sep calls");
-	teetty4test("123 UIO\b\b\b" "\033[", -1);
-	teetty4test("C" "\033", -1);
-	teetty4test("[C", -1);
-	teetty4test("\033[K", -1);
-	teetty4test("\r\n", -1);
+	teetty0term("123 UIO\b\b\b" "\033[");
+	teetty0term("C" "\033");
+	teetty0term("[C");
+	teetty0term("\033[K");
+	teetty0term("\r\n");
 
 	puts("drop console title escape seq");
 	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
-	teetty4test("abc\033]0;title\007xyz\r\n", -1);
-	teetty4test("abc\033]1;title\007xyz\r\n", -1);
-	teetty4test("123\033]2;title\007" "456\r\n", -1);
+	teetty0term("abc\033]0;title\007xyz\r\n");
+	teetty0term("abc\033]1;title\007xyz\r\n");
+	teetty0term("123\033]2;title\007" "456\r\n");
 
 	puts("drop console title escape seq; separate calls");
-	teetty4test("abc\033]0;ti", -1);
-	teetty4test("tle\007xyz\r\n", -1);
+	teetty0term("abc\033]0;ti");
+	teetty0term("tle\007xyz\r\n");
 
 	puts("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
 
 	/* \r after paste mode off */
-	teetty4test("before (", -1);
-	teetty4test("\033[?2004l\rhello\033[?2004h", -1);
-	teetty4test(") after\r\n", -1);
+	teetty0term("before (");
+	teetty0term("\033[?2004l\rhello\033[?2004h");
+	teetty0term(") after\r\n");
 
 	/* no \r after paste mode off */
-	teetty4test("before (", -1);
-	teetty4test("\033[?2004lhello\033[?2004h", -1);
-	teetty4test(") after\r\n", -1);
+	teetty0term("before (");
+	teetty0term("\033[?2004lhello\033[?2004h");
+	teetty0term(") after\r\n");
 
 	puts("drop color and font");
-	teetty4test("before : ", -1);
-	teetty4test("\033[1;35mafter\r\n", -1);
+	teetty0term("before : ");
+	teetty0term("\033[1;35mafter\r\n");
 
 	/* split between calls */
-	teetty4test("before : ", -1);
-	teetty4test("\033[1;", -1);
-	teetty4test("35mafter\r\n", -1);
+	teetty0term("before : ");
+	teetty0term("\033[1;");
+	teetty0term("35mafter\r\n");
 
-	teetty4test("before : \033[36mAfter\r\n", -1);
+	teetty0term("before : \033[36mAfter\r\n");
 
-	teetty4test("first ;; \033[1;31msecond\r\n", -1);
+	teetty0term("first ;; \033[1;31msecond\r\n");
 
 	puts("\\r to move to start of line");
-	teetty4test("xyz123\rXYZ\r\n", -1);
+	teetty0term("xyz123\rXYZ\r\n");
 
 	puts("something makes the logs stop");
-	teetty4test(
+	teetty0term(
 		"\033[?2004h[0]~$ l\b"
 		"\033[Kseq 1 | less\r"
 		"\n\033[?2004l\r\033[?104"
@@ -691,10 +689,10 @@ static void test_main(void)
 		";0t\033[?2004h[0]~$"
 		" # asdf\r\n\033[?2004"
 		"l\r\033[?2004h[0]~$ "
-	, -1);
+	);
 
 	puts("\\r then delete line");
-	teetty4test("abc\r\033[Kfoo\r\n", -1);
+	teetty0term("abc\r\033[Kfoo\r\n");
 }
 
 void set_argv0(const char *role)

@@ -8761,24 +8761,11 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // The keyboard state.
   this.keyboard = {
     /**
-     * Enable/disable application keypad.
-     *
-     * This changes the way numeric keys are sent from the keyboard.
-     */
-    applicationKeypad: false,
-
-    /**
      * Enable/disable the application cursor mode.
      *
      * This changes the way cursor keys are sent from the keyboard.
      */
     applicationCursor: false,
-
-    /**
-     * If true, the backspace should send BS ('\x08', aka ^H).  Otherwise
-     * the backspace key should send '\x7f'.
-     */
-    backspaceSendsBackspace: false,
   };
 
   // General IO interface that can be given to third parties without exposing
@@ -14054,10 +14041,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       this.terminal.setReverseWraparound(state);
       break;
 
-    case 67:  // Backarrow key sends backspace (DECBKM)
-      this.terminal.keyboard.backspaceSendsBackspace = state;
-      break;
-
     case 1000:  // Report on mouse clicks only (X11).
       this.mouseReport = (
           state ? this.MOUSE_REPORT_CLICK : this.MOUSE_REPORT_DISABLED);
@@ -14780,26 +14763,6 @@ hterm.VT.ESC['8'] = function() {
  * VT210 and up.  Not currently implemented.
  */
 hterm.VT.ESC['9'] = hterm.VT.ignore;
-
-/**
- * Application keypad (DECKPAM).
- *
- * @this {!hterm.VT}
- */
-hterm.VT.ESC['='] = function() {
-  console.log('application keypad was turned on');
-  this.terminal.keyboard.applicationKeypad = true;
-};
-
-/**
- * Normal keypad (DECKPNM).
- *
- * @this {!hterm.VT}
- */
-hterm.VT.ESC['>'] = function() {
-  console.log('application keypad was turned on');
-  this.terminal.keyboard.applicationKeypad = false;
-};
 
 /**
  * Cursor to lower left corner of screen.

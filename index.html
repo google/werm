@@ -379,10 +379,6 @@ function term_init()
 		var kind = t.keyboard.applicationCursor ? 'O' : '[';
 		signal(p + '\x1b' + kind + c);
 	}
-	function bs_sends()
-	{
-		return t.keyboard.backspaceSendsBackspace ? '\x08' : '\x7f';
-	}
 
 	t = new hterm.Terminal();
 	params = new URLSearchParams(window.location.search);
@@ -503,7 +499,7 @@ function term_init()
 			case 'pu': signal(pref + '\x1b[5~');	return true;
 			case 'pd': signal(pref + '\x1b[6~');	return true;
 			case 'en': signal(pref + '\r');		return true;
-			case 'bs': signal(pref + bs_sends());	return true;
+			case 'bs': signal(pref + '\177');	return true;
 			case 'es': signal(pref + '\x1b');	return true;
 			case 'me': signal(pref + '_');		return true;
 			case 'ta': signal(pref + '\t');		return true;
@@ -627,7 +623,7 @@ function term_init()
 		var boxi, box;
 
 		switch (code) {
-		case 'bs': repeater = [0, bs_sends()];	break;
+		case 'bs': repeater = [0, '\177'];	break;
 		case 'vs': repeater = [0, '\x1b[3~'];	break;
 		case 'en': repeater = [0, '\r'];	break;
 		case '- ': repeater = [0, '-'];		break;

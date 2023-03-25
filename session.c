@@ -19,14 +19,34 @@ static char *pream, *argv0, *termid;
 static size_t argv0sz;
 
 #define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
-static unsigned char linebuf[1024], escbuf[1024];
 
 static FILE *loghndl;
 static int rawlogfd;
 
-static unsigned linesz, linepos, escsz;
+/* Name is based on Write To Subproc but this contains process_kbd state too.
+ * We put this in a single struct so all logic state can be reset with a single
+ * memset call. */
+static struct {
+	/* Input/output buffer for write_to_subproc */
+	unsigned bufsz;
+	unsigned char buf[512];
 
-static char teest;
+	unsigned sendsigwin : 1, swrow : 16, swcol : 16;
+	unsigned wsi;
+	char winsize[8];
+
+	/* 0: reading raw characters
+	 * '1': next char is escaped
+	 * 'w': reading window size
+	 */
+	char escp;
+
+	/* Buffers for content about to be written to logs */
+	unsigned char linebuf[1024], escbuf[1024];
+	unsigned linesz, linepos, escsz;
+
+	char teest;
+} wts;
 
 static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 {
@@ -52,8 +72,8 @@ static void teettyline(void)
 	unsigned li;
 	int c;
 
-	for (li = 0; li < linesz; li++) {
-		c = *SAFEPTR(linebuf, li, 1);
+	for (li = 0; li < wts.linesz; li++) {
+		c = *SAFEPTR(wts.linebuf, li, 1);
 		if (c == '\t' || c >= ' ')
 			fputc(c, loghndl);
 		else
@@ -63,16 +83,17 @@ static void teettyline(void)
 	fputc('\n', loghndl);
 	fflush(loghndl);
 
-	linesz = 0;
-	linepos = 0;
+	wts.linesz = 0;
+	wts.linepos = 0;
 }
 
 static _Bool consumeesc(const char *pref, size_t preflen)
 {
-	if (preflen > sizeof(escbuf)) errx(1, "preflen too long: %zu", preflen);
-	if (escsz != preflen) return 0;
-	if (memcmp(pref, escbuf, preflen)) return 0;
-	escsz = 0;
+	if (preflen > sizeof(wts.escbuf))
+		errx(1, "preflen too long: %zu", preflen);
+	if (wts.escsz != preflen) return 0;
+	if (memcmp(pref, wts.escbuf, preflen)) return 0;
+	wts.escsz = 0;
 	return 1;
 }
 
@@ -84,34 +105,34 @@ static void teettycontent(const unsigned char *buf, size_t len)
 	if (!loghndl) return;
 
 	while (len) {
-switch (teest) {
+switch (wts.teest) {
 case 0:
 		if (buf[0] == '\r') {
-			escsz = 0;
-			linepos = 0;
+			wts.escsz = 0;
+			wts.linepos = 0;
 			goto eol;
 		}
 
 		if (buf[0] == '\b') {
 			/* move left */
-			linepos--;
+			wts.linepos--;
 			goto eol;
 		}
 
 		if (CONSUMEESC("\033[")) {
 			if (*buf == 0x4b) {
 				/* delete to EOL */
-				linesz = linepos;
+				wts.linesz = wts.linepos;
 				goto eol;
 			}
 
 			if (*buf == 0x43) {
 				/* move right */
-				linepos++;
+				wts.linepos++;
 				goto eol;
 			}
 
-			teest = 'c';
+			wts.teest = 'c';
 case 'c':
 			while (1) {
 				if (!len) return;
@@ -119,36 +140,37 @@ case 'c':
 				buf++;
 				len--;
 			}
-			teest = 0;
+			wts.teest = 0;
 			goto eol;
 		}
 
 		if (CONSUMEESC("\033]")) {
-			teest = 't';
+			wts.teest = 't';
 case 't':
 			while (*buf != 0x07 && len) {
 				buf++;
 				len--;
 			}
 			if (!len) return;
-			teest = 0;
+			wts.teest = 0;
 			goto eol;
 		}
 
-		if (*buf == '\n' || linesz == sizeof(linebuf)) {
+		if (*buf == '\n' || wts.linesz == sizeof(wts.linebuf)) {
 			teettyline();
 			goto eol;
 		}
-		if (buf[0] == '\033' || escsz) {
-			if (buf[0] == '\033') escsz = 0;
-			*SAFEPTR(escbuf, escsz, 1) = *buf;
-			escsz++;
+		if (buf[0] == '\033' || wts.escsz) {
+			if (buf[0] == '\033') wts.escsz = 0;
+			*SAFEPTR(wts.escbuf, wts.escsz, 1) = *buf;
+			wts.escsz++;
 		}
 		else {
-			*SAFEPTR(linebuf, linepos, 1) = *buf;
-			if (linesz < ++linepos) linesz = linepos;
+			*SAFEPTR(wts.linebuf, wts.linepos, 1) = *buf;
+			if (wts.linesz < ++wts.linepos)
+				wts.linesz = wts.linepos;
 		}
-		if (linesz == sizeof(linebuf)) teettyline();
+		if (wts.linesz == sizeof(wts.linebuf)) teettyline();
 }
 	eol:
 		len--;
@@ -397,21 +419,6 @@ void process_tty_out(
 	rout->len = theroutlen;
 }
 
-static struct {
-	unsigned bufsz;
-	unsigned char buf[512];
-
-	unsigned sendsigwin : 1, swrow : 16, swcol : 16;
-	unsigned wsi;
-	char winsize[8];
-
-	/* 0: reading raw characters
-	 * '1': next char is escaped
-	 * 'w': reading window size
-	 */
-	char escp;
-} wts;
-
 static void dumpw2sp(void)
 {
 	unsigned char *curs = wts.buf;
@@ -598,6 +605,8 @@ static void test_main(void)
 
 	puts("TEE_TTY_CONTENT");
 	loghndl = stdout;
+
+	testreset();
 	teetty0term("hello");
 	puts("pending line");
 	teetty0term("\r\n");
@@ -605,7 +614,7 @@ static void test_main(void)
 
 	do {
 		int i = 0;
-		while (i++ < sizeof(linebuf)) teetty0term("x");
+		while (i++ < sizeof(wts.linebuf)) teetty0term("x");
 		teetty0term("[exceeded]");
 		teetty0term("\r\n");
 	} while (0);

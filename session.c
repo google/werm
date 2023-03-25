@@ -396,7 +396,7 @@ void process_tty_out(
 	rout->len = theroutlen;
 }
 
-struct write_subproc_st {
+static struct {
 	unsigned bufsz;
 	unsigned char buf[512];
 
@@ -404,17 +404,17 @@ struct write_subproc_st {
 	unsigned wsi;
 	char winsize[8];
 
-	/* '0': reading raw characters
+	/* 0: reading raw characters
 	 * '1': next char is escaped
 	 * 'w': reading window size
 	 */
-	char esc;
-};
+	char escp;
+} wts;
 
-static void dump_wts_st(struct write_subproc_st *st)
+static void dumpw2sp(void)
 {
-	unsigned char *curs = st->buf;
-	while (st->bufsz--) {
+	unsigned char *curs = wts.buf;
+	while (wts.bufsz--) {
 		if (*curs >= ' ' && *curs != '\\') putchar(*curs);
 		else printf("\\%03o", *curs);
 
@@ -422,73 +422,73 @@ static void dump_wts_st(struct write_subproc_st *st)
 	}
 
 	puts("\\<eobuff>");
-	if (st->sendsigwin) printf("sigwin r=%d c=%d\n", st->swrow, st->swcol);
+	if (wts.sendsigwin) printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
 }
 
-static void write_to_subproc_core(struct write_subproc_st *st)
+static void writetosubproccore(void)
 {
 	unsigned char byte;
 	unsigned wi, ri, row, col;
 
-	st->sendsigwin = 0;
+	wts.sendsigwin = 0;
 
 	wi = 0;
-	for (ri = 0; ri < st->bufsz; ri++) {
-		byte = st->buf[ri];
+	for (ri = 0; ri < wts.bufsz; ri++) {
+		byte = wts.buf[ri];
 
 		if (byte == '\n') continue;
 
-		switch (st->esc) {
-		case '0':
+		switch (wts.escp) {
+		case 0:
 			if (byte == '\\')
-				st->esc = '1';
+				wts.escp = '1';
 			else
-				st->buf[wi++] = byte;
+				wts.buf[wi++] = byte;
 			break;
 
 		case '1':
 			switch (byte) {
 			case 'n':
-				st->buf[wi++] = '\n';
-				st->esc = '0';
+				wts.buf[wi++] = '\n';
+				wts.escp = 0;
 				break;
 
 			case '\\':
-				st->buf[wi++] = '\\';
-				st->esc = '0';
+				wts.buf[wi++] = '\\';
+				wts.escp = 0;
 				break;
 
 			case 'w':
-				st->wsi = 0;
-				st->esc = 'w';
+				wts.wsi = 0;
+				wts.escp = 'w';
 				break;
 
 			default:
-				st->esc = '0';
+				wts.escp = 0;
 				warnx("unknown escape: %d\n", byte);
 			}
 			break;
 
 		case 'w':
-			st->winsize[st->wsi++] = byte;
-			if (st->wsi != sizeof(st->winsize)) break;
+			wts.winsize[wts.wsi++] = byte;
+			if (wts.wsi != sizeof(wts.winsize)) break;
 
-			if (2 != sscanf(st->winsize, "%4u%4u", &row, &col))
+			if (2 != sscanf(wts.winsize, "%4u%4u", &row, &col))
 				warn("invalid winsize");
 			else {
-				st->swrow = row;
-				st->swcol = col;
-				st->sendsigwin = 1;
+				wts.swrow = row;
+				wts.swcol = col;
+				wts.sendsigwin = 1;
 			}
-			st->esc = '0';
+			wts.escp = 0;
 
 			break;
 
-		default: errx(1, "unknown escape: %d", st->esc);
+		default: errx(1, "unknown escape: %d", wts.escp);
 		}
 	}
 
-	st->bufsz = wi;
+	wts.bufsz = wi;
 }
 
 static void push(int sock, unsigned char *buf, unsigned len)
@@ -507,23 +507,20 @@ static void push(int sock, unsigned char *buf, unsigned len)
 void process_kbd(int sock)
 {
 	ssize_t red;
-	static struct write_subproc_st st = {
-		.esc = '0',
-	};
 	struct dtach_pkt winsz = {.type = MSG_WINCH};
 
-	red = read(0, st.buf, sizeof(512));
+	red = read(0, wts.buf, sizeof(wts.buf));
 	if (!red) errx(1, "nothing on stdin");
 	if (red == -1) err(1, "read from stdin");
 
-	st.bufsz = red;
-	write_to_subproc_core(&st);
-	push(sock, st.buf, st.bufsz);
+	wts.bufsz = red;
+	writetosubproccore();
+	push(sock, wts.buf, wts.bufsz);
 
-	if (!st.sendsigwin) return;
+	if (!wts.sendsigwin) return;
 
-	winsz.u.ws.ws_row = st.swrow;
-	winsz.u.ws.ws_col = st.swcol;
+	winsz.u.ws.ws_row = wts.swrow;
+	winsz.u.ws.ws_col = wts.swcol;
 	fullwrite(sock, "window size pkt", &winsz, sizeof(winsz));
 }
 
@@ -533,69 +530,71 @@ static void teetty4test(const char *s, int len)
 	teettycontent((const unsigned char *)s, len);
 }
 
+static void testreset(void)
+{
+	memset(&wts, 0, sizeof(wts));
+}
+
 static void test_main(void)
 {
-	struct write_subproc_st wts;
-
 	puts("WRITE_TO_SUBPROC_CORE");
 
 	puts("should ignore newline:");
-	wts.esc = '0';
+	testreset();
 	strcpy((char *)wts.buf, "hello\n how are you\n");
 	wts.bufsz = strlen("hello\n how are you\n");
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	puts("empty string:");
-	wts.esc = '0';
-	wts.bufsz = 0;
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	testreset();
+	writetosubproccore();
+	dumpw2sp();
 
 	puts("missing newline:");
-	wts.esc = '0';
+	testreset();
 	strcpy((char *)wts.buf, "asdf");
 	wts.bufsz = strlen("asdf");
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	puts("sending sigwinch:");
-	wts.esc = '0';
+	testreset();
 	strcpy((char *)wts.buf, "about to resize...\\w00910042...all done");
 	wts.bufsz = strlen((char *)wts.buf);
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	puts("escape seqs:");
-	wts.esc = '0';
+	testreset();
 	strcpy((char *)wts.buf,
 	       "line one\\nline two\\nline 3 \\\\ (reverse solidus)\\n\n");
 	wts.bufsz = strlen((char *)wts.buf);
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	puts("escape seqs straddling:");
-	wts.esc = '0';
+	testreset();
 
 	strcpy((char *)wts.buf, "line one\\nline two\\");
 	wts.bufsz = strlen((char *)wts.buf);
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	strcpy((char *)wts.buf, "nline 3 \\");
 	wts.bufsz = strlen((char *)wts.buf);
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	strcpy((char *)wts.buf, "\\ (reverse solidus)\\n\\w012");
 	wts.bufsz = strlen((char *)wts.buf);
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	strcpy((char *)wts.buf, "00140");
 	wts.bufsz = strlen((char *)wts.buf);
-	write_to_subproc_core(&wts);
-	dump_wts_st(&wts);
+	writetosubproccore();
+	dumpw2sp();
 
 	puts("TEE_TTY_CONTENT");
 	loghndl = stdout;

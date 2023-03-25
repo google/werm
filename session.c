@@ -474,7 +474,7 @@ static void writetosubproccore(void)
 			if (wts.wsi != sizeof(wts.winsize)) break;
 
 			if (2 != sscanf(wts.winsize, "%4u%4u", &row, &col))
-				warn("invalid winsize");
+				warn("invalid winsize: %.8s", wts.winsize);
 			else {
 				wts.swrow = row;
 				wts.swcol = col;

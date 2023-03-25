@@ -69,8 +69,9 @@ static void teettyline(void)
 
 static _Bool consumeesc(const char *pref, size_t preflen)
 {
+	if (preflen > sizeof(escbuf)) errx(1, "preflen too long: %zu", preflen);
 	if (escsz != preflen) return 0;
-	if (memcmp(pref, SAFEPTR(escbuf, 0, preflen), preflen)) return 0;
+	if (memcmp(pref, escbuf, preflen)) return 0;
 	escsz = 0;
 	return 1;
 }

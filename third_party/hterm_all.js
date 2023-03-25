@@ -8723,8 +8723,6 @@ hterm.Terminal = function({profileId, storage} = {}) {
 
   this.screenBorderSize_ = 0;
 
-  this.scrollWheelArrowKeys_ = true;
-
   // True if we should override mouse event reporting to allow local selection.
   this.defeatMouseReports_ = false;
 
@@ -11999,36 +11997,33 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
     }
 
     // Emulate arrow key presses via scroll wheel events.
-    if (this.scrollWheelArrowKeys_ && !e.shiftKey &&
-        this.keyboard.applicationCursor && !this.isPrimaryScreen()) {
-      if (e.type == 'wheel') {
-        const delta =
-            this.scrollPort_.scrollWheelDelta(/** @type {!WheelEvent} */ (e));
+    if (e.type == 'wheel') {
+      const delta =
+          this.scrollPort_.scrollWheelDelta(/** @type {!WheelEvent} */ (e));
 
-        // Helper to turn a wheel event delta into a series of key presses.
-        const deltaToArrows = (distance, charSize, arrowPos, arrowNeg) => {
-          if (distance == 0) {
-            return '';
-          }
+      // Helper to turn a wheel event delta into a series of key presses.
+      const deltaToArrows = (distance, charSize, arrowPos, arrowNeg) => {
+        if (distance == 0) {
+          return '';
+        }
 
-          // Convert the scroll distance into a number of rows/cols.
-          const cells = lib.f.smartFloorDivide(Math.abs(distance), charSize);
-          const data = '\x1bO' + (distance < 0 ? arrowNeg : arrowPos);
-          return data.repeat(cells);
-        };
+        // Convert the scroll distance into a number of rows/cols.
+        const cells = lib.f.smartFloorDivide(Math.abs(distance), charSize);
+        const data = '\x1bO' + (distance < 0 ? arrowNeg : arrowPos);
+        return data.repeat(cells);
+      };
 
-        // The order between up/down and left/right doesn't really matter.
-        this.io.sendString(
-            // Up/down arrow keys.
-            deltaToArrows(delta.y, this.scrollPort_.characterSize.height,
-                          'A', 'B') +
-            // Left/right arrow keys.
-            deltaToArrows(delta.x, this.scrollPort_.characterSize.width,
-                          'C', 'D'),
-        );
+      // The order between up/down and left/right doesn't really matter.
+      this.io.sendString(
+          // Up/down arrow keys.
+          deltaToArrows(delta.y, this.scrollPort_.characterSize.height,
+                        'A', 'B') +
+          // Left/right arrow keys.
+          deltaToArrows(delta.x, this.scrollPort_.characterSize.width,
+                        'C', 'D'),
+      );
 
-        e.preventDefault();
-      }
+      e.preventDefault();
     }
   } else /* if (this.reportMouseEvents) */ {
     if (!this.scrollBlockerNode_.engaged) {
@@ -13990,6 +13985,7 @@ hterm.VT.prototype.setANSIMode = function(code, state) {
 hterm.VT.prototype.setDECMode = function(code, state) {
   switch (parseInt(code, 10)) {
     case 1:  // DECCKM
+      console.log('app cursor state: ', state);
       this.terminal.keyboard.applicationCursor = state;
       break;
 
@@ -14065,10 +14061,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
     case 1006:  // Extended coordinates in SGR mode.
       this.mouseCoordinates = (
           state ? this.MOUSE_COORDINATES_SGR : this.MOUSE_COORDINATES_X10);
-      break;
-
-    case 1007:  // Enable Alternate Scroll Mode.
-      this.terminal.scrollWheelArrowKeys_ = state;
       break;
 
     case 1010:  // Scroll to bottom on tty output

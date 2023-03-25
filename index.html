@@ -139,6 +139,20 @@ var native_to_mn = {
 	'IntlYen':		'j7',
 };
  
+function sanit(s)
+{
+	var e = [], c, ci;
+
+	for (ci = 0; ci < s.length; ci++) {
+		c = s.charAt(ci);
+		if (c === '\\') e.push('\\\\');
+		else if (c === '\n') e.push('\\n');
+		else e.push(c);
+	}
+
+	return e.join('');
+}
+
 function cookev(e)
 {
 	var mn, ce;
@@ -236,7 +250,7 @@ function term_init()
 		ignore_disp = '';
 
 		if (log_display) {
-			console.log('display: ' + JSON.stringify(s));
+			console.log('display:', encodeURI(s));
 			if (log_display > 1) console.trace();
 		}
 
@@ -347,7 +361,7 @@ function term_init()
 	function signal(s)
 	{
 		if (log_send) {
-			console.log('request send: ' + JSON.stringify(s));
+			console.log('request send:', encodeURI(s));
 			if (log_send > 1) console.trace();
 		}
 
@@ -384,19 +398,6 @@ function term_init()
 	};
 	t.setWindowTitle(cached_title);
 
-	function escape(s)
-	{
-		var e = [], c, ci;
-
-		for (ci = 0; ci < s.length; ci++) {
-			c = s.charAt(ci);
-			if (c === '\\') e.push('\\\\');
-			else if (c === '\n') e.push('\\n');
-			else e.push(c);
-		}
-
-		return e.join('');
-	}
 
 	function open_child_term()
 	{
@@ -421,7 +422,7 @@ function term_init()
 	{
 		var io = t.io.push();
 
-		io.sendString = function(s) { signal(escape(s)); };
+		io.sendString = function(s) { signal(sanit(s)); };
 		io.onTerminalResize = function(c, r) {
 			signal('\\w' + (10000 + r + '').substr(1)
 				     + (10000 + c + '').substr(1));
@@ -516,11 +517,11 @@ function term_init()
 			if (ch >= 0x61) ch -= 0x20;
 			ch -= 0x40;
 
-			signal(escape(pref + String.fromCharCode(ch)));
+			signal(sanit(pref + String.fromCharCode(ch)));
 			return true;
 		}
 
-		signal(escape(pref + e.key));
+		signal(sanit(pref + e.key));
 		return true;
 	}
 
@@ -833,7 +834,7 @@ function term_init()
 			case 'm':
 				mch = mac[1];
 				if (typeof mch === 'string')
-					signal(escape(mch));
+					signal(sanit(mch));
 				else if (typeof mch === 'function')
 					mch();
 				else {

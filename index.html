@@ -178,7 +178,7 @@ function cookev(e)
 }
 
 var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
-	log_mn = 0;
+	log_mn, log_print;
 
 function term_init()
 {
@@ -214,6 +214,7 @@ function term_init()
 
 	function print(str)
 	{
+		if (log_print) console.log('print:', encodeURI(str));
 		t.io.print(str);
 
 		if (keep_row_ttl) return;

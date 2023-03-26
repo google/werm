@@ -42,6 +42,8 @@ static struct {
 	unsigned linesz, linepos, escsz;
 
 	char teest;
+
+	unsigned appcursor : 1;
 } wts;
 
 static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
@@ -93,10 +95,15 @@ static _Bool consumeesc(const char *pref, size_t preflen)
 	return 1;
 }
 
+/* app cursor on: \x1b[?1h
+ * app cursor off: \x1b[?1l
+ */
 #define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
 static void teettycontent(const unsigned char *buf, size_t len)
 {
+	char lastescbyt;
+
 	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
 	if (!loghndl) return;
 
@@ -115,29 +122,29 @@ case 0:
 			goto eol;
 		}
 
-		if (CONSUMEESC("\033[")) {
-			if (*buf == 0x4b) {
-				/* delete to EOL */
-				wts.linesz = wts.linepos;
-				goto eol;
-			}
+		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[")) {
+			switch (*buf) {
+			/* delete to EOL */
+			case 'K': wts.linesz = wts.linepos; break;
 
-			if (*buf == 0x43) {
-				/* move right */
-				wts.linepos++;
-				goto eol;
+			/* move right */
+			case 'C': wts.linepos++; break;
 			}
-
-			wts.teest = 'c';
-case 'c':
-			while (1) {
-				if (!len) return;
-				if (*buf >= 'a' && *buf <= 'z') break;
-				buf++;
-				len--;
-			}
-			wts.teest = 0;
 			goto eol;
+		}
+		if (*buf >= 'a' && *buf <= 'z') {
+			if (CONSUMEESC("\033[?1")) {
+				switch (*buf) {
+				case 'h': wts.appcursor = 1; break;
+				case 'l': wts.appcursor = 0; break;
+				}
+				goto eol;
+			}
+
+			if (wts.escsz > 1 && wts.escbuf[1] == '[') {
+				wts.escsz = 0;
+				goto eol;
+			}
 		}
 
 		if (CONSUMEESC("\033]")) {
@@ -446,8 +453,8 @@ static void addkeybyte(int outfd, int c)
 
 static void writetosubproccore(int outfd, const unsigned char *buf, unsigned bufsz)
 {
-	unsigned char byte;
 	unsigned wi, ri, row, col;
+	unsigned char byte, cursmvbyte;
 
 	if (kbufsz != 0) errx(1, "expected kbuf to be empty, has %u bytes", kbufsz);
 	wts.sendsigwin = 0;
@@ -467,6 +474,8 @@ static void writetosubproccore(int outfd, const unsigned char *buf, unsigned buf
 			break;
 
 		case '1':
+			cursmvbyte = 0;
+
 			switch (byte) {
 			case 'n':
 				addkeybyte(outfd, '\n');
@@ -483,10 +492,25 @@ static void writetosubproccore(int outfd, const unsigned char *buf, unsigned buf
 				wts.escp = 'w';
 				break;
 
+			/* directions, home, end */
+			case '^':	cursmvbyte = 'A'; break;
+			case 'v':	cursmvbyte = 'B'; break;
+			case '>':	cursmvbyte = 'C'; break;
+			case '<':	cursmvbyte = 'D'; break;
+			case 'e':	cursmvbyte = 'F'; break;
+			case 'h':	cursmvbyte = 'H'; break;
+
 			default:
 				wts.escp = 0;
 				warnx("unknown escape: %d\n", byte);
 			}
+
+			if (!cursmvbyte) break;
+			addkeybyte(outfd, 033);
+			/* application cursor mode does O rather than [ */
+			addkeybyte(outfd, wts.appcursor ? 'O' : '[');
+			addkeybyte(outfd, cursmvbyte);
+			wts.escp = 0;
 			break;
 
 		case 'w':
@@ -691,6 +715,21 @@ static void test_main(void)
 
 	puts("\\r then delete line");
 	teetty0term("abc\r\033[Kfoo\r\n");
+
+	puts("arrow keys are translated to escape sequences");
+	testreset();
+
+	puts("app cursor off: up,down,right,left=ESC [ A,B,C,D");
+	writetosp0term("left (\\< \\<)\r");
+	writetosp0term("up down up (\\^ \\v \\^)\r");
+	writetosp0term("right (\\>)\r");
+
+	puts("app cursor on: same codes as when off but O instead of [");
+	teetty0term("\033[?1h");
+	writetosp0term("left (\\< \\<)\r");
+	writetosp0term("up down up (\\^ \\v \\^)\r");
+	writetosp0term("right (\\>)\r");
+
 }
 
 void set_argv0(const char *role)

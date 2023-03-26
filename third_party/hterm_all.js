@@ -8756,16 +8756,6 @@ hterm.Terminal = function({profileId, storage} = {}) {
 
   this.saveCursorAndState(true);
 
-  // The keyboard state.
-  this.keyboard = {
-    /**
-     * Enable/disable the application cursor mode.
-     *
-     * This changes the way cursor keys are sent from the keyboard.
-     */
-    applicationCursor: false,
-  };
-
   // General IO interface that can be given to third parties without exposing
   // the entire terminal object.
   this.io = new hterm.Terminal.IO(this);
@@ -13984,11 +13974,6 @@ hterm.VT.prototype.setANSIMode = function(code, state) {
  */
 hterm.VT.prototype.setDECMode = function(code, state) {
   switch (parseInt(code, 10)) {
-    case 1:  // DECCKM
-      console.log('app cursor state: ', state);
-      this.terminal.keyboard.applicationCursor = state;
-      break;
-
     case 3:  // DECCOLM
       if (this.allowColumnWidthChanges_) {
         this.terminal.setWidth(state ? 132 : 80);

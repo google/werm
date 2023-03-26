@@ -70,3 +70,22 @@ something makes the logs stop
 [0]~$ # asdf
 \r then delete line
 foo
+arrow keys are translated to escape sequences
+app cursor off: up,down,right,left=ESC [ A,B,C,D
+kbd[left (\033[]
+kbd[D \033[D)\015]
+kbd[up down ]
+kbd[up (\033[A ]
+kbd[\033[B \033[A)]
+kbd[\015]
+kbd[right (\033]
+kbd[[C)\015]
+app cursor on: same codes as when off but O instead of [
+kbd[left (\033O]
+kbd[D \033OD)\015]
+kbd[up down ]
+kbd[up (\033OA ]
+kbd[\033OB \033OA)]
+kbd[\015]
+kbd[right (\033]
+kbd[OC)\015]

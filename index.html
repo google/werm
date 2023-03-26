@@ -375,11 +375,6 @@ function term_init()
 		pend_send += s;
 		if (sock.readyState > WebSocket.OPEN) prepare_sock();
 	}
-	function sigapp(p, c)
-	{
-		var kind = t.keyboard.applicationCursor ? 'O' : '[';
-		signal(p + '\x1b' + kind + c);
-	}
 
 	t = new hterm.Terminal();
 	params = new URLSearchParams(window.location.search);
@@ -489,12 +484,12 @@ function term_init()
 			}
 
 			switch (e.mn) {
-			case 'up': sigapp(pref, 'A');		return true;
-			case 'do': sigapp(pref, 'B');		return true;
-			case 'ri': sigapp(pref, 'C');		return true;
-			case 'le': sigapp(pref, 'D');		return true;
-			case 'nd': sigapp(pref, 'F');		return true;
-			case 'ho': sigapp(pref, 'H');		return true;
+			case 'up': signal(pref + '\\^');	return true;
+			case 'do': signal(pref + '\\v');	return true;
+			case 'ri': signal(pref + '\\>');	return true;
+			case 'le': signal(pref + '\\<');	return true;
+			case 'nd': signal(pref + '\\e');	return true;
+			case 'ho': signal(pref + '\\h');	return true;
 			case 'in': signal(pref + '\x1b[2~');	return true;
 			case 'de': signal(pref + '\x1b[3~');	return true;
 			case 'pu': signal(pref + '\x1b[5~');	return true;
@@ -578,7 +573,7 @@ function term_init()
 	}
 	function set_font_macro() { set_font(font_key); }
 
-	var repeat_cnt, repeater, repeat_boxes = [];
+	var repeat_cnt, repsignal, repeat_boxes = [];
 	const REPEAT_BOX_CNT = 8;
 	function make_repeat_box(layer)
 	{
@@ -624,15 +619,15 @@ function term_init()
 		var boxi, box;
 
 		switch (code) {
-		case 'bs': repeater = [0, '\177'];	break;
-		case 'vs': repeater = [0, '\x1b[3~'];	break;
-		case 'en': repeater = [0, '\r'];	break;
-		case '- ': repeater = [0, '-'];		break;
-		case 'sp': repeater = [0, ' '];		break;
-		case 'ri': repeater = [1, 'C'];		break;
-		case 'le': repeater = [1, 'D'];		break;
-		case 'up': repeater = [1, 'A'];		break;
-		case 'do': repeater = [1, 'B'];		break;
+		case 'bs': repsignal = '\177';		break;
+		case 'vs': repsignal = '\x1b[3~';	break;
+		case 'en': repsignal = '\r';		break;
+		case '- ': repsignal = '-';		break;
+		case 'sp': repsignal = ' ';		break;
+		case 'ri': repsignal = '\\>';		break;
+		case 'le': repsignal = '\\<';		break;
+		case 'up': repsignal = '\\^';		break;
+		case 'do': repsignal = '\\v';		break;
 
 		default:	return 0;
 		}
@@ -673,12 +668,7 @@ function term_init()
 	}
 
 	function repeat_keystroke() {
-		while (repeat_cnt--) {
-			if (!repeater[0])
-				signal(repeater[1]);
-			else
-				sigapp('', repeater[1]);
-		}
+		while (repeat_cnt--) signal(repsignal);
 	}
 
 	var barrier_dig = [], barrier_div;

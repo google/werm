@@ -492,6 +492,10 @@ static void writetosubproccore(int outfd, const unsigned char *buf, unsigned buf
 				wts.escp = 'w';
 				break;
 
+			/* no-op escape used for alerting master that it's OK to read
+			 * from subproc. */
+			case 'N':	wts.escp = 0; break;
+
 			/* directions, home, end */
 			case '^':	cursmvbyte = 'A'; break;
 			case 'v':	cursmvbyte = 'B'; break;
@@ -592,6 +596,14 @@ static void test_main(void)
 	puts("empty string:");
 	testreset();
 	writetosp0term("");
+
+	puts("no-op escape \\N:");
+	testreset();
+	writetosp0term("\\N");
+
+	puts("change window size after \\N:");
+	testreset();
+	writetosp0term("\\N\\w00990011");
 
 	puts("missing newline:");
 	testreset();
@@ -729,7 +741,6 @@ static void test_main(void)
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");
-
 }
 
 void set_argv0(const char *role)

@@ -4,6 +4,9 @@ kbd[hello ho]
 kbd[w are yo]
 kbd[u]
 empty string:
+no-op escape \N:
+change window size after \N:
+sigwin r=99 c=11
 missing newline:
 kbd[asdf]
 sending sigwinch:

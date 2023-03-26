@@ -27,10 +27,6 @@ static int rawlogfd;
  * We put this in a single struct so all logic state can be reset with a single
  * memset call. */
 static struct {
-	/* Input/output buffer for write_to_subproc */
-	unsigned bufsz;
-	unsigned char buf[512];
-
 	unsigned sendsigwin : 1, swrow : 16, swcol : 16;
 	unsigned wsi;
 	char winsize[8];
@@ -419,16 +415,46 @@ void process_tty_out(
 	rout->len = theroutlen;
 }
 
-static void writetosubproccore(void)
+static unsigned kbufsz;
+static unsigned char kbuf[8];
+
+static void finishkbuf(int outfd)
+{
+	unsigned bi;
+
+	if (!kbufsz) return;
+
+	if (outfd != 1)
+		fullwrite(outfd, "keyboard buffer", kbuf, kbufsz);
+	else {
+		fputs("kbd[", stdout);
+		for (bi = 0; bi < kbufsz; bi++) {
+			if (kbuf[bi] >= ' ' && kbuf[bi] != '\\') putchar(kbuf[bi]);
+			else printf("\\%03o", kbuf[bi]);
+		}
+		puts("]");
+	}
+
+	kbufsz = 0;
+}
+
+static void addkeybyte(int outfd, int c)
+{
+	if (kbufsz == sizeof(kbuf)) finishkbuf(outfd);
+	kbuf[kbufsz++] = c;
+}
+
+static void writetosubproccore(int outfd, const unsigned char *buf, unsigned bufsz)
 {
 	unsigned char byte;
 	unsigned wi, ri, row, col;
 
+	if (kbufsz != 0) errx(1, "expected kbuf to be empty, has %u bytes", kbufsz);
 	wts.sendsigwin = 0;
 
 	wi = 0;
-	for (ri = 0; ri < wts.bufsz; ri++) {
-		byte = wts.buf[ri];
+	while (bufsz--) {
+		byte = *buf++;
 
 		if (byte == '\n') continue;
 
@@ -437,18 +463,18 @@ static void writetosubproccore(void)
 			if (byte == '\\')
 				wts.escp = '1';
 			else
-				wts.buf[wi++] = byte;
+				addkeybyte(outfd, byte);
 			break;
 
 		case '1':
 			switch (byte) {
 			case 'n':
-				wts.buf[wi++] = '\n';
+				addkeybyte(outfd, '\n');
 				wts.escp = 0;
 				break;
 
 			case '\\':
-				wts.buf[wi++] = '\\';
+				addkeybyte(outfd, '\\');
 				wts.escp = 0;
 				break;
 
@@ -482,7 +508,7 @@ static void writetosubproccore(void)
 		}
 	}
 
-	wts.bufsz = wi;
+	finishkbuf(outfd);
 }
 
 void forward_stdin(int sock)
@@ -501,10 +527,7 @@ void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz)
 {
 	struct winsize ws = {0};
 
-	memcpy(wts.buf, buf, bufsz);
-	wts.bufsz = bufsz;
-	writetosubproccore();
-	fullwrite(ptyfd, "unescaped kbd data", wts.buf, wts.bufsz);
+	writetosubproccore(ptyfd, buf, bufsz);
 
 	if (!wts.sendsigwin) return;
 
@@ -526,27 +549,11 @@ static void testreset(void)
 static void writetosp0term(const char *s)
 {
 	size_t len;
-	unsigned char *curs;
 
 	len = strlen(s);
-	if (len > sizeof(wts.buf)) errx(1, "string too long: %s", s);
 
-	/* It's OK if not 0-terminated, writetosubproccore doesn't treat the
-	 * string as 0-terminated anyway. */
-	strncpy((char *)wts.buf, s, len);
+	writetosubproccore(1, (const unsigned char *)s, len);
 
-	wts.bufsz = len;
-	writetosubproccore();
-
-	curs = wts.buf;
-	while (wts.bufsz--) {
-		if (*curs >= ' ' && *curs != '\\') putchar(*curs);
-		else printf("\\%03o", *curs);
-
-		curs++;
-	}
-
-	puts("\\<eobuff>");
 	if (wts.sendsigwin) printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
 }
 

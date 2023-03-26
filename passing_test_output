@@ -1,20 +1,32 @@
 WRITE_TO_SUBPROC_CORE
 should ignore newline:
-hello how are you\<eobuff>
+kbd[hello ho]
+kbd[w are yo]
+kbd[u]
 empty string:
-\<eobuff>
 missing newline:
-asdf\<eobuff>
+kbd[asdf]
 sending sigwinch:
-about to resize......all done\<eobuff>
+kbd[about to]
+kbd[ resize.]
+kbd[.....all]
+kbd[ done]
 sigwin r=91 c=42
 escape seqs:
-line one\012line two\012line 3 \134 (reverse solidus)\012\<eobuff>
+kbd[line one]
+kbd[\012line tw]
+kbd[o\012line 3]
+kbd[ \134 (reve]
+kbd[rse soli]
+kbd[dus)\012]
 escape seqs straddling:
-line one\012line two\<eobuff>
-\012line 3 \<eobuff>
-\134 (reverse solidus)\012\<eobuff>
-\<eobuff>
+kbd[line one]
+kbd[\012line tw]
+kbd[o]
+kbd[\012line 3 ]
+kbd[\134 (rever]
+kbd[se solid]
+kbd[us)\012]
 sigwin r=120 c=140
 TEE_TTY_CONTENT
 pending line

@@ -28,9 +28,6 @@ struct pty
 #endif
 	/* Process id of the child. */
 	pid_t pid;
-	/* The terminal parameters of the pty. Old and new for comparision
-	** purposes. */
-	struct termios term;
 	/* The current window size of the pty. */
 	struct winsize ws;
 };
@@ -115,8 +112,6 @@ init_pty(int statusfd)
 		subproc_main();
 
 	/* Parent.. Finish up and return */
-
-	if (tcgetattr(the_pty.fd, &the_pty.term) < 0) return -1;
 
 #ifdef BROKEN_MASTER
 	{
@@ -237,16 +232,6 @@ pty_activity(int s)
 	/* Error -> die */
 	if (preproclen <= 0)
 		exit(1);
-
-#ifdef BROKEN_MASTER
-	/* Get the current terminal settings. */
-	if (tcgetattr(the_pty.slave, &the_pty.term) < 0)
-		exit(1);
-#else
-	/* Get the current terminal settings. */
-	if (tcgetattr(the_pty.fd, &the_pty.term) < 0)
-		exit(1);
-#endif
 
 top:
 	/*

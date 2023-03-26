@@ -419,20 +419,6 @@ void process_tty_out(
 	rout->len = theroutlen;
 }
 
-static void dumpw2sp(void)
-{
-	unsigned char *curs = wts.buf;
-	while (wts.bufsz--) {
-		if (*curs >= ' ' && *curs != '\\') putchar(*curs);
-		else printf("\\%03o", *curs);
-
-		curs++;
-	}
-
-	puts("\\<eobuff>");
-	if (wts.sendsigwin) printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
-}
-
 static void writetosubproccore(void)
 {
 	unsigned char byte;
@@ -542,66 +528,67 @@ static void testreset(void)
 	memset(&wts, 0, sizeof(wts));
 }
 
+static void writetosp0term(const char *s)
+{
+	size_t len;
+	unsigned char *curs;
+
+	len = strlen(s);
+	if (len > sizeof(wts.buf)) errx(1, "string too long: %s", s);
+
+	/* It's OK if not 0-terminated, writetosubproccore doesn't treat the
+	 * string as 0-terminated anyway. */
+	strncpy((char *)wts.buf, s, len);
+
+	wts.bufsz = len;
+	writetosubproccore();
+
+	curs = wts.buf;
+	while (wts.bufsz--) {
+		if (*curs >= ' ' && *curs != '\\') putchar(*curs);
+		else printf("\\%03o", *curs);
+
+		curs++;
+	}
+
+	puts("\\<eobuff>");
+	if (wts.sendsigwin) printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
+}
+
 static void test_main(void)
 {
 	puts("WRITE_TO_SUBPROC_CORE");
 
 	puts("should ignore newline:");
 	testreset();
-	strcpy((char *)wts.buf, "hello\n how are you\n");
-	wts.bufsz = strlen("hello\n how are you\n");
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("hello\n how are you\n");
 
 	puts("empty string:");
 	testreset();
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("");
 
 	puts("missing newline:");
 	testreset();
-	strcpy((char *)wts.buf, "asdf");
-	wts.bufsz = strlen("asdf");
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("asdf");
 
 	puts("sending sigwinch:");
 	testreset();
-	strcpy((char *)wts.buf, "about to resize...\\w00910042...all done");
-	wts.bufsz = strlen((char *)wts.buf);
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("about to resize...\\w00910042...all done");
 
 	puts("escape seqs:");
 	testreset();
-	strcpy((char *)wts.buf,
-	       "line one\\nline two\\nline 3 \\\\ (reverse solidus)\\n\n");
-	wts.bufsz = strlen((char *)wts.buf);
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("line one\\nline two\\nline 3 \\\\ (reverse solidus)\\n\n");
 
 	puts("escape seqs straddling:");
 	testreset();
 
-	strcpy((char *)wts.buf, "line one\\nline two\\");
-	wts.bufsz = strlen((char *)wts.buf);
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("line one\\nline two\\");
 
-	strcpy((char *)wts.buf, "nline 3 \\");
-	wts.bufsz = strlen((char *)wts.buf);
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("nline 3 \\");
 
-	strcpy((char *)wts.buf, "\\ (reverse solidus)\\n\\w012");
-	wts.bufsz = strlen((char *)wts.buf);
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("\\ (reverse solidus)\\n\\w012");
 
-	strcpy((char *)wts.buf, "00140");
-	wts.bufsz = strlen((char *)wts.buf);
-	writetosubproccore();
-	dumpw2sp();
+	writetosp0term("00140");
 
 	puts("TEE_TTY_CONTENT");
 	loghndl = stdout;

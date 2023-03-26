@@ -1,5 +1,4 @@
 #include <stddef.h>
-#include "third_party/dtach/pkt.h"
 
 extern char *dtach_sock;
 extern _Bool dtach_ephem;
@@ -14,7 +13,8 @@ struct raw_tty_out {
 void process_tty_out(
 	const unsigned char *buf, size_t len, struct raw_tty_out *rout);
 
-void process_kbd(int sock);
+void forward_stdin(int sock);
+void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz);
 
 void set_argv0(const char *role);
 

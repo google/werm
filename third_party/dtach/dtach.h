@@ -19,7 +19,6 @@
 #define dtach_h
 
 #include "third_party/dtach/config.h"
-#include "third_party/dtach/pkt.h"
 #include "shared.h"
 
 #include <errno.h>

@@ -485,37 +485,32 @@ static void writetosubproccore(void)
 	wts.bufsz = wi;
 }
 
-static void push(int sock, unsigned char *buf, unsigned len)
-{
-	struct dtach_pkt p = {.type = MSG_PUSH};
-
-	while (len--) {
-		p.u.buf[p.len++] = *buf++;
-		if (!len || p.len == sizeof(p.u.buf)) {
-			fullwrite(sock, "keystroke packet", &p, sizeof(p));
-			p.len = 0;
-		}
-	}
-}
-
-void process_kbd(int sock)
+void forward_stdin(int sock)
 {
 	ssize_t red;
-	struct dtach_pkt winsz = {.type = MSG_WINCH};
+	unsigned char buf[512];
 
-	red = read(0, wts.buf, sizeof(wts.buf));
+	red = read(0, buf, sizeof(buf));
 	if (!red) errx(1, "nothing on stdin");
 	if (red == -1) err(1, "read from stdin");
 
-	wts.bufsz = red;
+	fullwrite(sock, "forward stdin", buf, red);
+}
+
+void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz)
+{
+	struct winsize ws = {0};
+
+	memcpy(wts.buf, buf, bufsz);
+	wts.bufsz = bufsz;
 	writetosubproccore();
-	push(sock, wts.buf, wts.bufsz);
+	fullwrite(ptyfd, "unescaped kbd data", wts.buf, wts.bufsz);
 
 	if (!wts.sendsigwin) return;
 
-	winsz.u.ws.ws_row = wts.swrow;
-	winsz.u.ws.ws_col = wts.swcol;
-	fullwrite(sock, "window size pkt", &winsz, sizeof(winsz));
+	ws.ws_row = wts.swrow;
+	ws.ws_col = wts.swcol;
+	if (0 > ioctl(ptyfd, TIOCSWINSZ, &ws)) warn("setting window size");
 }
 
 static void teetty0term(const char *s)

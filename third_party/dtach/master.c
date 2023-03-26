@@ -339,10 +339,10 @@ static void
 client_activity(struct client *p)
 {
 	ssize_t len;
-	struct dtach_pkt pkt;
+	unsigned char buf[512];
 
 	/* Read the activity. */
-	len = read(p->fd, &pkt, sizeof(struct dtach_pkt));
+	len = read(p->fd, buf, sizeof(buf));
 	if (len < 0 && (errno == EAGAIN || errno == EINTR))
 		return;
 
@@ -355,25 +355,10 @@ client_activity(struct client *p)
 		*(p->pprev) = p->next;
 		free(p);
 		return;
-	} 
-
-	/* Push out data to the program. */
-	if (pkt.type == MSG_PUSH)
-	{
-		if (pkt.len <= sizeof(pkt.u.buf))
-			write(the_pty.fd, pkt.u.buf, pkt.len);
 	}
+	p->attached = 1;
 
-	/* Attach or detach from the program. */
-	else if (pkt.type == MSG_ATTACH)
-		p->attached = 1;
-
-	/* Window size change request, without a forced redraw. */
-	else if (pkt.type == MSG_WINCH)
-	{
-		the_pty.ws = pkt.u.ws;
-		ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
-	}
+	process_kbd(the_pty.fd, buf, len);
 }
 
 /* The master process - It watches over the pty process and the attached */

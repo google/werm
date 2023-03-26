@@ -70,7 +70,6 @@ die(int sig)
 int
 attach_main(int noerror)
 {
-	struct dtach_pkt pkt;
 	unsigned char buf[BUFSIZE];
 	fd_set readfds;
 	int s;
@@ -122,10 +121,8 @@ attach_main(int noerror)
 	/* TODO: this is not needed for werm I bet */
 	write(1, "\33[H\33[J", 6);
 
-	/* Tell the master that we want to attach. */
-	memset(&pkt, 0, sizeof(struct dtach_pkt));
-	pkt.type = MSG_ATTACH;
-	write(s, &pkt, sizeof(struct dtach_pkt));
+	/* Tell the master that we want to attach by sending a no-op signal. */
+	write(s, "\\N", 2);
 
 	/* Wait for things to happen */
 	while (1)
@@ -165,7 +162,7 @@ attach_main(int noerror)
 		/* stdin activity */
 		if (n > 0 && FD_ISSET(0, &readfds))
 		{
-			process_kbd(s);
+			forward_stdin(s);
 			n--;
 		}
 	}

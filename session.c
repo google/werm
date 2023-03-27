@@ -65,10 +65,12 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 	}
 }
 
-static void teettyline(void)
+static void logttyline(void)
 {
 	unsigned li;
 	int c;
+
+	if (!loghndl) return;
 
 	for (li = 0; li < wts.linesz; li++) {
 		c = *SAFEPTR(wts.linebuf, li, 1);
@@ -80,9 +82,6 @@ static void teettyline(void)
 
 	fputc('\n', loghndl);
 	fflush(loghndl);
-
-	wts.linesz = 0;
-	wts.linepos = 0;
 }
 
 static _Bool consumeesc(const char *pref, size_t preflen)
@@ -100,12 +99,11 @@ static _Bool consumeesc(const char *pref, size_t preflen)
  */
 #define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
-static void teettycontent(const unsigned char *buf, size_t len)
+static void processttyout(const unsigned char *buf, size_t len)
 {
 	char lastescbyt;
 
 	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
-	if (!loghndl) return;
 
 	while (len) {
 switch (wts.teest) {
@@ -160,20 +158,20 @@ case 't':
 		}
 
 		if (*buf == '\n' || wts.linesz == sizeof(wts.linebuf)) {
-			teettyline();
-			goto eol;
+			logttyline();
+			wts.linesz = 0;
+			wts.linepos = 0;
 		}
 		if (buf[0] == '\033' || wts.escsz) {
 			if (buf[0] == '\033') wts.escsz = 0;
 			*SAFEPTR(wts.escbuf, wts.escsz, 1) = *buf;
 			wts.escsz++;
 		}
-		else {
+		else if (*buf != '\n') {
 			*SAFEPTR(wts.linebuf, wts.linepos, 1) = *buf;
 			if (wts.linesz < ++wts.linepos)
 				wts.linesz = wts.linepos;
 		}
-		if (wts.linesz == sizeof(wts.linebuf)) teettyline();
 }
 	eol:
 		len--;
@@ -404,7 +402,7 @@ void process_tty_out(
 {
 	size_t needsz;
 
-	teettycontent(buf, len);
+	processttyout(buf, len);
 
 	/* At worst every byte needs escaping, plus trailing newline. */
 	needsz = len*3 + 1;
@@ -564,9 +562,9 @@ void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz)
 	if (0 > ioctl(ptyfd, TIOCSWINSZ, &ws)) warn("setting window size");
 }
 
-static void teetty0term(const char *s)
+static void proctty0term(const char *s)
 {
-	teettycontent((const unsigned char *)s, strlen(s));
+	processttyout((const unsigned char *)s, strlen(s));
 }
 
 static void testreset(void)
@@ -632,87 +630,87 @@ static void test_main(void)
 	loghndl = stdout;
 
 	testreset();
-	teetty0term("hello");
+	proctty0term("hello");
 	puts("pending line");
-	teetty0term("\r\n");
+	proctty0term("\r\n");
 	puts("finished line");
 
 	do {
 		int i = 0;
-		while (i++ < sizeof(wts.linebuf)) teetty0term("x");
-		teetty0term("[exceeded]");
-		teetty0term("\r\n");
+		while (i++ < sizeof(wts.linebuf)) proctty0term("x");
+		proctty0term("[exceeded]");
+		proctty0term("\r\n");
 	} while (0);
 
-	teetty0term("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n");
-	teetty0term("abcdef\b\r\n");
+	proctty0term("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n");
+	proctty0term("abcdef\b\r\n");
 
 	puts("move back x2 and delete to eol");
-	teetty0term("abcdef\b\b\033[K\r\n");
+	proctty0term("abcdef\b\b\033[K\r\n");
 
 	puts("move back x1 and insert");
-	teetty0term("asdf\bxy\r\n");
+	proctty0term("asdf\bxy\r\n");
 
 	puts("move back and forward");
-	teetty0term("asdf\b\033[C\r\n");
+	proctty0term("asdf\b\033[C\r\n");
 
 	puts("move back x2 and forward x1, then del to EOL");
-	teetty0term("asdf\b\b" "\033[C" "\033[K" "\r\n");
+	proctty0term("asdf\b\b" "\033[C" "\033[K" "\r\n");
 
 	puts("as above, but in separate calls");
-	teetty0term("asdf\b\b");
-	teetty0term("\033[C");
-	teetty0term("\033[K");
-	teetty0term("\r\n");
+	proctty0term("asdf\b\b");
+	proctty0term("\033[C");
+	proctty0term("\033[K");
+	proctty0term("\r\n");
 
 	puts("move left x3, move right x2, del EOL; 'right' seq in sep calls");
-	teetty0term("123 UIO\b\b\b" "\033[");
-	teetty0term("C" "\033");
-	teetty0term("[C");
-	teetty0term("\033[K");
-	teetty0term("\r\n");
+	proctty0term("123 UIO\b\b\b" "\033[");
+	proctty0term("C" "\033");
+	proctty0term("[C");
+	proctty0term("\033[K");
+	proctty0term("\r\n");
 
 	puts("drop console title escape seq");
 	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
-	teetty0term("abc\033]0;title\007xyz\r\n");
-	teetty0term("abc\033]1;title\007xyz\r\n");
-	teetty0term("123\033]2;title\007" "456\r\n");
+	proctty0term("abc\033]0;title\007xyz\r\n");
+	proctty0term("abc\033]1;title\007xyz\r\n");
+	proctty0term("123\033]2;title\007" "456\r\n");
 
 	puts("drop console title escape seq; separate calls");
-	teetty0term("abc\033]0;ti");
-	teetty0term("tle\007xyz\r\n");
+	proctty0term("abc\033]0;ti");
+	proctty0term("tle\007xyz\r\n");
 
 	puts("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
 
 	/* \r after paste mode off */
-	teetty0term("before (");
-	teetty0term("\033[?2004l\rhello\033[?2004h");
-	teetty0term(") after\r\n");
+	proctty0term("before (");
+	proctty0term("\033[?2004l\rhello\033[?2004h");
+	proctty0term(") after\r\n");
 
 	/* no \r after paste mode off */
-	teetty0term("before (");
-	teetty0term("\033[?2004lhello\033[?2004h");
-	teetty0term(") after\r\n");
+	proctty0term("before (");
+	proctty0term("\033[?2004lhello\033[?2004h");
+	proctty0term(") after\r\n");
 
 	puts("drop color and font");
-	teetty0term("before : ");
-	teetty0term("\033[1;35mafter\r\n");
+	proctty0term("before : ");
+	proctty0term("\033[1;35mafter\r\n");
 
 	/* split between calls */
-	teetty0term("before : ");
-	teetty0term("\033[1;");
-	teetty0term("35mafter\r\n");
+	proctty0term("before : ");
+	proctty0term("\033[1;");
+	proctty0term("35mafter\r\n");
 
-	teetty0term("before : \033[36mAfter\r\n");
+	proctty0term("before : \033[36mAfter\r\n");
 
-	teetty0term("first ;; \033[1;31msecond\r\n");
+	proctty0term("first ;; \033[1;31msecond\r\n");
 
 	puts("\\r to move to start of line");
-	teetty0term("xyz123\rXYZ\r\n");
+	proctty0term("xyz123\rXYZ\r\n");
 
 	puts("something makes the logs stop");
-	teetty0term(
+	proctty0term(
 		"\033[?2004h[0]~$ l\b"
 		"\033[Kseq 1 | less\r"
 		"\n\033[?2004l\r\033[?104"
@@ -726,7 +724,7 @@ static void test_main(void)
 	);
 
 	puts("\\r then delete line");
-	teetty0term("abc\r\033[Kfoo\r\n");
+	proctty0term("abc\r\033[Kfoo\r\n");
 
 	puts("arrow keys are translated to escape sequences");
 	testreset();
@@ -737,7 +735,7 @@ static void test_main(void)
 	writetosp0term("right (\\>)\r");
 
 	puts("app cursor on: same codes as when off but O instead of [");
-	teetty0term("\033[?1h");
+	proctty0term("\033[?1h");
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");

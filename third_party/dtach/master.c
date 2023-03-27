@@ -462,6 +462,7 @@ masterprocess(int s, int statusfd)
 			if (FD_ISSET(p->fd, &readfds))
 				client_activity(p);
 		}
+		if (!clients && !waitattach && dtach_ephem) exit(0);
 		/* pty activity? */
 		if (FD_ISSET(the_pty.fd, &readfds))
 			pty_activity(s);

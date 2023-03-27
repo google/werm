@@ -356,9 +356,14 @@ static _Noreturn void dtachorshell(void)
 	dtach_ephem = !termid;
 	openlogs();
 
-	if (!termid)
-		xasprintf(&dtach_sock, "/tmp/werm.ephem.%lld",
+#define EPHEM_SOCK_PREFIX "/tmp/werm.ephem"
+
+	if (!termid) {
+		xasprintf(&dtach_sock, EPHEM_SOCK_PREFIX ".%lld",
 			  (long long) getpid());
+		/* We need some termid for setting argv0 later */
+		termid = dtach_sock + sizeof(EPHEM_SOCK_PREFIX);
+	}
 	else
 		xasprintf(&dtach_sock, "/tmp/dtach.%s", termid);
 

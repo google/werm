@@ -18,7 +18,7 @@ static char *pream, *argv0, *termid;
 
 static size_t argv0sz;
 
-#define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
+#define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz)+1)))
 
 static FILE *loghndl;
 static int rawlogfd;
@@ -65,23 +65,17 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 	}
 }
 
-static void logttyline(void)
+static void logescaped(FILE *f, const unsigned char *buf, size_t sz)
 {
-	unsigned li;
-	int c;
-
-	if (!loghndl) return;
-
-	for (li = 0; li < wts.linesz; li++) {
-		c = *SAFEPTR(wts.linebuf, li, 1);
-		if (c == '\t' || c >= ' ')
-			fputc(c, loghndl);
+	while (sz--) {
+		if (*buf == '\t' || *buf >= ' ')
+			fputc(*buf, f);
 		else
-			fprintf(loghndl, "\\%03o", c);
+			fprintf(f, "\\%03o", *buf);
+		buf++;
 	}
-
-	fputc('\n', loghndl);
-	fflush(loghndl);
+	fputc('\n', f);
+	fflush(f);
 }
 
 static _Bool consumeesc(const char *pref, size_t preflen)
@@ -158,7 +152,8 @@ case 't':
 		}
 
 		if (*buf == '\n' || wts.linesz == sizeof(wts.linebuf)) {
-			logttyline();
+			if (loghndl)
+				logescaped(loghndl, wts.linebuf, wts.linesz);
 			wts.linesz = 0;
 			wts.linepos = 0;
 		}

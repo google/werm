@@ -92,3 +92,5 @@ kbd[\033OB \033OA)]
 kbd[\015]
 kbd[right (\033]
 kbd[OC)\015]
+bad input tolerance: terminate OS cmd without char 7
+don't hide me

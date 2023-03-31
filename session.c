@@ -48,7 +48,8 @@ static int rawlogfd;
  * We put this in a single struct so all logic state can be reset with a single
  * memset call. */
 static struct {
-	unsigned sendsigwin : 1, swrow : 16, swcol : 16;
+	unsigned sendsigwin : 1;
+	unsigned short swrow, swcol;
 	unsigned wsi;
 	char winsize[8];
 
@@ -555,13 +556,11 @@ static void writetosubproccore(
 			wts.winsize[wts.wsi++] = byte;
 			if (wts.wsi != sizeof(wts.winsize)) break;
 
-			if (2 != sscanf(wts.winsize, "%4u%4u", &row, &col))
+			wts.sendsigwin = (
+				2 == sscanf(wts.winsize, "%4hu%4hu",
+					    &wts.swrow, &wts.swcol));
+			if (!wts.sendsigwin)
 				warn("invalid winsize: %.8s", wts.winsize);
-			else {
-				wts.swrow = row;
-				wts.swcol = col;
-				wts.sendsigwin = 1;
-			}
 			wts.escp = 0;
 
 			break;

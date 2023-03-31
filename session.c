@@ -14,11 +14,32 @@
 #include <sys/ioctl.h>
 #include <err.h>
 
+static int xasprintf(char **strp, const char *format, ...)
+{
+	int res;
+
+	va_list argp;
+
+	va_start(argp, format);
+	res = vsnprintf(NULL, 0, format, argp);
+	va_end(argp);
+	if (res < 0) errx(1, "vsnprintf: サイズの計算に失敗した");
+
+	*strp = malloc(res+1);
+
+	va_start(argp, format);
+	res = vsnprintf(*strp, res+1, format, argp);
+	va_end(argp);
+	if (res < 0) errx(1, "vsnprintf");
+
+	return res;
+}
+
 static char *pream, *argv0, *termid;
 
 static size_t argv0sz;
 
-#define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz))))
+#define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz)+1)))
 
 static FILE *loghndl;
 static int rawlogfd;
@@ -65,23 +86,38 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 	}
 }
 
-static void logttyline(void)
+static void logescaped(FILE *f, const unsigned char *buf, size_t sz)
 {
-	unsigned li;
-	int c;
-
-	if (!loghndl) return;
-
-	for (li = 0; li < wts.linesz; li++) {
-		c = *SAFEPTR(wts.linebuf, li, 1);
-		if (c == '\t' || c >= ' ')
-			fputc(c, loghndl);
+	while (sz--) {
+		if (*buf == '\t' || *buf >= ' ')
+			fputc(*buf, f);
 		else
-			fprintf(loghndl, "\\%03o", c);
+			fprintf(f, "\\%03o", *buf);
+		buf++;
 	}
+	fputc('\n', f);
+	fflush(f);
+}
 
-	fputc('\n', loghndl);
-	fflush(loghndl);
+static void dump(void)
+{
+	char *dumpfn;
+	FILE *f;
+
+	xasprintf(&dumpfn, "/tmp/dump.%lld", (long long)getpid());
+	f = fopen(dumpfn, "w");
+	if (!f) warn("could not fopen %s for dumping state", dumpfn);
+	free(dumpfn);
+	if (!f) return;
+
+	fprintf(f, "escp: %d (%c)\n", wts.escp, wts.escp);
+	fprintf(f, "linebuf: (pos=%u, sz=%us)\n", wts.linepos, wts.linesz);
+	logescaped(f, wts.linebuf, wts.linesz);
+	fprintf(f, "escbuf: (%u bytes)\n", wts.escsz);
+	logescaped(f, wts.escbuf, wts.escsz);
+	fprintf(f, "teest: %d (%c)\n", wts.teest, wts.teest);
+	fprintf(f, "appcurs: %u\n", wts.appcursor);
+	fclose(f);
 }
 
 static _Bool consumeesc(const char *pref, size_t preflen)
@@ -148,7 +184,7 @@ case 0:
 		if (CONSUMEESC("\033]")) {
 			wts.teest = 't';
 case 't':
-			while (*buf != 0x07 && len) {
+			while (len && *buf != 0x07 && *buf != '\r') {
 				buf++;
 				len--;
 			}
@@ -158,7 +194,8 @@ case 't':
 		}
 
 		if (*buf == '\n' || wts.linesz == sizeof(wts.linebuf)) {
-			logttyline();
+			if (loghndl)
+				logescaped(loghndl, wts.linebuf, wts.linesz);
 			wts.linesz = 0;
 			wts.linepos = 0;
 		}
@@ -209,26 +246,6 @@ static char *extract_query_arg(const char **qs, const char *pref)
 	return buf;
 }
 
-static int xasprintf(char **strp, const char *format, ...)
-{
-	int res;
-
-	va_list argp;
-
-	va_start(argp, format);
-	res = vsnprintf(NULL, 0, format, argp);
-	va_end(argp);
-	if (res < 0) errx(1, "vsnprintf: サイズの計算に失敗した");
-
-	*strp = malloc(res+1);
-
-	va_start(argp, format);
-	res = vsnprintf(*strp, res+1, format, argp);
-	va_end(argp);
-	if (res < 0) errx(1, "vsnprintf");
-
-	return res;
-}
 
 static void parse_query(void)
 {
@@ -497,6 +514,12 @@ static void writetosubproccore(
 				wts.escp = 'w';
 				break;
 
+			case 'd':
+				dump();
+				wts.wsi = 0;
+				wts.escp = 0;
+				break;
+
 			/* no-op escape used for alerting master that it's OK to read
 			 * from subproc. */
 			case 'N':	wts.escp = 0; break;
@@ -746,6 +769,9 @@ static void test_main(void)
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");
+
+	puts("bad input tolerance: terminate OS cmd without char 7");
+	proctty0term("\033]0;foobar\rdon't hide me\r\n");
 }
 
 void set_argv0(const char *role)

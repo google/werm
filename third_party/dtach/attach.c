@@ -117,10 +117,6 @@ attach_main(int noerror)
 	signal(SIGINT, die);
 	signal(SIGQUIT, die);
 
-	/* Clear the screen. This assumes VT100. */
-	/* TODO: this is not needed for werm I bet */
-	write(1, "\33[H\33[J", 6);
-
 	/* Tell the master that we want to attach by sending a no-op signal. */
 	write(s, "\\N", 2);
 

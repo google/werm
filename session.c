@@ -68,7 +68,10 @@ static struct {
 	unsigned appcursor : 1;
 
 	unsigned char *rwoutbuf;
-	size_t rwoutsz, rwoutlen;
+	size_t rwoutsz;
+
+	/* Raw output will be written here if non-null. */
+	FILE *rwouthndl;
 } wts;
 
 static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
@@ -140,9 +143,43 @@ static _Bool consumeesc(const char *pref, size_t preflen)
  */
 #define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
-static void processttyout(const unsigned char *buf, size_t len)
+static void verifyrawosiz(size_t needsz)
+{
+	if (wts.rwoutsz >= needsz) return;
+	wts.rwoutsz = needsz;
+	wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
+	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
+}
+
+static int hexdig(int v)
+{
+	v &= 0x0f;
+	return v + (v < 10 ? '0' : 'W');
+}
+
+static void putrout(struct raw_tty_out *rout, int b)
+{
+	unsigned char *bf = rout->buf;
+
+	b &= 0xff;
+
+	if (b == '\\' || b < ' ' || b > '~') {
+		bf[rout->len++] = '\\';
+		bf[rout->len++] = hexdig(b >> 4);
+		bf[rout->len++] = hexdig(b);
+	}
+	else bf[rout->len++] = b;
+}
+
+void process_tty_out(
+	const unsigned char *buf, size_t len, struct raw_tty_out *rout)
 {
 	char lastescbyt;
+
+	/* At worst every byte needs escaping, plus trailing newline. */
+	verifyrawosiz(len*3 + 1);
+	rout->len = 0;
+	rout->buf = wts.rwoutbuf;
 
 	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
 
@@ -190,7 +227,7 @@ case 0:
 			wts.teest = 't';
 case 't':
 			while (len && *buf != 0x07 && *buf != '\r') {
-				buf++;
+				putrout(rout, *buf++);
 				len--;
 			}
 			if (!len) return;
@@ -222,8 +259,10 @@ case 't':
 }
 	eol:
 		len--;
-		buf++;
+		putrout(rout, *buf++);
 	}
+
+	wts.rwoutbuf[rout->len++] = '\n';
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)
@@ -397,23 +436,6 @@ static _Noreturn void dtachorshell(void)
 	dtach_main();
 }
 
-static int hexdig(int v)
-{
-	v &= 0x0f;
-	return v + (v < 10 ? '0' : 'W');
-}
-
-static void putrout(int b)
-{
-	b &= 0xff;
-
-	if (b == '\\' || b < ' ' || b > '~') {
-		wts.rwoutbuf[wts.rwoutlen++] = '\\';
-		wts.rwoutbuf[wts.rwoutlen++] = hexdig(b >> 4);
-		wts.rwoutbuf[wts.rwoutlen++] = hexdig(b);
-	}
-	else wts.rwoutbuf[wts.rwoutlen++] = b;
-}
 
 void send_pream(int fd)
 {
@@ -426,28 +448,6 @@ void send_pream(int fd)
 	pream = NULL;
 }
 
-void process_tty_out(
-	const unsigned char *buf, size_t len, struct raw_tty_out *rout)
-{
-	size_t needsz;
-
-	processttyout(buf, len);
-
-	/* At worst every byte needs escaping, plus trailing newline. */
-	needsz = len*3 + 1;
-	if (wts.rwoutsz < needsz) {
-		wts.rwoutsz = needsz;
-		wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
-		if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
-	}
-
-	wts.rwoutlen = 0;
-	while (len--) putrout(*buf++);
-	wts.rwoutbuf[wts.rwoutlen++] = '\n';
-
-	rout->buf = wts.rwoutbuf;
-	rout->len = wts.rwoutlen;
-}
 
 static unsigned kbufsz;
 static unsigned char kbuf[8];
@@ -599,7 +599,11 @@ void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz)
 
 static void proctty0term(const char *s)
 {
-	processttyout((const unsigned char *)s, strlen(s));
+	struct raw_tty_out rout;
+
+	process_tty_out((const unsigned char *)s, strlen(s), &rout);
+
+	if (wts.rwouthndl) logescaped(wts.rwouthndl, rout.buf, rout.len);
 }
 
 static void testreset(void)
@@ -782,6 +786,19 @@ static void test_main(void)
 	puts("backward to negative linepos, then dump line to log");
 	testreset();
 	proctty0term("\r\010\010\010x\n");
+
+	puts("escape before sending to attached clients");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("abcd\r\n");
+	proctty0term("xyz\b\t\r\n");
+
+	puts("pass OS escape to client");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("\033]0;asdf\007xyz\r\n");
 }
 
 void set_argv0(const char *role)

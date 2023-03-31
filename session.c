@@ -65,6 +65,9 @@ static struct {
 	char teest;
 
 	unsigned appcursor : 1;
+
+	unsigned char *rwoutbuf;
+	size_t rwoutsz, rwoutlen;
 } wts;
 
 static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
@@ -393,9 +396,6 @@ static _Noreturn void dtachorshell(void)
 	dtach_main();
 }
 
-static unsigned char *theroutbuf;
-static size_t theroutsz, theroutlen;
-
 static int hexdig(int v)
 {
 	v &= 0x0f;
@@ -407,11 +407,11 @@ static void putrout(int b)
 	b &= 0xff;
 
 	if (b == '\\' || b < ' ' || b > '~') {
-		theroutbuf[theroutlen++] = '\\';
-		theroutbuf[theroutlen++] = hexdig(b >> 4);
-		theroutbuf[theroutlen++] = hexdig(b);
+		wts.rwoutbuf[wts.rwoutlen++] = '\\';
+		wts.rwoutbuf[wts.rwoutlen++] = hexdig(b >> 4);
+		wts.rwoutbuf[wts.rwoutlen++] = hexdig(b);
 	}
-	else theroutbuf[theroutlen++] = b;
+	else wts.rwoutbuf[wts.rwoutlen++] = b;
 }
 
 void send_pream(int fd)
@@ -434,18 +434,18 @@ void process_tty_out(
 
 	/* At worst every byte needs escaping, plus trailing newline. */
 	needsz = len*3 + 1;
-	if (theroutsz < needsz) {
-		theroutsz = needsz;
-		theroutbuf = realloc(theroutbuf, theroutsz);
-		if (!theroutbuf) errx(1, "even realloc knows: out of mem");
+	if (wts.rwoutsz < needsz) {
+		wts.rwoutsz = needsz;
+		wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
+		if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
 	}
 
-	theroutlen = 0;
+	wts.rwoutlen = 0;
 	while (len--) putrout(*buf++);
-	theroutbuf[theroutlen++] = '\n';
+	wts.rwoutbuf[wts.rwoutlen++] = '\n';
 
-	rout->buf = theroutbuf;
-	rout->len = theroutlen;
+	rout->buf = wts.rwoutbuf;
+	rout->len = wts.rwoutlen;
 }
 
 static unsigned kbufsz;
@@ -605,6 +605,7 @@ static void proctty0term(const char *s)
 
 static void testreset(void)
 {
+	free(wts.rwoutbuf);
 	memset(&wts, 0, sizeof(wts));
 }
 

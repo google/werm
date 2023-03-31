@@ -276,7 +276,12 @@ function term_init()
 				break;
 			}
 
-			pend_display.push(hex_val(1) * 16 + hex_val(2));
+			if (s.startsWith('\\s1'))
+				t.setAlternateMode(false);
+			else if (s.startsWith('\\s2'))
+				t.setAlternateMode(true);
+			else
+				pend_display.push(hex_val(1) * 16 + hex_val(2));
 
 			s = s.substr(3);
 		}

@@ -128,27 +128,9 @@ static void dump(void)
 	fclose(f);
 }
 
-static _Bool consumeesc(const char *pref, size_t preflen)
-{
-	if (preflen > sizeof(wts.escbuf))
-		errx(1, "preflen too long: %zu", preflen);
-	if (wts.escsz != preflen) return 0;
-	if (memcmp(pref, wts.escbuf, preflen)) return 0;
-	wts.escsz = 0;
-	return 1;
-}
-
-/* app cursor on: \x1b[?1h
- * app cursor off: \x1b[?1l
- */
-#define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
-
-static void verifyrawosiz(size_t needsz)
-{
-	if (wts.rwoutsz >= needsz) return;
-	wts.rwoutsz = needsz;
-	wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
-	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
+static void putroutraw(struct raw_tty_out *rout, const char *s) {
+	unsigned char *bf = rout->buf;
+	while (*s) bf[rout->len++] = *s++;
 }
 
 static int hexdig(int v)
@@ -169,6 +151,42 @@ static void putrout(struct raw_tty_out *rout, int b)
 		bf[rout->len++] = hexdig(b);
 	}
 	else bf[rout->len++] = b;
+}
+
+static void finiesc(struct raw_tty_out *forw)
+{
+	unsigned char *cpyrw;
+
+	if (forw) {
+		*SAFEPTR(wts.escbuf, wts.escsz, 1) = 0;
+		cpyrw = wts.escbuf;
+		while (wts.escsz--) putrout(forw, *cpyrw++);
+	}
+	wts.escsz = 0;
+}
+
+static _Bool consumeesc(const char *pref, size_t preflen,
+			struct raw_tty_out *forward)
+{
+	if (preflen > sizeof(wts.escbuf))
+		errx(1, "preflen too long: %zu", preflen);
+	if (wts.escsz != preflen) return 0;
+	if (memcmp(pref, wts.escbuf, preflen)) return 0;
+	finiesc(forward);
+	return 1;
+}
+
+/* app cursor on: \x1b[?1h
+ * app cursor off: \x1b[?1l
+ */
+#define CONSUMEESC(pref, forward) consumeesc(pref, sizeof(pref)-1, forward)
+
+static void verifyrawosiz(size_t needsz)
+{
+	if (wts.rwoutsz >= needsz) return;
+	wts.rwoutsz = needsz;
+	wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
+	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
 }
 
 void process_tty_out(
@@ -198,7 +216,7 @@ case 0:
 			goto eol;
 		}
 
-		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[")) {
+		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[", rout)) {
 			switch (*buf) {
 			/* delete to EOL */
 			case 'K': wts.linesz = wts.linepos; break;
@@ -209,21 +227,23 @@ case 0:
 			goto eol;
 		}
 		if (*buf >= 'a' && *buf <= 'z') {
-			if (CONSUMEESC("\033[?1")) {
-				switch (*buf) {
-				case 'h': wts.appcursor = 1; break;
-				case 'l': wts.appcursor = 0; break;
-				}
+			if (CONSUMEESC("\033[?1", rout)) {
+				wts.appcursor = *buf == 'h';
 				goto eol;
+			}
+			if (CONSUMEESC("\033[?47", NULL)) {
+				/* Obviously this is a mess. */
+				putroutraw(rout, *buf == 'h' ? "\\s2" : "\\s1");
+				goto eoldrop;
 			}
 
 			if (wts.escsz > 1 && wts.escbuf[1] == '[') {
-				wts.escsz = 0;
-				goto eol;
+				finiesc(rout);
+				goto eoldrop;
 			}
 		}
 
-		if (CONSUMEESC("\033]")) {
+		if (CONSUMEESC("\033]", rout)) {
 			wts.teest = 't';
 case 't':
 			while (len && *buf != 0x07 && *buf != '\r') {
@@ -258,8 +278,10 @@ case 't':
 		}
 }
 	eol:
+		if (!wts.escsz) putrout(rout, *buf);
+	eoldrop:
+		buf++;
 		len--;
-		putrout(rout, *buf++);
 	}
 
 	wts.rwoutbuf[rout->len++] = '\n';
@@ -799,6 +821,16 @@ static void test_main(void)
 	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033]0;asdf\007xyz\r\n");
+
+	puts("simplify alternate mode signal");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("\033[?47h" "hello\r\n" "\033[?47l");
+
+	proctty0term("\033[");
+	proctty0term("?47h" "hello\r\n" "\033");
+	proctty0term("[?47l");
 }
 
 void set_argv0(const char *role)

@@ -454,12 +454,14 @@ static void addkeybyte(int outfd, int c)
 	kbuf[kbufsz++] = c;
 }
 
-static void writetosubproccore(int outfd, const unsigned char *buf, unsigned bufsz)
+static void writetosubproccore(
+	int outfd, const unsigned char *buf, unsigned bufsz)
 {
 	unsigned wi, ri, row, col;
 	unsigned char byte, cursmvbyte;
 
-	if (kbufsz != 0) errx(1, "expected kbuf to be empty, has %u bytes", kbufsz);
+	if (kbufsz != 0)
+		errx(1, "expected kbuf to be empty, has %u bytes", kbufsz);
 	wts.sendsigwin = 0;
 
 	wi = 0;

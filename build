@@ -29,7 +29,10 @@ else
 fi
 
 echo 'running session test...' >&2
-./session test >|/tmp/testout.$$
+if ! ./session test >|/tmp/testout.$$; then
+	echo 'test session proc terminated with error' >&2
+	exit 1
+fi
 
 if ! diff -u passing_test_output /tmp/testout.$$
 then

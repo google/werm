@@ -426,7 +426,7 @@ void send_pream(int fd)
 }
 
 void process_tty_out(
-        const unsigned char *buf, size_t len, struct raw_tty_out *rout)
+	const unsigned char *buf, size_t len, struct raw_tty_out *rout)
 {
 	size_t needsz;
 

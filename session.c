@@ -103,8 +103,9 @@ static void dump(void)
 {
 	char *dumpfn;
 	FILE *f;
+	static unsigned dimp;
 
-	xasprintf(&dumpfn, "/tmp/dump.%lld", (long long)getpid());
+	xasprintf(&dumpfn, "/tmp/dump.%lld.%u", (long long)getpid(), dimp++);
 	f = fopen(dumpfn, "w");
 	if (!f) warn("could not fopen %s for dumping state", dumpfn);
 	free(dumpfn);
@@ -152,7 +153,7 @@ case 0:
 
 		if (buf[0] == '\b') {
 			/* move left */
-			wts.linepos--;
+			if (wts.linepos) wts.linepos--;
 			goto eol;
 		}
 
@@ -194,6 +195,11 @@ case 't':
 		}
 
 		if (*buf == '\n' || wts.linesz == sizeof(wts.linebuf)) {
+			if (wts.linesz > sizeof(wts.linebuf)) {
+				dump();
+				errx(1, "linesz is too large, see dump");
+			}
+
 			if (loghndl)
 				logescaped(loghndl, wts.linebuf, wts.linesz);
 			wts.linesz = 0;
@@ -772,6 +778,10 @@ static void test_main(void)
 
 	puts("bad input tolerance: terminate OS cmd without char 7");
 	proctty0term("\033]0;foobar\rdon't hide me\r\n");
+
+	puts("backward to negative linepos, then dump line to log");
+	testreset();
+	proctty0term("\r\010\010\010x\n");
 }
 
 void set_argv0(const char *role)

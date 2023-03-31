@@ -94,3 +94,5 @@ kbd[right (\033]
 kbd[OC)\015]
 bad input tolerance: terminate OS cmd without char 7
 don't hide me
+backward to negative linepos, then dump line to log
+x

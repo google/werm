@@ -134,8 +134,23 @@ static void dump(void)
 	fclose(f);
 }
 
+static void verifyroutcap(size_t needed)
+{
+	size_t minsz = wts.rwoutlen + needed;
+
+	if (minsz <= wts.rwoutsz) return;
+
+	wts.rwoutsz = minsz * 2;
+	if (wts.rwoutsz < 16) wts.rwoutsz = 16;
+	wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
+	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
+}
+
 static void putroutraw(const char *s) {
-	unsigned char *bf = wts.rwoutbuf;
+	unsigned char *bf;
+
+	verifyroutcap(strlen(s));
+	bf = wts.rwoutbuf;
 	while (*s) bf[wts.rwoutlen++] = *s++;
 }
 
@@ -147,7 +162,10 @@ static int hexdig(int v)
 
 static void putrout(int b)
 {
-	unsigned char *bf = wts.rwoutbuf;
+	unsigned char *bf;
+
+	verifyroutcap(3);
+	bf = wts.rwoutbuf;
 
 	b &= 0xff;
 
@@ -185,20 +203,10 @@ static _Bool consumeesc(const char *pref, size_t preflen, int forward)
  */
 #define CONSUMEESC(pref, forward) consumeesc(pref, sizeof(pref)-1, forward)
 
-static void verifyrawosiz(size_t needsz)
-{
-	if (wts.rwoutsz >= needsz) return;
-	wts.rwoutsz = needsz;
-	wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
-	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
-}
-
 void process_tty_out(const unsigned char *buf, size_t len)
 {
 	char lastescbyt;
 
-	/* At worst every byte needs escaping, plus trailing newline. */
-	verifyrawosiz(len*3 + 1);
 	wts.rwoutlen = 0;
 
 	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
@@ -288,7 +296,7 @@ case 't':
 		len--;
 	}
 
-	wts.rwoutbuf[wts.rwoutlen++] = '\n';
+	putroutraw("\n");
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)

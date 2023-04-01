@@ -7,6 +7,7 @@ cd `dirname $0`
 echo '{' >| compile_commands.json
 
 	clang -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L -MJ $cmd_scratch \
+	 -fsanitize=address \
 	 -o session \
 	 session.c \
 	 shared.c \

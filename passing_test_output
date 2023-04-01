@@ -106,3 +106,10 @@ simplify alternate mode signal
 \012
 \s2hello\0d\0a\012
 \s1\012
+regression
+\1b[?2004h\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ \0d\1b[K\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ \012
+passthrough escape \033[1P from subproc to client
+\1b[1P\012
+\1b[4P\012
+\1b[5P\012
+\1b[16P\012

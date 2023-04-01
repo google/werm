@@ -158,7 +158,6 @@ static void finiesc(struct raw_tty_out *forw)
 	unsigned char *cpyrw;
 
 	if (forw) {
-		*SAFEPTR(wts.escbuf, wts.escsz, 1) = 0;
 		cpyrw = wts.escbuf;
 		while (wts.escsz--) putrout(forw, *cpyrw++);
 	}
@@ -239,7 +238,7 @@ case 0:
 
 			if (wts.escsz > 1 && wts.escbuf[1] == '[') {
 				finiesc(rout);
-				goto eoldrop;
+				goto eol;
 			}
 		}
 
@@ -279,6 +278,8 @@ case 't':
 }
 	eol:
 		if (!wts.escsz) putrout(rout, *buf);
+
+		if (wts.escsz && wts.escbuf[wts.escsz-1] == 'P') finiesc(rout);
 	eoldrop:
 		buf++;
 		len--;
@@ -831,6 +832,30 @@ static void test_main(void)
 	proctty0term("\033[");
 	proctty0term("?47h" "hello\r\n" "\033");
 	proctty0term("[?47l");
+
+	puts("regression");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040");
+
+	puts("passthrough escape \\033[1P from subproc to client");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("\033[1P");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("\033[4P");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("\033[5P");
+	testreset();
+	loghndl = NULL;
+	wts.rwouthndl = stdout;
+	proctty0term("\033[16P");
 }
 
 void set_argv0(const char *role)

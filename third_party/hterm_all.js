@@ -14056,7 +14056,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       this.terminal.scrollOnKeystroke = state;
       break;
 
-    case 47:  // Use Alternate Screen Buffer
     case 1047:
       this.terminal.setAlternateMode(state);
       break;

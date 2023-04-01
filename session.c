@@ -177,32 +177,23 @@ static void putrout(int b)
 	else bf[wts.rwoutlen++] = b;
 }
 
-static void finiesc(int forw)
-{
-	unsigned char *cpyrw;
-
-	if (forw) {
-		cpyrw = wts.escbuf;
-		while (wts.escsz--) putrout(*cpyrw++);
-	}
-	wts.escsz = 0;
-}
-
-static _Bool consumeesc(const char *pref, size_t preflen, int forward)
+static _Bool consumeesc(const char *pref, size_t preflen)
 {
 	if (preflen > sizeof(wts.escbuf))
 		errx(1, "preflen too long: %zu", preflen);
 	if (wts.escsz != preflen) return 0;
 	if (memcmp(pref, wts.escbuf, preflen)) return 0;
-	finiesc(forward);
+	wts.escsz = 0;
 	return 1;
 }
 
 /* app cursor on: \x1b[?1h
  * app cursor off: \x1b[?1l
  */
-#define CONSUMEESC(pref, forward) consumeesc(pref, sizeof(pref)-1, forward)
+#define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
+/* Obviously this function is a mess. But I'm still planning how to clean it up.
+ */
 void process_tty_out(const unsigned char *buf, size_t len)
 {
 	char lastescbyt;
@@ -226,7 +217,7 @@ case 0:
 			goto eol;
 		}
 
-		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[", 1)) {
+		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[")) {
 			switch (*buf) {
 			/* delete to EOL */
 			case 'K': wts.linesz = wts.linepos; break;
@@ -237,23 +228,22 @@ case 0:
 			goto eol;
 		}
 		if (*buf >= 'a' && *buf <= 'z') {
-			if (CONSUMEESC("\033[?1", 1)) {
+			if (CONSUMEESC("\033[?1")) {
 				wts.appcursor = *buf == 'h';
 				goto eol;
 			}
-			if (CONSUMEESC("\033[?47", 0)) {
-				/* Obviously this is a mess. */
+			if (CONSUMEESC("\033[?47")) {
 				putroutraw(*buf == 'h' ? "\\s2" : "\\s1");
-				goto eoldrop;
+				goto eol;
 			}
 
 			if (wts.escsz > 1 && wts.escbuf[1] == '[') {
-				finiesc(1);
+				wts.escsz = 0;
 				goto eol;
 			}
 		}
 
-		if (CONSUMEESC("\033]", 1)) {
+		if (CONSUMEESC("\033]")) {
 			wts.teest = 't';
 case 't':
 			while (len && *buf != 0x07 && *buf != '\r') {
@@ -288,11 +278,7 @@ case 't':
 		}
 }
 	eol:
-		if (!wts.escsz) putrout(*buf);
-
-		if (wts.escsz && wts.escbuf[wts.escsz-1] == 'P') finiesc(1);
-	eoldrop:
-		buf++;
+		putrout(*buf++);
 		len--;
 	}
 

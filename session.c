@@ -192,6 +192,26 @@ static _Bool consumeesc(const char *pref, size_t preflen)
  */
 #define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
+void deletechrahead(void)
+{
+	char *endptr;
+	const char *lesc;
+	unsigned long cnt;
+
+	lesc = (char *)wts.escbuf + wts.escsz - 1;
+	if (wts.escsz < 4 || *lesc != 'P' || wts.escbuf[1] != '[') return;
+
+	cnt = strtoul((char *)wts.escbuf+2, &endptr, 10);
+
+	if (endptr != lesc) return;
+
+	if (wts.linesz <= wts.linepos + cnt) return;
+
+	wts.linesz -= cnt;
+	memmove(wts.linebuf + wts.linepos, wts.linebuf + wts.linepos + cnt,
+		wts.linesz - wts.linepos);
+}
+
 /* Obviously this function is a mess. But I'm still planning how to clean it up.
  */
 void process_tty_out(const unsigned char *buf, size_t len)
@@ -278,6 +298,8 @@ case 't':
 		}
 }
 	eol:
+		deletechrahead();
+
 		putrout(*buf++);
 		len--;
 	}
@@ -852,6 +874,21 @@ static void test_main(void)
 	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033[16P");
+
+	puts("delete 5 characters ahead");
+	testreset();
+	loghndl = stdout;
+	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n");
+
+	puts("delete 12 characters ahead");
+	testreset();
+	loghndl = stdout;
+	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n");
+
+	puts("delete 16 characters ahead");
+	testreset();
+	loghndl = stdout;
+	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n");
 }
 
 void set_argv0(const char *role)

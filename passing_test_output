@@ -113,3 +113,9 @@ passthrough escape \033[1P from subproc to client
 \1b[4P\012
 \1b[5P\012
 \1b[16P\012
+delete 5 characters ahead
+$ sdfasdf # asdfasdfasdf
+delete 12 characters ahead
+$  # asdfasdfasdf
+delete 16 characters ahead
+$ sdfasdfasdf

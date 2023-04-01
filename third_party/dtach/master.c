@@ -219,12 +219,13 @@ update_socket_modes(int exec)
 static void
 pty_activity(int s)
 {
-	unsigned char preprocb[BUFSIZE], *routcurs;
-	ssize_t preproclen, writn, routrema;
+	unsigned char preprocb[BUFSIZE];
+	const unsigned char *routcurs;
+	ssize_t preproclen, writn;
+	size_t routrema;
 	struct client *p;
 	fd_set readfds, writefds;
 	int highest_fd, nclients;
-	struct raw_tty_out rout;
 
 	/* Read the pty activity */
 	preproclen = read(the_pty.fd, preprocb, sizeof(preprocb));
@@ -256,7 +257,7 @@ top:
 	if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
 		return;
 
-	process_tty_out(preprocb, preproclen, &rout);
+	process_tty_out(preprocb, preproclen);
 
 	/* Send the data out to the clients. */
 	for (p = clients, nclients = 0; p; p = p->next)
@@ -264,8 +265,7 @@ top:
 		if (!FD_ISSET(p->fd, &writefds))
 			continue;
 
-		routrema = rout.len;
-		routcurs = rout.buf;
+		get_rout_for_attached(&routcurs, &routrema);
 		while (routrema)
 		{
 			writn = write(p->fd, routcurs, routrema);

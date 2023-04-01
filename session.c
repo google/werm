@@ -68,11 +68,17 @@ static struct {
 	unsigned appcursor : 1;
 
 	unsigned char *rwoutbuf;
-	size_t rwoutsz;
+	size_t rwoutsz, rwoutlen;
 
 	/* Raw output will be written here if non-null. */
 	FILE *rwouthndl;
 } wts;
+
+void get_rout_for_attached(const unsigned char **buf, size_t *len)
+{
+	*buf = wts.rwoutbuf;
+	*len = wts.rwoutlen;
+}
 
 static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 {
@@ -128,9 +134,9 @@ static void dump(void)
 	fclose(f);
 }
 
-static void putroutraw(struct raw_tty_out *rout, const char *s) {
-	unsigned char *bf = rout->buf;
-	while (*s) bf[rout->len++] = *s++;
+static void putroutraw(const char *s) {
+	unsigned char *bf = wts.rwoutbuf;
+	while (*s) bf[wts.rwoutlen++] = *s++;
 }
 
 static int hexdig(int v)
@@ -139,33 +145,32 @@ static int hexdig(int v)
 	return v + (v < 10 ? '0' : 'W');
 }
 
-static void putrout(struct raw_tty_out *rout, int b)
+static void putrout(int b)
 {
-	unsigned char *bf = rout->buf;
+	unsigned char *bf = wts.rwoutbuf;
 
 	b &= 0xff;
 
 	if (b == '\\' || b < ' ' || b > '~') {
-		bf[rout->len++] = '\\';
-		bf[rout->len++] = hexdig(b >> 4);
-		bf[rout->len++] = hexdig(b);
+		bf[wts.rwoutlen++] = '\\';
+		bf[wts.rwoutlen++] = hexdig(b >> 4);
+		bf[wts.rwoutlen++] = hexdig(b);
 	}
-	else bf[rout->len++] = b;
+	else bf[wts.rwoutlen++] = b;
 }
 
-static void finiesc(struct raw_tty_out *forw)
+static void finiesc(int forw)
 {
 	unsigned char *cpyrw;
 
 	if (forw) {
 		cpyrw = wts.escbuf;
-		while (wts.escsz--) putrout(forw, *cpyrw++);
+		while (wts.escsz--) putrout(*cpyrw++);
 	}
 	wts.escsz = 0;
 }
 
-static _Bool consumeesc(const char *pref, size_t preflen,
-			struct raw_tty_out *forward)
+static _Bool consumeesc(const char *pref, size_t preflen, int forward)
 {
 	if (preflen > sizeof(wts.escbuf))
 		errx(1, "preflen too long: %zu", preflen);
@@ -188,15 +193,13 @@ static void verifyrawosiz(size_t needsz)
 	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
 }
 
-void process_tty_out(
-	const unsigned char *buf, size_t len, struct raw_tty_out *rout)
+void process_tty_out(const unsigned char *buf, size_t len)
 {
 	char lastescbyt;
 
 	/* At worst every byte needs escaping, plus trailing newline. */
 	verifyrawosiz(len*3 + 1);
-	rout->len = 0;
-	rout->buf = wts.rwoutbuf;
+	wts.rwoutlen = 0;
 
 	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
 
@@ -215,7 +218,7 @@ case 0:
 			goto eol;
 		}
 
-		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[", rout)) {
+		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[", 1)) {
 			switch (*buf) {
 			/* delete to EOL */
 			case 'K': wts.linesz = wts.linepos; break;
@@ -226,27 +229,27 @@ case 0:
 			goto eol;
 		}
 		if (*buf >= 'a' && *buf <= 'z') {
-			if (CONSUMEESC("\033[?1", rout)) {
+			if (CONSUMEESC("\033[?1", 1)) {
 				wts.appcursor = *buf == 'h';
 				goto eol;
 			}
-			if (CONSUMEESC("\033[?47", NULL)) {
+			if (CONSUMEESC("\033[?47", 0)) {
 				/* Obviously this is a mess. */
-				putroutraw(rout, *buf == 'h' ? "\\s2" : "\\s1");
+				putroutraw(*buf == 'h' ? "\\s2" : "\\s1");
 				goto eoldrop;
 			}
 
 			if (wts.escsz > 1 && wts.escbuf[1] == '[') {
-				finiesc(rout);
+				finiesc(1);
 				goto eol;
 			}
 		}
 
-		if (CONSUMEESC("\033]", rout)) {
+		if (CONSUMEESC("\033]", 1)) {
 			wts.teest = 't';
 case 't':
 			while (len && *buf != 0x07 && *buf != '\r') {
-				putrout(rout, *buf++);
+				putrout(*buf++);
 				len--;
 			}
 			if (!len) return;
@@ -277,15 +280,15 @@ case 't':
 		}
 }
 	eol:
-		if (!wts.escsz) putrout(rout, *buf);
+		if (!wts.escsz) putrout(*buf);
 
-		if (wts.escsz && wts.escbuf[wts.escsz-1] == 'P') finiesc(rout);
+		if (wts.escsz && wts.escbuf[wts.escsz-1] == 'P') finiesc(1);
 	eoldrop:
 		buf++;
 		len--;
 	}
 
-	wts.rwoutbuf[rout->len++] = '\n';
+	wts.rwoutbuf[wts.rwoutlen++] = '\n';
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)
@@ -622,11 +625,10 @@ void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz)
 
 static void proctty0term(const char *s)
 {
-	struct raw_tty_out rout;
+	process_tty_out((const unsigned char *)s, strlen(s));
 
-	process_tty_out((const unsigned char *)s, strlen(s), &rout);
-
-	if (wts.rwouthndl) logescaped(wts.rwouthndl, rout.buf, rout.len);
+	if (wts.rwouthndl)
+		logescaped(wts.rwouthndl, wts.rwoutbuf, wts.rwoutlen);
 }
 
 static void testreset(void)

@@ -563,16 +563,15 @@ static void writetosubproccore(
 
 		case '1':
 			cursmvbyte = 0;
+			wts.escp = 0;
 
 			switch (byte) {
 			case 'n':
 				addkeybyte(outfd, '\n');
-				wts.escp = 0;
 				break;
 
 			case '\\':
 				addkeybyte(outfd, '\\');
-				wts.escp = 0;
 				break;
 
 			case 'w':
@@ -582,13 +581,11 @@ static void writetosubproccore(
 
 			case 'd':
 				dump();
-				wts.wsi = 0;
-				wts.escp = 0;
 				break;
 
 			/* no-op escape used for alerting master that it's OK to read
 			 * from subproc. */
-			case 'N':	wts.escp = 0; break;
+			case 'N':	break;
 
 			/* directions, home, end */
 			case '^':	cursmvbyte = 'A'; break;
@@ -599,7 +596,6 @@ static void writetosubproccore(
 			case 'h':	cursmvbyte = 'H'; break;
 
 			default:
-				wts.escp = 0;
 				warnx("unknown escape: %d\n", byte);
 			}
 
@@ -608,7 +604,6 @@ static void writetosubproccore(
 			/* application cursor mode does O rather than [ */
 			addkeybyte(outfd, wts.appcursor ? 'O' : '[');
 			addkeybyte(outfd, cursmvbyte);
-			wts.escp = 0;
 			break;
 
 		case 'w':

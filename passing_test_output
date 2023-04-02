@@ -127,3 +127,14 @@ itle\07xyz\0d\0a\012
 1049h/l code for switching to/from alternate screen + other ops
 abc \1b[?1049\ss\s2\clh\012
 -in-\1b[?1049\s1\rslout\012
+dump of state
+\s1
+\1b[?47\s2h\012
+\s2
+\s2
+\1b[?47\s1l\012
+\s1
+\1b[?1049\ss\s2\clh\012
+\s2
+\1b[?1049\s1\rsl\012
+\s1

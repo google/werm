@@ -341,6 +341,7 @@ client_activity(struct client *p)
 		free(p);
 		return;
 	}
+	if (!p->attached) recount_state(p->fd);
 	p->attached = 1;
 
 	process_kbd(the_pty.fd, buf, len);

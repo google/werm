@@ -64,7 +64,8 @@ static struct {
 
 	char teest;
 
-	unsigned appcursor : 1;
+	unsigned altscren	: 1;
+	unsigned appcursor	: 1;
 
 	unsigned char *rwoutbuf;
 	size_t rwoutsz, rwoutlen;
@@ -257,10 +258,12 @@ case 0:
 			}
 			if (CONSUMEESC("\033[?47")
 			    || CONSUMEESC("\033[?1047")) {
+				wts.altscren = *buf=='h';
 				putroutraw(*buf == 'h' ? "\\s2" : "\\s1");
 				goto eol;
 			}
 			if (CONSUMEESC("\033[?1049")) {
+				wts.altscren = *buf=='h';
 				/* on: save cursor+state, set alternate screen,
 				 * clear
 				 * off: set primary screen, restore
@@ -321,6 +324,12 @@ case 't':
 
 eobuf:
 	putroutraw("\n");
+}
+
+void recount_state(int fd)
+{
+	if (fd == 1) fflush(stdout);
+	fullwrite(fd, "recount", wts.altscren ? "\\s2" : "\\s1", 3);
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)
@@ -910,6 +919,20 @@ static void test_main(void)
 	wts.rwouthndl = stdout;
 	proctty0term("abc \033[?1049h");
 	proctty0term("-in-\033[?1049lout");
+
+	puts("dump of state");
+	testreset();
+	wts.rwouthndl = stdout;
+	recount_state(1); putchar('\n');
+	proctty0term("\033[?47h");
+	recount_state(1); putchar('\n');
+	recount_state(1); putchar('\n');
+	proctty0term("\033[?47l");
+	recount_state(1); putchar('\n');
+	proctty0term("\033[?1049h");
+	recount_state(1); putchar('\n');
+	proctty0term("\033[?1049l");
+	recount_state(1); putchar('\n');
 }
 
 void set_argv0(const char *role)

@@ -16,3 +16,6 @@ void set_argv0(const char *role);
 
 /* Called if the process was attached to for the first time. */
 void send_pream(int fd);
+
+/* Sends terminal state to a client, such as whether using alternate screen. */
+void recount_state(int fd);

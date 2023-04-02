@@ -41,7 +41,6 @@ static size_t argv0sz;
 
 #define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz)+1)))
 
-static FILE *loghndl;
 static int rawlogfd;
 
 /* Name is based on Write To Subproc but this contains process_kbd state too.
@@ -72,6 +71,10 @@ static struct {
 
 	/* Raw output will be written here if non-null. */
 	FILE *rwouthndl;
+
+	/* Log output (raw text without formatting or escapes) is written here
+	 * if not null. */
+	FILE *loghndl;
 } wts;
 
 void get_rout_for_attached(const unsigned char **buf, size_t *len)
@@ -281,8 +284,9 @@ case 't':
 				errx(1, "linesz is too large, see dump");
 			}
 
-			if (loghndl)
-				logescaped(loghndl, wts.linebuf, wts.linesz);
+			if (wts.loghndl)
+				logescaped(wts.loghndl,
+					   wts.linebuf, wts.linesz);
 			wts.linesz = 0;
 			wts.linepos = 0;
 		}
@@ -403,8 +407,9 @@ static void openlogs(void)
 	if (0 > mknod(logfn, 0600, 0) && errno != EEXIST)
 		warn("mknod %s", logfn);
 	else {
-		loghndl = fopen(logfn, "a");
-		if (0 > fseek(loghndl, 0, SEEK_END)) warn("fseek %s", logfn);
+		wts.loghndl = fopen(logfn, "a");
+		if (0 > fseek(wts.loghndl, 0, SEEK_END))
+			warn("fseek %s", logfn);
 	}
 
 	free(rawlogfn);
@@ -708,9 +713,9 @@ static void test_main(void)
 	writetosp0term("00140");
 
 	puts("TEE_TTY_CONTENT");
-	loghndl = stdout;
 
 	testreset();
+	wts.loghndl = stdout;
 	proctty0term("hello");
 	puts("pending line");
 	proctty0term("\r\n");
@@ -809,6 +814,7 @@ static void test_main(void)
 
 	puts("arrow keys are translated to escape sequences");
 	testreset();
+	wts.loghndl = stdout;
 
 	puts("app cursor off: up,down,right,left=ESC [ A,B,C,D");
 	writetosp0term("left (\\< \\<)\r");
@@ -826,24 +832,22 @@ static void test_main(void)
 
 	puts("backward to negative linepos, then dump line to log");
 	testreset();
+	wts.loghndl = stdout;
 	proctty0term("\r\010\010\010x\n");
 
 	puts("escape before sending to attached clients");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("abcd\r\n");
 	proctty0term("xyz\b\t\r\n");
 
 	puts("pass OS escape to client");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033]0;asdf\007xyz\r\n");
 
 	puts("simplify alternate mode signal");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033[?47h" "hello\r\n" "\033[?47l");
 
@@ -853,41 +857,36 @@ static void test_main(void)
 
 	puts("regression");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040");
 
 	puts("passthrough escape \\033[1P from subproc to client");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033[1P");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033[4P");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033[5P");
 	testreset();
-	loghndl = NULL;
 	wts.rwouthndl = stdout;
 	proctty0term("\033[16P");
 
 	puts("delete 5 characters ahead");
 	testreset();
-	loghndl = stdout;
+	wts.loghndl = stdout;
 	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n");
 
 	puts("delete 12 characters ahead");
 	testreset();
-	loghndl = stdout;
+	wts.loghndl = stdout;
 	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n");
 
 	puts("delete 16 characters ahead");
 	testreset();
-	loghndl = stdout;
+	wts.loghndl = stdout;
 	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n");
 }
 

@@ -124,3 +124,6 @@ save rawout from before OS escape
 abc\1b]0;new-t\012
 <between calls>
 itle\07xyz\0d\0a\012
+1049h/l code for switching to/from alternate screen + other ops
+abc \1b[?1049\ss\s2\clh\012
+-in-\1b[?1049\s1\rslout\012

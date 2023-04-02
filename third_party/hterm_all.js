@@ -14031,18 +14031,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       }
       break;
 
-    case 1049:  // 1047 + 1048 + clear.
-      if (state) {
-        this.terminal.saveCursorAndState();
-        this.terminal.setAlternateMode(state);
-        this.terminal.clear();
-      } else {
-        this.terminal.setAlternateMode(state);
-        this.terminal.restoreCursorAndState();
-      }
-
-      break;
-
     case 2004:  // Bracketed paste mode.
       this.terminal.setBracketedPaste(state);
       break;

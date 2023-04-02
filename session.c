@@ -260,6 +260,16 @@ case 0:
 				putroutraw(*buf == 'h' ? "\\s2" : "\\s1");
 				goto eol;
 			}
+			if (CONSUMEESC("\033[?1049")) {
+				/* on: save cursor+state, set alternate screen,
+				 * clear
+				 * off: set primary screen, restore
+				 * cursor+state
+				 */
+				putroutraw(*buf == 'h' ? "\\ss\\s2\\cl"
+						       : "\\s1\\rs");
+				goto eol;
+			}
 
 			if (wts.escsz > 1 && wts.escbuf[1] == '[') {
 				wts.escsz = 0;
@@ -899,6 +909,12 @@ static void test_main(void)
 	proctty0term("abc\033]0;new-t");
 	puts("<between calls>");
 	proctty0term("itle\007xyz\r\n");
+
+	puts("1049h/l code for switching to/from alternate screen + other ops");
+	testreset();
+	wts.rwouthndl = stdout;
+	proctty0term("abc \033[?1049h");
+	proctty0term("-in-\033[?1049lout");
 }
 
 void set_argv0(const char *role)

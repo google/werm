@@ -280,6 +280,12 @@ function term_init()
 				t.setAlternateMode(false);
 			else if (s.startsWith('\\s2'))
 				t.setAlternateMode(true);
+			else if (s.startsWith('\\ss'))
+				t.saveCursorAndState();
+			else if (s.startsWith('\\cl'))
+				t.clear();
+			else if (s.startsWith('\\rs'))
+				t.restoreCursorAndState();
 			else
 				pend_display.push(hex_val(1) * 16 + hex_val(2));
 

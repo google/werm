@@ -255,7 +255,8 @@ case 0:
 				wts.appcursor = *buf == 'h';
 				goto eol;
 			}
-			if (CONSUMEESC("\033[?47")) {
+			if (CONSUMEESC("\033[?47")
+			    || CONSUMEESC("\033[?1047")) {
 				putroutraw(*buf == 'h' ? "\\s2" : "\\s1");
 				goto eol;
 			}
@@ -855,6 +856,8 @@ static void test_main(void)
 	proctty0term("\033[");
 	proctty0term("?47h" "hello\r\n" "\033");
 	proctty0term("[?47l");
+
+	proctty0term("\033[?1047h" "hello\r\n" "\033[?1047l");
 
 	puts("regression");
 	testreset();

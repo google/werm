@@ -14023,10 +14023,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
           state ? this.MOUSE_COORDINATES_SGR : this.MOUSE_COORDINATES_X10);
       break;
 
-    case 1047:
-      this.terminal.setAlternateMode(state);
-      break;
-
     case 1048:  // Save cursor as in DECSC.
       if (state) {
         this.terminal.saveCursorAndState();

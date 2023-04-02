@@ -12492,17 +12492,7 @@ hterm.TextAttributes = function(document) {
 };
 
 /**
- * If false, we ignore the bold attribute.
- *
- * This is used for fonts that have a bold version that is a different size
- * than the normal weight version.
- */
-hterm.TextAttributes.prototype.enableBold = true;
-
-/**
  * If true, use bright colors (if available) for bold text.
- *
- * This setting is independent of the enableBold setting.
  */
 hterm.TextAttributes.prototype.enableBoldAsBright = true;
 
@@ -12630,9 +12620,7 @@ hterm.TextAttributes.prototype.createContainer = function(textContent = '') {
     style.display = 'inline-block';
   }
 
-  if (this.enableBold && this.bold) {
-    style.fontWeight = 'bold';
-  }
+  if (this.bold) style.fontWeight = 'var(--hterm-bold-weight)';
 
   if (this.faint) {
     span.faint = true;
@@ -12729,7 +12717,7 @@ hterm.TextAttributes.prototype.matchesContainer = function(obj) {
            style.backgroundColor == '') &&
           (this.underlineColor == this.DEFAULT_COLOR &&
            style.textDecorationColor == '') &&
-          (this.enableBold && this.bold) == !!style.fontWeight &&
+          this.bold == !!style.fontWeight &&
           this.blink == !!obj.blinkNode &&
           this.italic == !!style.fontStyle &&
           this.underline == obj.underline &&

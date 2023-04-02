@@ -41,8 +41,6 @@ static size_t argv0sz;
 
 #define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz)+1)))
 
-static int rawlogfd;
-
 /* Name is based on Write To Subproc but this contains process_kbd state too.
  * We put this in a single struct so all logic state can be reset with a single
  * memset call. */
@@ -73,9 +71,9 @@ static struct {
 	/* Raw output will be written here if non-null. */
 	FILE *rwouthndl;
 
-	/* Log output (raw text without formatting or escapes) is written here
-	 * if not null. */
-	FILE *loghndl;
+	/* Logs (either text only, or raw subproc output) are written to these
+	 * fd's if not 0. */
+	int logfd, rawlogfd;
 } wts;
 
 void get_rout_for_attached(const unsigned char **buf, size_t *len)
@@ -88,6 +86,9 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 {
 	ssize_t writn;
 	const unsigned char *buf = buf_;
+
+	/* This is convenient for tests. */
+	if (1 == fd) fflush(stdout);
 
 	while (sz) {
 		writn = write(fd, buf, sz);
@@ -113,7 +114,6 @@ static void logescaped(FILE *f, const unsigned char *buf, size_t sz)
 		buf++;
 	}
 	fputc('\n', f);
-	fflush(f);
 }
 
 static void dump(void)
@@ -224,7 +224,7 @@ void process_tty_out(const unsigned char *buf, size_t len)
 
 	wts.rwoutlen = 0;
 
-	if (rawlogfd) fullwrite(rawlogfd, "raw log", buf, len);
+	if (wts.rawlogfd) fullwrite(wts.rawlogfd, "raw log", buf, len);
 
 	while (len) {
 switch (wts.teest) {
@@ -311,8 +311,8 @@ case 't':
 			errx(1, "linesz is too large, see dump");
 		}
 
-		if (wts.loghndl)
-			fwrite(wts.linebuf, wts.linesz, 1, wts.loghndl);
+		if (wts.logfd)
+			fullwrite(wts.logfd, "log", wts.linebuf, wts.linesz);
 		wts.linesz = 0;
 		wts.linepos = 0;
 }
@@ -329,7 +329,6 @@ eobuf:
 
 void recount_state(int fd)
 {
-	if (fd == 1) fflush(stdout);
 	fullwrite(fd, "recount", wts.altscren ? "\\s2" : "\\s1", 3);
 }
 
@@ -411,31 +410,19 @@ void _Noreturn subproc_main(void)
 	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
 }
 
-static void openlogs(void)
+static int opnforlog(const char *suff)
 {
-	char *rawlogfn, *logfn;
+	int fd;
+	char *fn;
 
-	if (!termid) return;
-
-	xasprintf(&rawlogfn, "/tmp/log.%s.raw", termid);
-	xasprintf(&logfn, "/tmp/log.%s", termid);
-
-	rawlogfd = open(rawlogfn, O_WRONLY | O_CREAT | O_APPEND, 0600);
-	if (rawlogfd < 0) {
-		rawlogfd = 0;
-		warn("open %s", rawlogfn);
+	xasprintf(&fn, "/tmp/log.%s%s", termid, suff);
+	fd = open(fn, O_WRONLY | O_CREAT | O_APPEND, 0600);
+	if (fd < 0) {
+		warn("open %s", fn);
+		fd = 0;
 	}
-
-	if (0 > mknod(logfn, 0600, 0) && errno != EEXIST)
-		warn("mknod %s", logfn);
-	else {
-		wts.loghndl = fopen(logfn, "a");
-		if (0 > fseek(wts.loghndl, 0, SEEK_END))
-			warn("fseek %s", logfn);
-	}
-
-	free(rawlogfn);
-	free(logfn);
+	free(fn);
+	return fd;
 }
 
 static _Noreturn void dtachorshell(void)
@@ -489,7 +476,6 @@ static _Noreturn void dtachorshell(void)
 	unsetenv("SERVER_SOFTWARE");
 
 	dtach_ephem = !termid;
-	openlogs();
 
 #define EPHEM_SOCK_PREFIX "/tmp/werm.ephem"
 
@@ -499,8 +485,11 @@ static _Noreturn void dtachorshell(void)
 		/* We need some termid for setting argv0 later */
 		termid = dtach_sock + sizeof(EPHEM_SOCK_PREFIX);
 	}
-	else
+	else {
 		xasprintf(&dtach_sock, "/tmp/dtach.%s", termid);
+		wts.logfd = opnforlog("");
+		wts.rawlogfd = opnforlog(".raw");
+	}
 
 	dtach_main();
 }
@@ -732,7 +721,7 @@ static void test_main(void)
 	puts("TEE_TTY_CONTENT");
 
 	testreset();
-	wts.loghndl = stdout;
+	wts.logfd = 1;
 	proctty0term("hello");
 	puts("pending line");
 	proctty0term("\r\n");
@@ -831,7 +820,7 @@ static void test_main(void)
 
 	puts("arrow keys are translated to escape sequences");
 	testreset();
-	wts.loghndl = stdout;
+	wts.logfd = 1;
 
 	puts("app cursor off: up,down,right,left=ESC [ A,B,C,D");
 	writetosp0term("left (\\< \\<)\r");
@@ -849,7 +838,7 @@ static void test_main(void)
 
 	puts("backward to negative linepos, then dump line to log");
 	testreset();
-	wts.loghndl = stdout;
+	wts.logfd = 1;
 	proctty0term("\r\010\010\010x\n");
 
 	puts("escape before sending to attached clients");
@@ -895,17 +884,17 @@ static void test_main(void)
 
 	puts("delete 5 characters ahead");
 	testreset();
-	wts.loghndl = stdout;
+	wts.logfd = 1;
 	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n");
 
 	puts("delete 12 characters ahead");
 	testreset();
-	wts.loghndl = stdout;
+	wts.logfd = 1;
 	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n");
 
 	puts("delete 16 characters ahead");
 	testreset();
-	wts.loghndl = stdout;
+	wts.logfd = 1;
 	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n");
 
 	puts("save rawout from before OS escape");

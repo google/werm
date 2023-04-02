@@ -13032,16 +13032,6 @@ hterm.VT = function(terminal) {
   this.enableDec12 = false;
 
   /**
-   * If true, emit warnings when we encounter a control character or escape
-   * sequence that we don't recognize or explicitly ignore.
-   *
-   * We disable this by default as the console logging can be expensive when
-   * dumping binary files (e.g. `cat /dev/zero`) to the point where you can't
-   * recover w/out restarting.
-   */
-  this.warnUnimplemented = false;
-
-  /**
    * The set of available character maps (used by G0...G3 below).
    */
   this.characterMaps = new hterm.VT.CharacterMaps();
@@ -13876,10 +13866,6 @@ hterm.VT.prototype.parseUntilStringTerminator_ = function(parseState) {
     }
 
     if (abortReason) {
-      if (this.warnUnimplemented) {
-        console.log('parseUntilStringTerminator_: aborting: ' + abortReason,
-                    args[0]);
-      }
       parseState.reset(args[0]);
       return false;
     }
@@ -13907,23 +13893,14 @@ hterm.VT.prototype.parseUntilStringTerminator_ = function(parseState) {
 hterm.VT.prototype.dispatch = function(type, code, parseState) {
   const handler = hterm.VT[type][code];
   if (!handler) {
-    if (this.warnUnimplemented) {
-      console.warn(`Unknown ${type} code: ${JSON.stringify(code)}`);
-    }
     return;
   }
 
   if (handler == hterm.VT.ignore) {
-    if (this.warnUnimplemented) {
-      console.warn(`Ignored ${type} code: ${JSON.stringify(code)}`);
-    }
     return;
   }
 
   if (parseState.subargs && !handler.supportsSubargs) {
-    if (this.warnUnimplemented) {
-      console.warn(`Ignored ${type} code w/subargs: ${JSON.stringify(code)}`);
-    }
     return;
   }
 
@@ -13959,8 +13936,6 @@ hterm.VT.prototype.setANSIMode = function(code, state) {
     this.terminal.setInsertMode(state);
   } else if (code == 20) {  // Automatic Newline (LNM)
     this.terminal.setAutoCarriageReturn(state);
-  } else if (this.warnUnimplemented) {
-    console.warn('Unimplemented ANSI Mode: ' + code);
   }
 };
 
@@ -14048,14 +14023,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
           state ? this.MOUSE_COORDINATES_SGR : this.MOUSE_COORDINATES_X10);
       break;
 
-    case 1010:  // Scroll to bottom on tty output
-      // always true since we don't have scrollback buffer
-      break;
-
-    case 1011:  // Scroll to bottom on key press
-      this.terminal.scrollOnKeystroke = state;
-      break;
-
     case 1047:
       this.terminal.setAlternateMode(state);
       break;
@@ -14082,12 +14049,6 @@ hterm.VT.prototype.setDECMode = function(code, state) {
 
     case 2004:  // Bracketed paste mode.
       this.terminal.setBracketedPaste(state);
-      break;
-
-    default:
-      if (this.warnUnimplemented) {
-        console.warn('Unimplemented DEC Private Mode: ' + code);
-      }
       break;
   }
 };

@@ -137,3 +137,5 @@ dump of state
 \s2
 \1b[?1049\s1\rsl\012
 \s1
+do not save bell character in plain text log
+ready... D I N G!

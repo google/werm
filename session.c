@@ -60,8 +60,6 @@ static struct {
 	unsigned char linebuf[1024], escbuf[1024];
 	unsigned linesz, linepos, escsz;
 
-	char teest;
-
 	unsigned altscren	: 1;
 	unsigned appcursor	: 1;
 
@@ -133,7 +131,7 @@ static void dump(void)
 	logescaped(f, wts.linebuf, wts.linesz);
 	fprintf(f, "escbuf: (%u bytes)\n", wts.escsz);
 	logescaped(f, wts.escbuf, wts.escsz);
-	fprintf(f, "teest: %d (%c)\n", wts.teest, wts.teest);
+	fprintf(f, "altscr:  %u\n", wts.altscren);
 	fprintf(f, "appcurs: %u\n", wts.appcursor);
 	fclose(f);
 }
@@ -227,8 +225,6 @@ void process_tty_out(const unsigned char *buf, size_t len)
 	if (wts.rawlogfd) fullwrite(wts.rawlogfd, "raw log", buf, len);
 
 	while (len) {
-switch (wts.teest) {
-case 0:
 		if (buf[0] == '\r') {
 			wts.escsz = 0;
 			wts.linepos = 0;
@@ -240,6 +236,10 @@ case 0:
 			if (wts.linepos) wts.linepos--;
 			goto eol;
 		}
+
+		/* The bell character (7) is the correct way to
+		 * terminate escapes that start with \033] */
+		if (*buf == 7) wts.escsz = 0;
 
 		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[")) {
 			switch (*buf) {
@@ -279,19 +279,6 @@ case 0:
 				goto eol;
 			}
 		}
-
-		if (CONSUMEESC("\033]")) {
-			wts.teest = 't';
-case 't':
-			while (len && *buf != 0x07 && *buf != '\r') {
-				putrout(*buf++);
-				len--;
-			}
-			if (!len) goto eobuf;
-			wts.teest = 0;
-			goto eol;
-		}
-
 		if (buf[0] == '\033' || wts.escsz) {
 			if (buf[0] == '\033') wts.escsz = 0;
 			*SAFEPTR(wts.escbuf, wts.escsz, 1) = *buf;
@@ -300,6 +287,7 @@ case 't':
 		}
 
 		if (*buf == '\n') wts.linepos = wts.linesz;
+		if (*buf == 7) goto eol;
 
 		*SAFEPTR(wts.linebuf, wts.linepos, 1) = *buf;
 		if (wts.linesz < ++wts.linepos) wts.linesz = wts.linepos;
@@ -315,7 +303,7 @@ case 't':
 			fullwrite(wts.logfd, "log", wts.linebuf, wts.linesz);
 		wts.linesz = 0;
 		wts.linepos = 0;
-}
+
 	eol:
 		deletechrahead();
 
@@ -323,7 +311,6 @@ case 't':
 		len--;
 	}
 
-eobuf:
 	putroutraw("\n");
 }
 
@@ -923,6 +910,11 @@ static void test_main(void)
 	recount_state(1); putchar('\n');
 	proctty0term("\033[?1049l");
 	recount_state(1); putchar('\n');
+
+	puts("do not save bell character in plain text log");
+	testreset();
+	wts.logfd = 1;
+	proctty0term("ready...\007 D I N G!\r\n");
 }
 
 void set_argv0(const char *role)

@@ -273,7 +273,7 @@ case 't':
 				putrout(*buf++);
 				len--;
 			}
-			if (!len) return;
+			if (!len) goto eobuf;
 			wts.teest = 0;
 			goto eol;
 		}
@@ -308,6 +308,7 @@ case 't':
 		len--;
 	}
 
+eobuf:
 	putroutraw("\n");
 }
 
@@ -888,6 +889,13 @@ static void test_main(void)
 	testreset();
 	wts.loghndl = stdout;
 	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n");
+
+	puts("save rawout from before OS escape");
+	testreset();
+	wts.rwouthndl = stdout;
+	proctty0term("abc\033]0;new-t");
+	puts("<between calls>");
+	proctty0term("itle\007xyz\r\n");
 }
 
 void set_argv0(const char *role)

@@ -119,3 +119,7 @@ delete 12 characters ahead
 $  # asdfasdfasdf
 delete 16 characters ahead
 $ sdfasdfasdf
+save rawout from before OS escape
+abc\1b]0;new-t\012
+<between calls>
+itle\07xyz\0d\0a\012

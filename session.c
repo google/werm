@@ -292,28 +292,29 @@ case 't':
 			goto eol;
 		}
 
-		if (*buf == '\n' || wts.linesz == sizeof(wts.linebuf)) {
-			if (wts.linesz > sizeof(wts.linebuf)) {
-				dump();
-				errx(1, "linesz is too large, see dump");
-			}
-
-			if (wts.loghndl)
-				logescaped(wts.loghndl,
-					   wts.linebuf, wts.linesz);
-			wts.linesz = 0;
-			wts.linepos = 0;
-		}
 		if (buf[0] == '\033' || wts.escsz) {
 			if (buf[0] == '\033') wts.escsz = 0;
 			*SAFEPTR(wts.escbuf, wts.escsz, 1) = *buf;
 			wts.escsz++;
+			goto eol;
 		}
-		else if (*buf != '\n') {
-			*SAFEPTR(wts.linebuf, wts.linepos, 1) = *buf;
-			if (wts.linesz < ++wts.linepos)
-				wts.linesz = wts.linepos;
+
+		if (*buf == '\n') wts.linepos = wts.linesz;
+
+		*SAFEPTR(wts.linebuf, wts.linepos, 1) = *buf;
+		if (wts.linesz < ++wts.linepos) wts.linesz = wts.linepos;
+
+		if (*buf != '\n' && wts.linesz < sizeof(wts.linebuf)) goto eol;
+
+		if (wts.linesz > sizeof(wts.linebuf)) {
+			dump();
+			errx(1, "linesz is too large, see dump");
 		}
+
+		if (wts.loghndl)
+			fwrite(wts.linebuf, wts.linesz, 1, wts.loghndl);
+		wts.linesz = 0;
+		wts.linepos = 0;
 }
 	eol:
 		deletechrahead();

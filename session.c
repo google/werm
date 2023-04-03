@@ -105,7 +105,7 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 static void logescaped(FILE *f, const unsigned char *buf, size_t sz)
 {
 	while (sz--) {
-		if (*buf == '\t' || *buf >= ' ')
+		if (*buf >= ' ' && *buf != 0x7f)
 			fputc(*buf, f);
 		else
 			fprintf(f, "\\%03o", *buf);
@@ -642,7 +642,7 @@ static void proctty0term(const char *s)
 	process_tty_out((const unsigned char *)s, strlen(s));
 
 	if (wts.rwouthndl)
-		logescaped(wts.rwouthndl, wts.rwoutbuf, wts.rwoutlen);
+		fullwrite(1, "proctty0term", wts.rwoutbuf, wts.rwoutlen);
 }
 
 static void testreset(void)

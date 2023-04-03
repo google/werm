@@ -96,23 +96,23 @@ don't hide me
 backward to negative linepos, then dump line to log
 x
 escape before sending to attached clients
-abcd\0d\0a\012
-xyz\08\09\0d\0a\012
+abcd\0d\0a
+xyz\08\09\0d\0a
 pass OS escape to client
-\1b]0;asdf\07xyz\0d\0a\012
+\1b]0;asdf\07xyz\0d\0a
 simplify alternate mode signal
-\1b[?47\s2hhello\0d\0a\1b[?47\s1l\012
-\1b[\012
-?47\s2hhello\0d\0a\1b\012
-[?47\s1l\012
-\1b[?1047\s2hhello\0d\0a\1b[?1047\s1l\012
+\1b[?47\s2hhello\0d\0a\1b[?47\s1l
+\1b[
+?47\s2hhello\0d\0a\1b
+[?47\s1l
+\1b[?1047\s2hhello\0d\0a\1b[?1047\s1l
 regression
-\1b[?2004h\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ \0d\1b[K\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ \012
+\1b[?2004h\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ \0d\1b[K\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ 
 passthrough escape \033[1P from subproc to client
-\1b[1P\012
-\1b[4P\012
-\1b[5P\012
-\1b[16P\012
+\1b[1P
+\1b[4P
+\1b[5P
+\1b[16P
 delete 5 characters ahead
 $ sdfasdf # asdfasdfasdf
 delete 12 characters ahead
@@ -120,22 +120,22 @@ $  # asdfasdfasdf
 delete 16 characters ahead
 $ sdfasdfasdf
 save rawout from before OS escape
-abc\1b]0;new-t\012
+abc\1b]0;new-t
 <between calls>
-itle\07xyz\0d\0a\012
+itle\07xyz\0d\0a
 1049h/l code for switching to/from alternate screen + other ops
-abc \1b[?1049\ss\s2\clh\012
--in-\1b[?1049\s1\rslout\012
+abc \1b[?1049\ss\s2\clh
+-in-\1b[?1049\s1\rslout
 dump of state
 \s1
-\1b[?47\s2h\012
+\1b[?47\s2h
 \s2
 \s2
-\1b[?47\s1l\012
+\1b[?47\s1l
 \s1
-\1b[?1049\ss\s2\clh\012
+\1b[?1049\ss\s2\clh
 \s2
-\1b[?1049\s1\rsl\012
+\1b[?1049\s1\rsl
 \s1
 do not save bell character in plain text log
 ready... D I N G!

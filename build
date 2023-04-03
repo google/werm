@@ -35,11 +35,22 @@ if ! ./session test >|/tmp/testout.$$; then
 	exit 1
 fi
 
+err=
+
 if ! diff -u passing_test_output /tmp/testout.$$
 then
 	echo "build succeeded but tests failed; to update:
 	cp /tmp/testout.$$ $PWD/passing_test_output"
-	exit 1
+	err=1
 fi >&2
 
-make -C third_party/websocketd
+# We pipe this into wc first because grep may not recognize a null byte
+# as expected.
+if </tmp/testout.$$ tr -d '\n -~' | wc -c | grep -q '[^0]'
+then
+	echo 'TEST OUTPUT HAS NON-PRINTABLE OR CONTROL CHAR(S) !!1!' >&2
+	err=1
+fi
+
+test -n "$err" && exit 1
+make -C third_party/websocketd || exit 1

@@ -178,7 +178,7 @@ function cookev(e)
 }
 
 var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
-	log_mn, log_print;
+	log_mn, log_print, log_macks;
 
 function term_init()
 {
@@ -790,7 +790,7 @@ function term_init()
 	collect_macros('gum');
 	collect_macros('local');
 
-	var got_key_up = false, matching = [];
+	var got_key_up = false, matching = [], macro_winpos;
 
 	function process_mkey(e)
 	{
@@ -798,14 +798,26 @@ function term_init()
 
 		is_alt = (e.mn == 'la' || e.mn == 'ra');
 
+		if (e.key == 'Meta' && e.altKey) {
+			// Alt+Meta+M to switch monitors should not be considered
+			// the start of a macro.
+			matching.length = 0;
+			if (log_macks)
+				console.log('Ignore Meta for second macro key');
+			return false;
+		}
+
 		if (!matching.length) {
 			if (!is_alt) return false;
 			got_key_up = false;
+			if (log_macks) console.log('start of macro: ', e);
 		}
 		else if (!got_key_up && is_alt) {
 			// Ignore holding down Alt key, or starting a macro
 			// right after an Alt+<ash keybinding>.
 			matching = [];
+			if (log_macks)
+				console.log('macro reset (hold alt): ', e);
 		}
 		else if (!got_key_up && !e.altKey) {
 			// We never received Alt release event, but the current
@@ -813,13 +825,31 @@ function term_init()
 			// Chrome may have hid the event from us, indicating an
 			// Ash shortcut was activated, so we don't consider
 			// macros.
+			// On Lacros this seems to have changed. The Alt Key up
+			// event is still received.
+			matching.length = 0;
+			if (log_macks)
+				console.log('macro reset (missed alt up)', e);
+			return false;
+		}
+		else if (log_macks)
+			console.log('process macro', e, matching);
+
+		winposnow = window.screenX + '.' + window.screenY;
+		if (!matching.length) {
+			macro_winpos = winposnow;
+			for (mi = 0; mi < macro_map.length; mi++)
+				matching.push(macro_map[mi].slice());
+		}
+		else if (macro_winpos != winposnow) {
+			// This happens on Lacros when moving window
+			// to different screen or snapping to side with
+			// a keyboard shortcut that involves Alt.
+			if (log_macks) console.log('window moved; not macro');
+			macro_winpos = '';
 			matching.length = 0;
 			return false;
 		}
-
-		if (!matching.length)
-			for (mi = 0; mi < macro_map.length; mi++)
-				matching.push(macro_map[mi].slice());
 
 		for (mi = 0; mi < matching.length; mi++) {
 			mac = matching[mi];
@@ -888,6 +918,8 @@ function term_init()
 			// But this would just activate the Alt+Tab shortcut to
 			// switch windows.
 			if (e.code != 'Tab') got_key_up = true;
+			if (log_macks)
+				console.log('check key up', got_key_up, e);
 			return;
 		}
 

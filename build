@@ -4,6 +4,42 @@ cmd_scratch=/tmp/compile_commands_$$.json
 
 cd `dirname $0`
 
+(
+	cd test || exit 1
+
+	echo '#include <unistd.h>' >| data.h
+
+	ls * | sed '/[.][hc]$/d' |
+	while read fn
+	do
+		printf 'extern const char test_%s[];\n' "$fn" >> data.h
+		printf 'extern const size_t test_%s_size;\n' "$fn" >> data.h
+
+		printf '#include "test/data.h"\n' >| $fn.c
+		printf 'const size_t test_%s_size = %d;\n' "$fn"  `wc -c <"$fn"` >> "$fn.c"
+		printf 'const char test_%s[] = ' "$fn" >> "$fn.c"
+
+		touch /tmp/line.$$
+		while :; do
+			rm /tmp/line.$$
+			dd status=none bs=80 count=1 of=/tmp/line.$$
+			test -s /tmp/line.$$ || break
+			printf '"' >> "$fn.c"
+			sed '
+s/\\/\\\\/g
+s/\x00/\\000/g
+s/\x1b/\\033/g
+s/$/\\012/
+s/\x0d/\\015/g
+s/"/\\022/g
+s/\x08/\\010/g
+			' /tmp/line.$$ | tr -d '\n' >> "$fn.c"
+			printf '"\n' >> "$fn.c"
+		done < "$fn" 
+		printf ';\n' >> "$fn.c"
+	done
+)
+
 echo '{' >| compile_commands.json
 
 	clang -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L -MJ $cmd_scratch \
@@ -11,6 +47,7 @@ echo '{' >| compile_commands.json
 	 -o session \
 	 session.c \
 	 shared.c \
+	 test/*.c \
 	 third_party/dtach/*.c \
 	 -lutil ||
 		exit 1

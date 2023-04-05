@@ -917,12 +917,10 @@ static void test_main(void)
 	wts.logfd = 1;
 	proctty0term("ready...\007 D I N G!\r\n");
 
-/*
 	puts("editing a long line");
 	testreset();
 	wts.logfd = 1;
 	proctty0term(test_lineed_in);
-*/
 }
 
 void set_argv0(const char *role)

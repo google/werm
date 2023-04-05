@@ -792,6 +792,7 @@ function term_init()
 
 	var got_key_up = false, matching = [], macro_winpos;
 
+	function winpos() { return window.screenX + 'x' + window.screenY; }
 	function process_mkey(e)
 	{
 		var mi, mch, mac, save, is_alt;
@@ -810,6 +811,7 @@ function term_init()
 		if (!matching.length) {
 			if (!is_alt) return false;
 			got_key_up = false;
+			macro_winpos = winpos();
 			if (log_macks) console.log('start of macro: ', e);
 		}
 		else if (!got_key_up && is_alt) {
@@ -835,21 +837,9 @@ function term_init()
 		else if (log_macks)
 			console.log('process macro', e, matching);
 
-		winposnow = window.screenX + '.' + window.screenY;
-		if (!matching.length) {
-			macro_winpos = winposnow;
+		if (!matching.length)
 			for (mi = 0; mi < macro_map.length; mi++)
 				matching.push(macro_map[mi].slice());
-		}
-		else if (macro_winpos != winposnow) {
-			// This happens on Lacros when moving window
-			// to different screen or snapping to side with
-			// a keyboard shortcut that involves Alt.
-			if (log_macks) console.log('window moved; not macro');
-			macro_winpos = '';
-			matching.length = 0;
-			return false;
-		}
 
 		for (mi = 0; mi < matching.length; mi++) {
 			mac = matching[mi];
@@ -910,6 +900,10 @@ function term_init()
 		if (log_keys) console.log('scrollport key:', e);
 
 		if (matching.length) {
+			if (macro_winpos != winpos()) {
+				matching.length = 0;
+				return;
+			}
 			// Don't consider Tab to validate the start of a macro,
 			// as this would only be useful if the user pressed:
 			//	1. AltDown

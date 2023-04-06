@@ -64,11 +64,11 @@ static struct {
 	unsigned altscren	: 1;
 	unsigned appcursor	: 1;
 
+	/* Cause attachee-bound output to be written stdout */
+	unsigned rwout		: 1;
+
 	unsigned char *rwoutbuf;
 	size_t rwoutsz, rwoutlen;
-
-	/* Raw output will be written here if non-null. */
-	FILE *rwouthndl;
 
 	/* Logs (either text only, or raw subproc output) are written to these
 	 * fd's if not 0. */
@@ -217,9 +217,12 @@ void deletechrahead(void)
 
 /* Obviously this function is a mess. But I'm still planning how to clean it up.
  */
-void process_tty_out(const unsigned char *buf, size_t len)
+void process_tty_out(const void *buf_, ssize_t len)
 {
 	char lastescbyt;
+	const unsigned char *buf = buf_;
+
+	if (len < 0) len = strlen(buf_);
 
 	wts.rwoutlen = 0;
 
@@ -313,6 +316,8 @@ void process_tty_out(const unsigned char *buf, size_t len)
 	}
 
 	putroutraw("\n");
+
+	if (wts.rwout) fullwrite(1, "rwout2stdout", wts.rwoutbuf, wts.rwoutlen);
 }
 
 void recount_state(int fd)
@@ -638,14 +643,6 @@ void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz)
 	if (0 > ioctl(ptyfd, TIOCSWINSZ, &ws)) warn("setting window size");
 }
 
-static void proctty0term(const char *s)
-{
-	process_tty_out((const unsigned char *)s, strlen(s));
-
-	if (wts.rwouthndl)
-		fullwrite(1, "proctty0term", wts.rwoutbuf, wts.rwoutlen);
-}
-
 static void testreset(void)
 {
 	free(wts.rwoutbuf);
@@ -710,87 +707,87 @@ static void test_main(void)
 
 	testreset();
 	wts.logfd = 1;
-	proctty0term("hello");
+	process_tty_out("hello", -1);
 	puts("pending line");
-	proctty0term("\r\n");
+	process_tty_out("\r\n", -1);
 	puts("finished line");
 
 	do {
 		int i = 0;
-		while (i++ < sizeof(wts.linebuf)) proctty0term("x");
-		proctty0term("[exceeded]");
-		proctty0term("\r\n");
+		while (i++ < sizeof(wts.linebuf)) process_tty_out("x", -1);
+		process_tty_out("[exceeded]", -1);
+		process_tty_out("\r\n", -1);
 	} while (0);
 
-	proctty0term("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n");
-	proctty0term("abcdef\b\r\n");
+	process_tty_out("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
+	process_tty_out("abcdef\b\r\n", -1);
 
 	puts("move back x2 and delete to eol");
-	proctty0term("abcdef\b\b\033[K\r\n");
+	process_tty_out("abcdef\b\b\033[K\r\n", -1);
 
 	puts("move back x1 and insert");
-	proctty0term("asdf\bxy\r\n");
+	process_tty_out("asdf\bxy\r\n", -1);
 
 	puts("move back and forward");
-	proctty0term("asdf\b\033[C\r\n");
+	process_tty_out("asdf\b\033[C\r\n", -1);
 
 	puts("move back x2 and forward x1, then del to EOL");
-	proctty0term("asdf\b\b" "\033[C" "\033[K" "\r\n");
+	process_tty_out("asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
 
 	puts("as above, but in separate calls");
-	proctty0term("asdf\b\b");
-	proctty0term("\033[C");
-	proctty0term("\033[K");
-	proctty0term("\r\n");
+	process_tty_out("asdf\b\b", -1);
+	process_tty_out("\033[C", -1);
+	process_tty_out("\033[K", -1);
+	process_tty_out("\r\n", -1);
 
 	puts("move left x3, move right x2, del EOL; 'right' seq in sep calls");
-	proctty0term("123 UIO\b\b\b" "\033[");
-	proctty0term("C" "\033");
-	proctty0term("[C");
-	proctty0term("\033[K");
-	proctty0term("\r\n");
+	process_tty_out("123 UIO\b\b\b" "\033[", -1);
+	process_tty_out("C" "\033", -1);
+	process_tty_out("[C", -1);
+	process_tty_out("\033[K", -1);
+	process_tty_out("\r\n", -1);
 
 	puts("drop console title escape seq");
 	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
-	proctty0term("abc\033]0;title\007xyz\r\n");
-	proctty0term("abc\033]1;title\007xyz\r\n");
-	proctty0term("123\033]2;title\007" "456\r\n");
+	process_tty_out("abc\033]0;title\007xyz\r\n", -1);
+	process_tty_out("abc\033]1;title\007xyz\r\n", -1);
+	process_tty_out("123\033]2;title\007" "456\r\n", -1);
 
 	puts("drop console title escape seq; separate calls");
-	proctty0term("abc\033]0;ti");
-	proctty0term("tle\007xyz\r\n");
+	process_tty_out("abc\033]0;ti", -1);
+	process_tty_out("tle\007xyz\r\n", -1);
 
 	puts("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
 
 	/* \r after paste mode off */
-	proctty0term("before (");
-	proctty0term("\033[?2004l\rhello\033[?2004h");
-	proctty0term(") after\r\n");
+	process_tty_out("before (", -1);
+	process_tty_out("\033[?2004l\rhello\033[?2004h", -1);
+	process_tty_out(") after\r\n", -1);
 
 	/* no \r after paste mode off */
-	proctty0term("before (");
-	proctty0term("\033[?2004lhello\033[?2004h");
-	proctty0term(") after\r\n");
+	process_tty_out("before (", -1);
+	process_tty_out("\033[?2004lhello\033[?2004h", -1);
+	process_tty_out(") after\r\n", -1);
 
 	puts("drop color and font");
-	proctty0term("before : ");
-	proctty0term("\033[1;35mafter\r\n");
+	process_tty_out("before : ", -1);
+	process_tty_out("\033[1;35mafter\r\n", -1);
 
 	/* split between calls */
-	proctty0term("before : ");
-	proctty0term("\033[1;");
-	proctty0term("35mafter\r\n");
+	process_tty_out("before : ", -1);
+	process_tty_out("\033[1;", -1);
+	process_tty_out("35mafter\r\n", -1);
 
-	proctty0term("before : \033[36mAfter\r\n");
+	process_tty_out("before : \033[36mAfter\r\n", -1);
 
-	proctty0term("first ;; \033[1;31msecond\r\n");
+	process_tty_out("first ;; \033[1;31msecond\r\n", -1);
 
 	puts("\\r to move to start of line");
-	proctty0term("xyz123\rXYZ\r\n");
+	process_tty_out("xyz123\rXYZ\r\n", -1);
 
 	puts("something makes the logs stop");
-	proctty0term(
+	process_tty_out(
 		"\033[?2004h[0]~$ l\b"
 		"\033[Kseq 1 | less\r"
 		"\n\033[?2004l\r\033[?104"
@@ -801,10 +798,11 @@ static void test_main(void)
 		";0t\033[?2004h[0]~$"
 		" # asdf\r\n\033[?2004"
 		"l\r\033[?2004h[0]~$ "
+		, -1
 	);
 
 	puts("\\r then delete line");
-	proctty0term("abc\r\033[Kfoo\r\n");
+	process_tty_out("abc\r\033[Kfoo\r\n", -1);
 
 	puts("arrow keys are translated to escape sequences");
 	testreset();
@@ -816,112 +814,112 @@ static void test_main(void)
 	writetosp0term("right (\\>)\r");
 
 	puts("app cursor on: same codes as when off but O instead of [");
-	proctty0term("\033[?1h");
+	process_tty_out("\033[?1h", -1);
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");
 
 	puts("bad input tolerance: terminate OS cmd without char 7");
-	proctty0term("\033]0;foobar\rdon't hide me\r\n");
+	process_tty_out("\033]0;foobar\rdon't hide me\r\n", -1);
 
 	puts("backward to negative linepos, then dump line to log");
 	testreset();
 	wts.logfd = 1;
-	proctty0term("\r\010\010\010x\n");
+	process_tty_out("\r\010\010\010x\n", -1);
 
 	puts("escape before sending to attached clients");
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("abcd\r\n");
-	proctty0term("xyz\b\t\r\n");
+	wts.rwout = 1;
+	process_tty_out("abcd\r\n", -1);
+	process_tty_out("xyz\b\t\r\n", -1);
 
 	puts("pass OS escape to client");
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("\033]0;asdf\007xyz\r\n");
+	wts.rwout = 1;
+	process_tty_out("\033]0;asdf\007xyz\r\n", -1);
 
 	puts("simplify alternate mode signal");
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("\033[?47h" "hello\r\n" "\033[?47l");
+	wts.rwout = 1;
+	process_tty_out("\033[?47h" "hello\r\n" "\033[?47l", -1);
 
-	proctty0term("\033[");
-	proctty0term("?47h" "hello\r\n" "\033");
-	proctty0term("[?47l");
+	process_tty_out("\033[", -1);
+	process_tty_out("?47h" "hello\r\n" "\033", -1);
+	process_tty_out("[?47l", -1);
 
-	proctty0term("\033[?1047h" "hello\r\n" "\033[?1047l");
+	process_tty_out("\033[?1047h" "hello\r\n" "\033[?1047l", -1);
 
 	puts("regression");
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040");
+	wts.rwout = 1;
+	process_tty_out("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040", -1);
 
 	puts("passthrough escape \\033[1P from subproc to client");
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("\033[1P");
+	wts.rwout = 1;
+	process_tty_out("\033[1P", -1);
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("\033[4P");
+	wts.rwout = 1;
+	process_tty_out("\033[4P", -1);
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("\033[5P");
+	wts.rwout = 1;
+	process_tty_out("\033[5P", -1);
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("\033[16P");
+	wts.rwout = 1;
+	process_tty_out("\033[16P", -1);
 
 	puts("delete 5 characters ahead");
 	testreset();
 	wts.logfd = 1;
-	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n");
+	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n", -1);
 
 	puts("delete 12 characters ahead");
 	testreset();
 	wts.logfd = 1;
-	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n");
+	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n", -1);
 
 	puts("delete 16 characters ahead");
 	testreset();
 	wts.logfd = 1;
-	proctty0term("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n");
+	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n", -1);
 
 	puts("save rawout from before OS escape");
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("abc\033]0;new-t");
+	wts.rwout = 1;
+	process_tty_out("abc\033]0;new-t", -1);
 	puts("<between calls>");
-	proctty0term("itle\007xyz\r\n");
+	process_tty_out("itle\007xyz\r\n", -1);
 
 	puts("1049h/l code for switching to/from alternate screen + other ops");
 	testreset();
-	wts.rwouthndl = stdout;
-	proctty0term("abc \033[?1049h");
-	proctty0term("-in-\033[?1049lout");
+	wts.rwout = 1;
+	process_tty_out("abc \033[?1049h", -1);
+	process_tty_out("-in-\033[?1049lout", -1);
 
 	puts("dump of state");
 	testreset();
-	wts.rwouthndl = stdout;
+	wts.rwout = 1;
 	recount_state(1); putchar('\n');
-	proctty0term("\033[?47h");
+	process_tty_out("\033[?47h", -1);
 	recount_state(1); putchar('\n');
 	recount_state(1); putchar('\n');
-	proctty0term("\033[?47l");
+	process_tty_out("\033[?47l", -1);
 	recount_state(1); putchar('\n');
-	proctty0term("\033[?1049h");
+	process_tty_out("\033[?1049h", -1);
 	recount_state(1); putchar('\n');
-	proctty0term("\033[?1049l");
+	process_tty_out("\033[?1049l", -1);
 	recount_state(1); putchar('\n');
 
 	puts("do not save bell character in plain text log");
 	testreset();
 	wts.logfd = 1;
-	proctty0term("ready...\007 D I N G!\r\n");
+	process_tty_out("ready...\007 D I N G!\r\n", -1);
 
 /*
 	puts("editing a long line");
 	testreset();
 	wts.logfd = 1;
-	proctty0term(test_lineed_in);
+	process_tty_out(test_lineed_in, -1);
 */
 }
 

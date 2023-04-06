@@ -139,3 +139,10 @@ dump of state
 \s1
 do not save bell character in plain text log
 ready... D I N G!
+editing a long line
+sigwin r=30 c=104
+cd platform2
+[0]platform2$ git log --graph --format="%ct %h %s" |perl -pE'/^(.*[^0-9])?(\d{8,10})\b(.*)/ and $_=$1.`d\n//'|less 
+editing a long line in a narrower window
+sigwin r=80 c=61
+matvore@penguin:~$ echo a --------------------------------------------------------------------------------

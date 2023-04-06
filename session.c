@@ -231,7 +231,8 @@ void process_tty_out(const void *buf_, ssize_t len)
 	while (len) {
 		if (buf[0] == '\r') {
 			wts.escsz = 0;
-			wts.linepos = 0;
+			if (wts.swcol) wts.linepos -= wts.linepos % wts.swcol;
+			else wts.linepos = 0;
 			goto eol;
 		}
 
@@ -249,6 +250,11 @@ void process_tty_out(const void *buf_, ssize_t len)
 			switch (*buf) {
 			/* delete to EOL */
 			case 'K': wts.linesz = wts.linepos; break;
+
+			case 'A': 
+				wts.linepos -= wts.swcol;
+				wts.linepos %= sizeof(wts.linebuf);
+				break;
 
 			/* move right */
 			case 'C': wts.linepos++; break;
@@ -915,12 +921,19 @@ static void test_main(void)
 	wts.logfd = 1;
 	process_tty_out("ready...\007 D I N G!\r\n", -1);
 
-/*
 	puts("editing a long line");
 	testreset();
 	wts.logfd = 1;
-	process_tty_out(test_lineed_in, -1);
-*/
+	writetosp0term("\\w00300104");
+	process_tty_out(test_lineed_in, 0xf8);
+	process_tty_out("\n", -1);
+
+	puts("editing a long line in a narrower window");
+	testreset();
+	wts.logfd = 1;
+	writetosp0term("\\w00800061");
+	process_tty_out(test_lineednar_in, -1);
+	process_tty_out("\n", -1);
 }
 
 void set_argv0(const char *role)

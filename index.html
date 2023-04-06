@@ -184,7 +184,7 @@ function term_init()
 {
 	var t, pend_send = '', term_ready = false, sock, pend_display = [],
 		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
-		params, dead_key_hist, keep_row_ttl, row_ttl, host;
+		params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl, host;
 
 	function find_row_ttl()
 	{
@@ -197,6 +197,25 @@ function term_init()
 
 	host = location.host.replace(/^localhost:/, ':');
 
+	function set_locked_title()
+	{
+		var ttl;
+
+		ttl = find_row_ttl();
+		if (!ttl) return;
+
+		locked_ttl = 1;
+		localStorage['locktitle-' + termid] = 1;
+		row_ttl = ttl;
+		set_title();
+	}
+
+	function unlock_title()
+	{
+		locked_ttl = localStorage['locktitle-' + termid] = 0;
+		set_title();
+	}
+
 	function set_title()
 	{
 		var compons;
@@ -204,7 +223,8 @@ function term_init()
 		compons = [];
 		if (termid) compons.push(`[${termid}]`);
 
-		row_ttl = find_row_ttl() || row_ttl;
+		if (!locked_ttl) row_ttl = find_row_ttl() || row_ttl;
+
 		if (row_ttl) compons.push(row_ttl);
 		compons.push(host);
 
@@ -217,7 +237,7 @@ function term_init()
 		if (log_print) console.log('print:', encodeURI(str));
 		t.io.print(str);
 
-		if (keep_row_ttl) return;
+		if (locked_ttl || keep_row_ttl) return;
 
 		set_title();
 		keep_row_ttl = setTimeout(function()
@@ -393,7 +413,18 @@ function term_init()
 	termid = params.get('termid');
 	pream = params.get('pream');
 
-	if (termid) localStorage['pream-' + termid] = pream || '';
+	if (termid) {
+		localStorage['pream-' + termid] = pream || '';
+
+		if (localStorage['locktitle-' + termid]) {
+			// This state should really live on the server in the
+			// master process so it is cleared for free when the
+			// process dies.
+			locked_ttl = 1;
+			row_ttl = localStorage['title-' + termid];
+			set_title();
+		}
+	}
 
 	t.setWindowTitle = function(ttl)
 	{
@@ -771,6 +802,8 @@ function term_init()
 		['raT ', '\x14'],
 		['ralsT ', '\x1b\x14'],
 		['raD U M P ', signal.bind(0, '\\d')],
+		['raS T ', set_locked_title],
+		['laU T ', unlock_title],
 
 		[['ra', set_repeat_key, set_repeat_cnt], repeat_keystroke],
 		[['la',

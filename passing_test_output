@@ -146,3 +146,5 @@ cd platform2
 editing a long line in a narrower window
 sigwin r=80 c=61
 matvore@penguin:~$ echo a --------------------------------------------------------------------------------
+go up more rows than exist in the linebuf
+sigwin r=80 c=60

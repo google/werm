@@ -253,7 +253,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 
 			case 'A': 
 				wts.linepos -= wts.swcol;
-				wts.linepos %= sizeof(wts.linebuf);
+				if (wts.linepos > wts.linesz) wts.linepos = 0;
 				break;
 
 			/* move right */
@@ -934,6 +934,11 @@ static void test_main(void)
 	writetosp0term("\\w00800061");
 	process_tty_out(test_lineednar_in, -1);
 	process_tty_out("\n", -1);
+
+	puts("go up more rows than exist in the linebuf");
+	testreset();
+	writetosp0term("\\w00800060");
+	process_tty_out("\033[Axyz\r\n", -1);
 }
 
 void set_argv0(const char *role)

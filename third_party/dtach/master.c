@@ -214,16 +214,45 @@ update_socket_modes(int exec)
 		chmod(dtach_sock, newmode);
 }
 
+static void sendrout(void)
+{
+	struct client *p;
+	const unsigned char *routcurs;
+	size_t routrema;
+	ssize_t writn;
+
+	/* Send the data out to the clients. */
+	for (p = clients; p; p = p->next)
+	{
+		get_rout_for_attached(&routcurs, &routrema);
+		while (routrema)
+		{
+			writn = write(p->fd, routcurs, routrema);
+
+			if (writn > 0)
+			{
+				routrema -= writn;
+				routcurs += writn;
+				continue;
+			}
+			else if (writn < 0 && errno == EINTR)
+				continue;
+			else if (writn < 0 && errno != EAGAIN)
+				break;
+		}
+	}
+
+	clear_rout();
+}
+
 /* Process activity on the pty - Input and terminal changes are sent out to
 ** the attached clients. If the pty goes away, we die. */
 static void
 pty_activity(int s)
 {
 	unsigned char preprocb[BUFSIZE];
-	const unsigned char *routcurs;
-	ssize_t preproclen, writn;
-	size_t routrema;
 	struct client *p;
+	ssize_t preproclen, writn;
 	fd_set readfds, writefds;
 	int highest_fd, nclients;
 
@@ -259,36 +288,11 @@ top:
 
 	process_tty_out(preprocb, preproclen);
 
-	/* Send the data out to the clients. */
-	for (p = clients, nclients = 0; p; p = p->next)
-	{
-		if (!FD_ISSET(p->fd, &writefds))
-			continue;
+//	werm: before, this is where data is sent to clients
 
-		get_rout_for_attached(&routcurs, &routrema);
-		while (routrema)
-		{
-			writn = write(p->fd, routcurs, routrema);
-
-			if (writn > 0)
-			{
-				routrema -= writn;
-				routcurs += writn;
-				continue;
-			}
-			else if (writn < 0 && errno == EINTR)
-				continue;
-			else if (writn < 0 && errno != EAGAIN)
-				nclients = -1;
-			break;
-		}
-		if (nclients != -1 && !routrema)
-			nclients++;
-	}
-
-	/* Try again if nothing happened. */
-	if (!FD_ISSET(s, &readfds) && nclients == 0)
-		goto top;
+//	/* Try again if nothing happened. */
+//	if (!FD_ISSET(s, &readfds) && nclients == 0)
+//		goto top;
 }
 
 /* Process activity on the control socket */
@@ -341,7 +345,8 @@ client_activity(struct client *p)
 		free(p);
 		return;
 	}
-	if (!p->attached) recount_state(p->fd);
+	clear_rout();
+	if (!p->attached) recount_state();
 	p->attached = 1;
 
 	process_kbd(the_pty.fd, buf, len);
@@ -467,6 +472,8 @@ masterprocess(int s, int statusfd)
 		/* pty activity? */
 		if (FD_ISSET(the_pty.fd, &readfds))
 			pty_activity(s);
+
+		sendrout();
 	}
 }
 

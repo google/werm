@@ -46,16 +46,20 @@ static size_t argv0sz;
  * We put this in a single struct so all logic state can be reset with a single
  * memset call. */
 static struct {
-	unsigned sendsigwin : 1;
 	unsigned short swrow, swcol;
-	unsigned wsi;
+	/* chars read into either winsize or ttl, depending on value of escp */
+	unsigned altbufsz;
 	char winsize[8];
 
 	/* 0: reading raw characters
 	 * '1': next char is escaped
 	 * 'w': reading window size
+	 * 't': reading title into ttl
 	 */
 	char escp;
+
+	/* title set by client */
+	char ttl[128];
 
 	/* Buffers for content about to be written to logs */
 	unsigned char linebuf[1024], escbuf[1024];
@@ -63,9 +67,7 @@ static struct {
 
 	unsigned altscren	: 1;
 	unsigned appcursor	: 1;
-
-	/* Cause attachee-bound output to be written stdout */
-	unsigned rwout		: 1;
+	unsigned sendsigwin	: 1;
 
 	unsigned char *rwoutbuf;
 	size_t rwoutsz, rwoutlen;
@@ -74,6 +76,8 @@ static struct {
 	 * fd's if not 0. */
 	int logfd, rawlogfd;
 } wts;
+
+void clear_rout(void) { wts.rwoutlen = 0; }
 
 void get_rout_for_attached(const unsigned char **buf, size_t *len)
 {
@@ -101,6 +105,12 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 			return;
 		}
 	}
+}
+
+static void putrwout(void)
+{
+	fullwrite(1, "rwout2stdout", wts.rwoutbuf, wts.rwoutlen);
+	wts.rwoutlen = 0;
 }
 
 static void logescaped(FILE *f, const unsigned char *buf, size_t sz)
@@ -149,12 +159,15 @@ static void verifyroutcap(size_t needed)
 	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
 }
 
-static void putroutraw(const char *s) {
+static void putroutraw(const char *s, ssize_t len)
+{
 	unsigned char *bf;
 
-	verifyroutcap(strlen(s));
+	if (len < 0) len = strlen(s);
+
+	verifyroutcap(len);
 	bf = wts.rwoutbuf;
-	while (*s) bf[wts.rwoutlen++] = *s++;
+	while (len--) bf[wts.rwoutlen++] = *s++;
 }
 
 static int hexdig(int v)
@@ -224,8 +237,6 @@ void process_tty_out(const void *buf_, ssize_t len)
 
 	if (len < 0) len = strlen(buf_);
 
-	wts.rwoutlen = 0;
-
 	if (wts.rawlogfd) fullwrite(wts.rawlogfd, "raw log", buf, len);
 
 	while (len) {
@@ -269,7 +280,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 			if (CONSUMEESC("\033[?47")
 			    || CONSUMEESC("\033[?1047")) {
 				wts.altscren = *buf=='h';
-				putroutraw(*buf == 'h' ? "\\s2" : "\\s1");
+				putroutraw(*buf == 'h' ? "\\s2" : "\\s1", -1);
 				goto eol;
 			}
 			if (CONSUMEESC("\033[?1049")) {
@@ -280,7 +291,8 @@ void process_tty_out(const void *buf_, ssize_t len)
 				 * cursor+state
 				 */
 				putroutraw(*buf == 'h' ? "\\ss\\s2\\cl"
-						       : "\\s1\\rs");
+						       : "\\s1\\rs",
+					   -1);
 				goto eol;
 			}
 
@@ -321,14 +333,20 @@ void process_tty_out(const void *buf_, ssize_t len)
 		len--;
 	}
 
-	putroutraw("\n");
-
-	if (wts.rwout) fullwrite(1, "rwout2stdout", wts.rwoutbuf, wts.rwoutlen);
+	putroutraw("\n", -1);
 }
 
-void recount_state(int fd)
+void recountttl(void)
 {
-	fullwrite(fd, "recount", wts.altscren ? "\\s2" : "\\s1", 3);
+	putroutraw("\\@title:", -1);
+	putroutraw(wts.ttl, strnlen(wts.ttl, sizeof wts.ttl));
+	putroutraw("\n", -1);
+}
+
+void recount_state(void)
+{
+	putroutraw(wts.altscren ? "\\s2" : "\\s1", -1);
+	if (wts.ttl[0]) recountttl();
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)
@@ -549,10 +567,10 @@ static void writetosubproccore(
 	while (bufsz--) {
 		byte = *buf++;
 
-		if (byte == '\n') continue;
-
 		switch (wts.escp) {
 		case 0:
+			if (byte == '\n') continue;
+
 			if (byte == '\\')
 				wts.escp = '1';
 			else
@@ -573,8 +591,9 @@ static void writetosubproccore(
 				break;
 
 			case 'w':
-				wts.wsi = 0;
-				wts.escp = 'w';
+			case 't':
+				wts.altbufsz = 0;
+				wts.escp = byte;
 				break;
 
 			case 'd':
@@ -605,8 +624,8 @@ static void writetosubproccore(
 			break;
 
 		case 'w':
-			wts.winsize[wts.wsi++] = byte;
-			if (wts.wsi != sizeof(wts.winsize)) break;
+			wts.winsize[wts.altbufsz++] = byte;
+			if (wts.altbufsz != sizeof(wts.winsize)) break;
 
 			wts.sendsigwin = (
 				2 == sscanf(wts.winsize, "%4hu%4hu",
@@ -614,6 +633,17 @@ static void writetosubproccore(
 			if (!wts.sendsigwin)
 				warn("invalid winsize: %.8s", wts.winsize);
 			wts.escp = 0;
+
+			break;
+
+		case 't':
+			if (byte == '\n') {
+				wts.escp = 0;
+				byte = 0;
+			}
+			if (wts.altbufsz < sizeof wts.ttl)
+				wts.ttl[wts.altbufsz++] = byte;
+			if (!byte) recountttl();
 
 			break;
 
@@ -666,8 +696,10 @@ static void writetosp0term(const char *s)
 	if (wts.sendsigwin) printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
 }
 
-static void test_main(void)
+static void _Noreturn testmain(void)
 {
+	int i;
+
 	puts("WRITE_TO_SUBPROC_CORE");
 
 	puts("should ignore newline:");
@@ -835,18 +867,17 @@ static void test_main(void)
 
 	puts("escape before sending to attached clients");
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("abcd\r\n", -1);
 	process_tty_out("xyz\b\t\r\n", -1);
+	putrwout();
 
 	puts("pass OS escape to client");
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("\033]0;asdf\007xyz\r\n", -1);
+	putrwout();
 
 	puts("simplify alternate mode signal");
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("\033[?47h" "hello\r\n" "\033[?47l", -1);
 
 	process_tty_out("\033[", -1);
@@ -854,25 +885,26 @@ static void test_main(void)
 	process_tty_out("[?47l", -1);
 
 	process_tty_out("\033[?1047h" "hello\r\n" "\033[?1047l", -1);
+	putrwout();
 
 	puts("regression");
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040", -1);
+	putrwout();
 
 	puts("passthrough escape \\033[1P from subproc to client");
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("\033[1P", -1);
+	putrwout();
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("\033[4P", -1);
+	putrwout();
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("\033[5P", -1);
+	putrwout();
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("\033[16P", -1);
+	putrwout();
 
 	puts("delete 5 characters ahead");
 	testreset();
@@ -891,30 +923,30 @@ static void test_main(void)
 
 	puts("save rawout from before OS escape");
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("abc\033]0;new-t", -1);
+	putrwout();
 	puts("<between calls>");
 	process_tty_out("itle\007xyz\r\n", -1);
+	putrwout();
 
 	puts("1049h/l code for switching to/from alternate screen + other ops");
 	testreset();
-	wts.rwout = 1;
 	process_tty_out("abc \033[?1049h", -1);
 	process_tty_out("-in-\033[?1049lout", -1);
+	putrwout();
 
 	puts("dump of state");
 	testreset();
-	wts.rwout = 1;
-	recount_state(1); putchar('\n');
+	recount_state(); putrwout(); putchar('\n');
 	process_tty_out("\033[?47h", -1);
-	recount_state(1); putchar('\n');
-	recount_state(1); putchar('\n');
+	recount_state(); putrwout(); putchar('\n');
+	recount_state(); putrwout(); putchar('\n');
 	process_tty_out("\033[?47l", -1);
-	recount_state(1); putchar('\n');
+	recount_state(); putrwout(); putchar('\n');
 	process_tty_out("\033[?1049h", -1);
-	recount_state(1); putchar('\n');
+	recount_state(); putrwout(); putchar('\n');
 	process_tty_out("\033[?1049l", -1);
-	recount_state(1); putchar('\n');
+	recount_state(); putrwout(); putchar('\n');
 
 	puts("do not save bell character in plain text log");
 	testreset();
@@ -939,6 +971,43 @@ static void test_main(void)
 	testreset();
 	writetosp0term("\\w00800060");
 	process_tty_out("\033[Axyz\r\n", -1);
+
+	puts("set long then shorter title");
+	testreset();
+	writetosp0term("\\tlongtitle\n");
+	putrwout();
+	writetosp0term("\\t1+1++1\n");
+	putrwout();
+
+	puts("title in recounted state");
+	testreset();
+	writetosp0term("\\tsometitle\n");
+	putrwout();
+	printf("  recount: ");
+	recount_state();
+	putrwout();
+
+	puts("... continued: unset title, respond with empty title");
+	writetosp0term("thisisnormalkeybinput\\t\n");
+	putrwout();
+	printf("  recount (should not include title here): ");
+	recount_state();
+	putrwout(); putchar('\n');
+
+	puts("title is too long");
+	wts.logfd = 1;
+	process_tty_out("this is plain terminal text", -1);
+	writetosp0term("\\t");
+	for (i = 0; i < sizeof(wts); i++) writetosp0term("abc");
+	writetosp0term("\n");
+	printf("rout buffer: ");
+	putrwout();
+	/* line buffer should not be clobbered by overflowing ttl buffer. */
+	printf("log: ");
+	process_tty_out("\r\n", -1);
+	printf("stored title length: %zu\n", strnlen(wts.ttl, sizeof wts.ttl));
+
+	exit(0);
 }
 
 void set_argv0(const char *role)
@@ -958,10 +1027,7 @@ int main(int argc, char **argv)
 	argc--;
 	argv++;
 
-	if (1 == argc && !strcmp("test", *argv)) {
-		test_main();
-		exit(0);
-	}
+	if (1 == argc && !strcmp("test", *argv)) testmain();
 
 	home = getenv("HOME");
 

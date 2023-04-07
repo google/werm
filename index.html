@@ -178,12 +178,12 @@ function cookev(e)
 }
 
 var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
-	log_mn, log_print, log_macks;
+	log_mn, log_print, log_macks, log_packin;
 
 function term_init()
 {
-	var t, pend_send = '', term_ready = false, sock, pend_display = [],
-		pend_escape = '', ignore_disp = '', termid, cached_title, pream,
+	var t, pend_send = [], term_ready = false, sock, pend_display = [],
+		pend_escape = '', termid, pream,
 		params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl, host;
 
 	function find_row_ttl()
@@ -202,17 +202,12 @@ function term_init()
 		var ttl;
 
 		ttl = find_row_ttl();
-		if (!ttl) return;
-
-		locked_ttl = 1;
-		localStorage['locktitle-' + termid] = 1;
-		row_ttl = ttl;
-		set_title();
+		if (ttl) signal('\\t' + ttl + '\n');
 	}
 
 	function unlock_title()
 	{
-		locked_ttl = localStorage['locktitle-' + termid] = 0;
+		signal('\\t\n');
 		set_title();
 	}
 
@@ -267,9 +262,6 @@ function term_init()
 			throw `invalid hex at ${i} in ${s}: ${c}`
 		}
 
-		if (ignore_disp === s) s = '';
-		ignore_disp = '';
-
 		if (log_display) {
 			console.log('display:', encodeURI(s));
 			if (log_display > 1) console.trace();
@@ -306,6 +298,12 @@ function term_init()
 				t.clear();
 			else if (s.startsWith('\\rs'))
 				t.restoreCursorAndState();
+			else if (s.startsWith('\\@title:')) {
+				row_ttl = s.replace(/^[^:]*:/, '');
+				locked_ttl = !!row_ttl;
+				set_title();
+				break;
+			}
 			else
 				pend_display.push(hex_val(1) * 16 + hex_val(2));
 
@@ -369,23 +367,26 @@ function term_init()
 		pend_display = pend_display.slice(pend_i);
 	}
 
+	function send_pending()
+	{
+		while (pend_send.length) {
+			sock.send(pend_send[0]);
+			pend_send.splice(0, 1);
+		}
+	}
+
 	function prepare_sock()
 	{
 		sock = new WebSocket(
 			'ws://' + location.host + '/' + location.search);
-		sock.onopen = function()
-		{
-			// Ignore any attempt to clear screen if it's the first
-			// message.
-			ignore_disp = "\\1b[H\\1b[J";
+		sock.onopen = send_pending;
 
-			if (!pend_send) return;
-
-			sock.send(pend_send);
-			pend_send = '';
+		sock.onmessage = function(e) {
+			if (log_packin)
+				console.log(`packet in ${e.data.length} chr(s)`,
+					    e.data);
+			display(e.data);
 		};
-
-		sock.onmessage = function(e) { display(e.data); };
 	}
 
 	prepare_sock();
@@ -397,13 +398,8 @@ function term_init()
 			if (log_send > 1) console.trace();
 		}
 
-		if (sock.readyState == WebSocket.OPEN) {
-			sock.send(pend_send + s);
-			pend_send = '';
-			return;
-		}
-
-		pend_send += s;
+		pend_send.push(s);
+		if (sock.readyState == WebSocket.OPEN) send_pending();
 		if (sock.readyState > WebSocket.OPEN) prepare_sock();
 	}
 
@@ -413,25 +409,12 @@ function term_init()
 	termid = params.get('termid');
 	pream = params.get('pream');
 
-	if (termid) {
-		localStorage['pream-' + termid] = pream || '';
-
-		if (localStorage['locktitle-' + termid]) {
-			// This state should really live on the server in the
-			// master process so it is cleared for free when the
-			// process dies.
-			locked_ttl = 1;
-			row_ttl = localStorage['title-' + termid];
-			set_title();
-		}
-	}
+	if (termid) localStorage['pream-' + termid] = pream || '';
 
 	t.setWindowTitle = function(ttl)
 	{
 		console.log('remotely-set title: ', ttl);
 	};
-	t.setWindowTitle(cached_title);
-
 
 	function open_child_term()
 	{

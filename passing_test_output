@@ -148,3 +148,20 @@ sigwin r=80 c=61
 matvore@penguin:~$ echo a --------------------------------------------------------------------------------
 go up more rows than exist in the linebuf
 sigwin r=80 c=60
+set long then shorter title
+\@title:longtitle
+\@title:1+1++1
+title in recounted state
+\@title:sometitle
+  recount: \s1\@title:sometitle
+... continued: unset title, respond with empty title
+kbd[thisisno]
+kbd[rmalkeyb]
+kbd[input]
+\@title:
+  recount (should not include title here): \s1
+title is too long
+rout buffer: this is plain terminal text
+\@title:abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab
+log: this is plain terminal text
+stored title length: 128

@@ -476,6 +476,9 @@ void _Noreturn subproc_main(void)
 {
 	const char *shell;
 
+	if (wts.logfd) close(wts.logfd);
+	if (wts.rawlogfd) close(wts.rawlogfd);
+
 	if (srvargv) {
 		execv(srvargv[0], srvargv);
 		err(1, "execv server");

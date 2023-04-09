@@ -263,7 +263,9 @@ pty_activity(int s)
 	if (preproclen <= 0)
 		exit(1);
 
-top:
+	process_tty_out(preprocb, preproclen);
+
+//top:
 	/*
 	** Wait until at least one client is writable. Also wait on the control
 	** socket in case a new client tries to connect.
@@ -285,8 +287,6 @@ top:
 		return;
 	if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
 		return;
-
-	process_tty_out(preprocb, preproclen);
 
 //	werm: before, this is where data is sent to clients
 

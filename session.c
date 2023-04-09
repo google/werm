@@ -487,6 +487,8 @@ void _Noreturn subproc_main(void)
 		warnx("$SHELL is not set, defaulting to %s", shell);
 	}
 
+	setenv("TERM", "xterm-256color", 1);
+
 	execl(shell, shell, NULL);
 	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
 }
@@ -508,10 +510,6 @@ static int opnforlog(const char *suff)
 
 static void prepfordtach(void)
 {
-	if (-1 == setsid()) warn("setsid");
-
-	setenv("TERM", "xterm-256color", 1);
-
 	dtach_ephem = !termid;
 
 #define EPHEM_SOCK_PREFIX "/tmp/werm.ephem"

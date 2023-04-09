@@ -345,7 +345,6 @@ client_activity(struct client *p)
 		free(p);
 		return;
 	}
-	clear_rout();
 	if (!p->attached) recount_state();
 	p->attached = 1;
 
@@ -478,7 +477,7 @@ masterprocess(int s, int statusfd)
 }
 
 int
-master_main(void)
+dtach_master(void)
 {
 	int fd[2] = {-1, -1};
 	int s;

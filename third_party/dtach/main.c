@@ -43,7 +43,7 @@ dtach_main(void)
 	{
 		if (errno == ECONNREFUSED)
 			unlink(dtach_sock);
-		if (master_main() != 0)
+		if (dtach_master() != 0)
 			exit(1);
 	}
 	exit(attach_main(0));

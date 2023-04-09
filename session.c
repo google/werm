@@ -1050,7 +1050,7 @@ int main(int argc, char **argv)
 		warnx("starting daemonized spawner process...");
 		warnx("access http://<host>/attach to get started");
 		cdhome();
-		exit(master_main());
+		exit(dtach_master());
 	}
 	else {
 		proccgienv();

@@ -379,8 +379,7 @@ static char *extract_query_arg(const char **qs, const char *pref)
 	return buf;
 }
 
-
-static void parse_query(void)
+static void proccgienv(void)
 {
 	const char *qs;
 	char *val;
@@ -415,38 +414,6 @@ static void parse_query(void)
 		/* Unrecognized query arg */
 		qs = strchrnul(qs, '&');
 	}
-}
-
-void _Noreturn subproc_main(void)
-{
-	const char *shell;
-
-	shell = getenv("SHELL");
-
-	execl(shell, shell, NULL);
-	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
-}
-
-static int opnforlog(const char *suff)
-{
-	int fd;
-	char *fn;
-
-	xasprintf(&fn, "/tmp/log.%s%s", termid, suff);
-	fd = open(fn, O_WRONLY | O_CREAT | O_APPEND, 0600);
-	if (fd < 0) {
-		warn("open %s", fn);
-		fd = 0;
-	}
-	free(fn);
-	return fd;
-}
-
-static _Noreturn void dtachorshell(void)
-{
-	if (-1 == setsid()) warn("setsid");
-
-	setenv("TERM", "xterm-256color", 1);
 
 	/* Set by websocketd and not wanted. CGI-related cruft: */
 	unsetenv("HTTP_ACCEPT_ENCODING");
@@ -491,6 +458,59 @@ static _Noreturn void dtachorshell(void)
 	unsetenv("HTTP_SEC_WEBSOCKET_EXTENSIONS");
 	unsetenv("HTTP_CACHE_CONTROL");
 	unsetenv("SERVER_SOFTWARE");
+}
+
+static char **srvargv;
+
+static void cdhome(void)
+{
+	const char *home;
+
+	home = getenv("HOME");
+
+	if (!home) warnx("HOME is not set");
+	else if (-1 == chdir(home)) warn("chdir to home: '%s'", home);
+}
+
+void _Noreturn subproc_main(void)
+{
+	const char *shell;
+
+	if (srvargv) {
+		execv(srvargv[0], srvargv);
+		err(1, "execv server");
+	}
+
+	shell = getenv("SHELL");
+	if (!shell) {
+		shell = "/bin/sh";
+		warnx("$SHELL is not set, defaulting to %s", shell);
+	}
+
+	execl(shell, shell, NULL);
+	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
+}
+
+static int opnforlog(const char *suff)
+{
+	int fd;
+	char *fn;
+
+	xasprintf(&fn, "/tmp/log.%s%s", termid, suff);
+	fd = open(fn, O_WRONLY | O_CREAT | O_APPEND, 0600);
+	if (fd < 0) {
+		warn("open %s", fn);
+		fd = 0;
+	}
+	free(fn);
+	return fd;
+}
+
+static void prepfordtach(void)
+{
+	if (-1 == setsid()) warn("setsid");
+
+	setenv("TERM", "xterm-256color", 1);
 
 	dtach_ephem = !termid;
 
@@ -507,8 +527,6 @@ static _Noreturn void dtachorshell(void)
 		wts.logfd = opnforlog("");
 		wts.rawlogfd = opnforlog(".raw");
 	}
-
-	dtach_main();
 }
 
 
@@ -1017,8 +1035,6 @@ void set_argv0(const char *role)
 
 int main(int argc, char **argv)
 {
-	const char *home;
-
 	argv0 = argv[0];
 	argv0sz = strlen(argv0)+1;
 	memset(argv0, ' ', argv0sz-1);
@@ -1029,12 +1045,18 @@ int main(int argc, char **argv)
 
 	if (1 == argc && !strcmp("test", *argv)) testmain();
 
-	home = getenv("HOME");
-
-	if (!home) warnx("HOME is not set");
-	else if (-1 == chdir(home)) warn("chdir to home: '%s'", home);
-
-	parse_query();
-
-	dtachorshell();
+	if (argc >= 1 && !strcmp("serve", *argv)) {
+		srvargv = argv+1;
+		termid = strdup("~spawner");
+		prepfordtach();
+		warnx("starting daemonized spawner process...");
+		warnx("access http://<host>/attach to get started");
+		cdhome();
+		exit(master_main());
+	}
+	else {
+		proccgienv();
+		prepfordtach();
+		dtach_main();
+	}
 }

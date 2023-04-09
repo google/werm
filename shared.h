@@ -5,6 +5,7 @@ extern char *dtach_sock;
 extern _Bool dtach_ephem;
 
 void _Noreturn dtach_main(void);
+int master_main(void);
 void _Noreturn subproc_main(void);
 
 void clear_rout(void);

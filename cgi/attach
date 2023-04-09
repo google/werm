@@ -131,7 +131,8 @@ END {
 	for (k in count)
 		printf "%s %d\n", k, count[k];
 }' |
-sort |
+# Sort according to ASCII - this puts ~ at the end of the list.
+LC_ALL=C sort |
 while read sess cnt
 do
 	att='&nbsp;'

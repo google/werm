@@ -16,9 +16,14 @@ env | sed '
 ' >> $passenv
 
 set -x
-exec third_party/websocketd/websocketd \
+# We run the `session` binary with the fully-qualified path so that the argv[0]
+# string can be overwritten with long strings.
+# We run websocketd with the fully-qualified paths because we will cd to $HOME
+# right before exec'ing it, so that spawned shells will start at home for free.
+exec "$PWD/session" serve \
+	"$PWD/third_party/websocketd/websocketd" \
 	--passenv `tr '\n' , <$passenv` \
-	--cgidir=cgi \
-	--staticdir=. \
+	--cgidir="$PWD/cgi" \
+	--staticdir="$PWD" \
 	"$@" \
 	"$PWD/session"

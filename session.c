@@ -1053,6 +1053,12 @@ int main(int argc, char **argv)
 		warnx("starting daemonized spawner process...");
 		warnx("access http://<host>/attach to get started");
 		cdhome();
+
+		/* Start reading from process immediately. Otherwise the server
+		 * may timeout, as stdout/stderr will block indefinitely.
+		 * A side-effect of setting this is that pream will be ignored,
+		 * so if we decide to set it this must be refactored. */
+		first_attach = 1;
 		exit(dtach_master());
 	}
 	else {

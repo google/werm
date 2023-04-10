@@ -358,8 +358,7 @@ masterprocess(int s, int statusfd)
 {
 	struct client *p, *next;
 	fd_set readfds;
-	int highest_fd;
-	int nullfd, waitattach;
+	int highest_fd, nullfd;
 
 	int has_attached_client = 0;
 
@@ -405,7 +404,6 @@ masterprocess(int s, int statusfd)
 	if (nullfd > 2)
 		close(nullfd);
 
-	waitattach = 1;
 	/* Loop forever. */
 	while (1)
 	{
@@ -417,16 +415,15 @@ masterprocess(int s, int statusfd)
 		highest_fd = s;
 
 		/*
-		** When waitattach is set, wait until the client attaches
+		** When first_attach is unset, wait until the client attaches
 		** before trying to read from the pty.
 		*/
-		if (waitattach && clients && clients->attached) {
-			waitattach = 0;
+		if (!first_attach && clients && clients->attached) {
+			first_attach = 1;
 			send_pream(the_pty.fd);
 		}
 
-		if (!waitattach)
-		{
+		if (first_attach) {
 			FD_SET(the_pty.fd, &readfds);
 			if (the_pty.fd > highest_fd)
 				highest_fd = the_pty.fd;
@@ -467,7 +464,7 @@ masterprocess(int s, int statusfd)
 			if (FD_ISSET(p->fd, &readfds))
 				client_activity(p);
 		}
-		if (!clients && !waitattach && dtach_ephem) exit(0);
+		if (!clients && first_attach && dtach_ephem) exit(0);
 		/* pty activity? */
 		if (FD_ISSET(the_pty.fd, &readfds))
 			pty_activity(s);

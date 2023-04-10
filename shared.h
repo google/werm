@@ -2,7 +2,12 @@
 #include <unistd.h>
 
 extern char *dtach_sock;
-extern _Bool dtach_ephem;
+
+/* Indicates a client has attached at some point. */
+extern int first_attach;
+
+/* If true, will terminate process when last client disconnects. */
+extern int dtach_ephem;
 
 void _Noreturn dtach_main(void);
 int dtach_master(void);

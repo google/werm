@@ -92,8 +92,6 @@ EOF
 # werm repo subdir should have profiles to use
 for p in $WERMDIR/profiles/* $HOME/.config/werm/profiles/*
 do
-	case $p in *.js) continue;; esac
-
 	echo '<ul class=common-list>'
 	sed '
 s_\([^	]*\)	\([^	]*\)\(	\(.*\)\)\{0,1\}_<li><a href="/?prof=\4\&termid=\1\&pream=\2%0d">\1</a>_

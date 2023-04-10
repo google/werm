@@ -787,6 +787,7 @@ function term_init()
 		['raD U M P ', signal.bind(0, '\\d')],
 		['raS T ', set_locked_title],
 		['laU T ', unlock_title],
+		['rarsA T ', function() { window.open('/attach', '_top'); }],
 
 		[['ra', set_repeat_key, set_repeat_cnt], repeat_keystroke],
 		[['la',

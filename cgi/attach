@@ -94,7 +94,7 @@ for p in $WERMDIR/profiles/* $HOME/.config/werm/profiles/*
 do
 	echo '<ul class=common-list>'
 	sed '
-s_\([^	]*\)	\([^	]*\)\(	\(.*\)\)\{0,1\}_<li><a href="/?prof=\4\&termid=\1\&pream=\2%0d">\1</a>_
+s_\([^	]*\)	\([^	]*\)\(	\(.*\)\)\{0,1\}_<li><a href="/?js=\4\&termid=\1\&pream=\2%0d">\1</a>_
 :r
 /\( [^ ]*\) /{
 	s//\1%20/

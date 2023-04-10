@@ -25,8 +25,6 @@ body {
          style="position:relative; width:100%; height:100%"></div>
     <script>window['extended_macros'] = {}</script>
 
-    <script src="extra.js"></script>
-
     <script src="third_party/hterm_all.js"></script>
     <script>
 
@@ -183,7 +181,7 @@ var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
 function term_init()
 {
 	var t, pend_send = [], term_ready = false, sock, pend_display = [],
-		pend_escape = '', termid, pream,
+		pend_escape = '', termid, pream, prof, profjs, profjsfn,
 		params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl, host;
 
 	function find_row_ttl()
@@ -408,6 +406,7 @@ function term_init()
 
 	termid = params.get('termid');
 	pream = params.get('pream');
+	prof = params.get('prof');
 
 	if (termid) localStorage['pream-' + termid] = pream || '';
 
@@ -424,7 +423,8 @@ function term_init()
 		newid = (termid || '') + '.' + rand_ltr;
 		window.open(
 			'/?termid=' + encodeURIComponent(newid) +
-			'&pream=' + encodeURIComponent(pream || ''));
+			'&pream=' + encodeURIComponent(pream || '') +
+			'&prof=' + encodeURIComponent(prof || ''));
 	}
 
 	function open_log_term()
@@ -797,14 +797,24 @@ function term_init()
 
 	if (termid) macro_map.push(['laH L ', open_log_term]);
 
-	function collect_macros(name)
-	{
-		var map = window.extended_macros[name] || [];
-		while (map.length) macro_map.push(map.pop());
-	}
+	if (prof) {
+		profjs = document.createElement('script');
+		profjsfn = '/prof.js?' + prof;
+		profjs.setAttribute('src', profjsfn);
+		profjs.addEventListener('load', function() {
+			var k, el;
+			for (k in window.extended_macros) {
+				el = window.extended_macros[k];
+				while (el.length) macro_map.push(el.pop());
+			}
+		});
+		document.body.appendChild(profjs);
 
-	collect_macros('gum');
-	collect_macros('local');
+		macro_map.push(['laO P J S ', function()
+		{
+			window.open(profjsfn);
+		}]);
+	}
 
 	var got_key_up = false, matching = [], macro_winpos;
 

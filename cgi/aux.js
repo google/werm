@@ -15,4 +15,5 @@ genjs () {
 '
 sed '
 s_[^,]*_genjs $WERMDIR/js/\0.js; genjs $HOME/.config/werm/js/\0.js_g
+s_,_;_g
 ' ) | /bin/sh

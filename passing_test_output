@@ -68,7 +68,6 @@ first ;; second
 XYZ123
 something makes the logs stop
 [0]~$ seq 1 | less
-1
 [0]~$ # asdf
 \r then delete line
 foo
@@ -165,3 +164,6 @@ rout buffer: this is plain terminal text
 \@title:abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab
 log: this is plain terminal text
 stored title length: 128
+do not include altscreen content in scrollback log
+xyz
+abcrest

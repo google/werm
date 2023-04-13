@@ -308,8 +308,10 @@ void process_tty_out(const void *buf_, ssize_t len)
 			goto eol;
 		}
 
-		if (*buf == '\n') wts.linepos = wts.linesz;
 		if (*buf == 7) goto eol;
+		if (wts.altscren) goto eol;
+
+		if (*buf == '\n') wts.linepos = wts.linesz;
 
 		*SAFEPTR(wts.linebuf, wts.linepos, 1) = *buf;
 		if (wts.linesz < ++wts.linepos) wts.linesz = wts.linepos;
@@ -1025,6 +1027,12 @@ static void _Noreturn testmain(void)
 	printf("log: ");
 	process_tty_out("\r\n", -1);
 	printf("stored title length: %zu\n", strnlen(wts.ttl, sizeof wts.ttl));
+
+	puts("do not include altscreen content in scrollback log");
+	wts.logfd = 1;
+	process_tty_out("xyz\r\nabc\033[?1049h", -1);
+	process_tty_out("defg", -1);
+	process_tty_out("hijk\033[?1049lrest\r\n", -1);
 
 	exit(0);
 }

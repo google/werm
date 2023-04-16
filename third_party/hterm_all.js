@@ -9410,46 +9410,6 @@ hterm.Terminal.prototype.setScreenBorderSize = function(size) {
 };
 
 /**
- * Set the width of the terminal, resizing the UI to match.
- *
- * @param {?number} columnCount
- */
-hterm.Terminal.prototype.setWidth = function(columnCount) {
-  if (columnCount == null) {
-    this.div_.style.width = '100%';
-    return;
-  }
-
-  const rightPadding = Math.max(
-      this.scrollPort_.screenPaddingSize,
-      this.scrollPort_.currentScrollbarWidthPx);
-  this.div_.style.width = Math.ceil(
-      (this.scrollPort_.characterSize.width * columnCount) +
-      this.scrollPort_.screenPaddingSize + rightPadding +
-      (2 * this.screenBorderSize_)) + 'px';
-  this.realizeSize_(columnCount, this.screenSize.height);
-  this.scheduleSyncCursorPosition_();
-};
-
-/**
- * Set the height of the terminal, resizing the UI to match.
- *
- * @param {?number} rowCount The height in rows.
- */
-hterm.Terminal.prototype.setHeight = function(rowCount) {
-  if (rowCount == null) {
-    this.div_.style.height = '100%';
-    return;
-  }
-
-  this.div_.style.height = (this.scrollPort_.characterSize.height * rowCount) +
-                           (2 * this.scrollPort_.screenPaddingSize) +
-                           (2 * this.screenBorderSize_) + 'px';
-  this.realizeSize_(this.screenSize.width, rowCount);
-  this.scheduleSyncCursorPosition_();
-};
-
-/**
  * Deal with terminal size changes.
  *
  * @param {number} columnCount The number of columns.

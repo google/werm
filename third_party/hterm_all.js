@@ -12989,9 +12989,6 @@ hterm.VT = function(terminal) {
   // except these are found after the numeric arguments.
   this.trailingModifier_ = '';
 
-  // Whether or not to respect the escape codes for setting terminal width.
-  this.allowColumnWidthChanges_ = false;
-
   // The amount of time we're willing to wait for the end of an OSC sequence.
   this.oscTimeLimit_ = 20000;
 
@@ -13012,12 +13009,6 @@ hterm.VT = function(terminal) {
    * Whether to allow the OSC 52 sequence to write to the system clipboard.
    */
   this.enableClipboardWrite = true;
-
-  /**
-   * Respect the host's attempt to change the cursor blink status using
-   * the DEC Private mode 12.
-   */
-  this.enableDec12 = false;
 
   /**
    * The set of available character maps (used by G0...G3 below).
@@ -13936,15 +13927,10 @@ hterm.VT.prototype.setANSIMode = function(code, state) {
  * @param {boolean} state
  */
 hterm.VT.prototype.setDECMode = function(code, state) {
-  switch (parseInt(code, 10)) {
-    case 3:  // DECCOLM
-      if (this.allowColumnWidthChanges_) {
-        this.terminal.setWidth(state ? 132 : 80);
+  var ignore;
 
-        this.terminal.clearHome();
-        this.terminal.setVTScrollRegion(null, null);
-      }
-      break;
+  switch (parseInt(code, 10)) {
+    case 3: ignore = 'DECCOLM (set terminal width)'; break;
 
     case 5:  // DECSCNM
       this.terminal.setReverseVideo(state);
@@ -13964,22 +13950,15 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       this.terminal.syncMouseStyle();
       break;
 
-    case 12:  // Start blinking cursor
-      if (this.enableDec12) {
-        this.terminal.setCursorBlink(state ? 'y' : 'n');
-      }
-      break;
+    case 12: ignore = '(att610) start blinking cursor'; break;
 
     case 25:  // DECTCEM
       this.terminal.setCursorVisible(state);
       break;
 
-    case 30:  // Show scrollbar, but we don't have the feature.
-      break;
+    case 30: ignore = 'scrollbar on/off (scroll not supported anyway)'; break;
 
-    case 40:  // Allow 80 - 132 (DECCOLM) Mode
-      this.terminal.allowColumnWidthChanges_ = state;
-      break;
+    case 40: ignore = 'allow 80 - 132 (DECCOLM) Mode'; break;
 
     case 45:  // Reverse-wraparound Mode
       this.terminal.setReverseWraparound(state);
@@ -14023,6 +14002,9 @@ hterm.VT.prototype.setDECMode = function(code, state) {
       this.terminal.setBracketedPaste(state);
       break;
   }
+
+  if (ignore)
+    console.log(`ignore DEC code ${code}, value ${state}, ${ignore}`);
 };
 
 /**

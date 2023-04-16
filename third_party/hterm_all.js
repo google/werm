@@ -5265,14 +5265,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `  "0": "\\u2588"\n} }`,
   ),
 
-  // TODO(crbug.com/1258487): remove this after all users has migrated.
-  'close-on-exit': hterm.PreferenceManager.definePref_(
-      'Close window on exit',
-      hterm.PreferenceManager.Categories.Miscellaneous,
-      true, 'bool',
-      `Whether to close the window when the command finishes executing.`,
-  ),
-
   'color-palette-overrides': hterm.PreferenceManager.definePref_(
       'Initial color palette',
       hterm.PreferenceManager.Categories.Appearance,
@@ -5372,25 +5364,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `clipboard.`,
   ),
 
-  'enable-clipboard-write': hterm.PreferenceManager.definePref_(
-      'Allow remote clipboard writes',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      true, 'bool',
-      `Allow the remote host to write directly to the local system ` +
-      `clipboard.\n` +
-      `Read access is never granted regardless of this setting.\n` +
-      `\n` +
-      `This is used to control access to features like OSC-52.`,
-  ),
-
-  'enable-dec12': hterm.PreferenceManager.definePref_(
-      'Allow changing of text cursor blinking',
-      hterm.PreferenceManager.Categories.Miscellaneous,
-      false, 'bool',
-      `Respect the host's attempt to change the text cursor blink status ` +
-      `using DEC Private Mode 12.`,
-  ),
-
   'enable-csi-j-3': hterm.PreferenceManager.definePref_(
       'Allow clearing of scrollback buffer (CSI-J-3)',
       hterm.PreferenceManager.Categories.Miscellaneous,
@@ -5399,24 +5372,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `command (CSI-J) may clear the terminal scrollback buffer.\n` +
       `\n` +
       `Enabling this by default is safe.`,
-  ),
-
-  'environment': hterm.PreferenceManager.definePref_(
-      'Environment variables',
-      hterm.PreferenceManager.Categories.Miscellaneous,
-      {
-        // Signal ncurses based apps to use UTF-8 output instead of legacy
-        // drawing modes (which only work in ISO-2022 mode).  Since hterm is
-        // always UTF-8, this shouldn't cause problems.
-        'NCURSES_NO_UTF8_ACS': '1',
-        'TERM': 'xterm-256color',
-        // Set this env var that a bunch of mainstream terminal emulators set
-        // to indicate we support true colors.
-        // https://gist.github.com/XVilka/8346728
-        'COLORTERM': 'truecolor',
-      },
-      'value',
-      `The initial set of environment variables, as an object.`,
   ),
 
   'foreground-color': hterm.PreferenceManager.definePref_(
@@ -8958,14 +8913,6 @@ hterm.Terminal.prototype.setProfile = function(
     'enable-bold-as-bright': (v) => {
       this.primaryScreen_.textAttributes.enableBoldAsBright = !!v;
       this.alternateScreen_.textAttributes.enableBoldAsBright = !!v;
-    },
-
-    'enable-clipboard-write': (v) => {
-      this.vt.enableClipboardWrite = !!v;
-    },
-
-    'enable-dec12': (v) => {
-      this.vt.enableDec12 = !!v;
     },
 
     'foreground-color': (v) => {

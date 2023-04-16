@@ -373,11 +373,24 @@ function term_init()
 		}
 	}
 
+	function dimensignal(c, r)
+	{
+		return '\\w' +
+			(10000 + r + '').substr(1) +
+			(10000 + c + '').substr(1);
+	}
+
 	function prepare_sock()
 	{
 		sock = new WebSocket(
 			'ws://' + location.host + '/' + location.search);
-		sock.onopen = send_pending;
+		// signalsize implicitly sends pending sends that have
+		// accumulated while disconnected.
+		sock.onopen = function() {
+			pend_send.push(dimensignal(t.screenSize.width,
+						   t.screenSize.height));
+			send_pending();
+		};
 
 		sock.onmessage = function(e) {
 			if (log_packin)
@@ -441,8 +454,7 @@ function term_init()
 
 		io.sendString = function(s) { signal(sanit(s)); };
 		io.onTerminalResize = function(c, r) {
-			signal('\\w' + (10000 + r + '').substr(1)
-				     + (10000 + c + '').substr(1));
+			signal(dimensignal(c, r));
 		};
 
 		term_ready = true;

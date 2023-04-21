@@ -652,7 +652,7 @@ function term_init()
 
 	function set_repeat_key(code)
 	{
-		var boxi, box;
+		var boxi, box, hid;
 
 		switch (code) {
 		case 'bs': repsignal = '\177';		break;
@@ -664,13 +664,15 @@ function term_init()
 		case 'le': repsignal = '\\<';		break;
 		case 'up': repsignal = '\\^';		break;
 		case 'do': repsignal = '\\v';		break;
+		case '. ': repsignal = '\t';		hid=1; break;
 
 		default:	return 0;
 		}
 
 		for (boxi = 0; boxi < REPEAT_BOX_CNT; boxi++) {
 			make_repeat_box(boxi);
-			repeat_boxes[boxi].style.visibility = 'visible';
+			repeat_boxes[boxi].style.visibility
+				= hid ? 'hidden' : 'visible';
 		}
 		t.setCssVar('repeat-box-opacity', 0.5);
 

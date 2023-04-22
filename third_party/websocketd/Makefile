@@ -19,7 +19,7 @@ GO_DOWNLOAD_URL:=https://dl.google.com/go/go$(GO_VERSION).tar.gz
 GO_DIR:=go-$(GO_VER)
 
 # Build websocketd binary
-websocketd: $(GO_DIR)/bin/go $(wildcard *.go) $(wildcard libwebsocketd/*.go)
+websocketd: $(GO_DIR)/bin/go $(wildcard *.go) $(wildcard libwebsocketd/*.go) $(wildcard third_party/gorillaws/*.go)
 	$(GO_DIR)/bin/go build
 
 localgo: $(GO_DIR)/bin/go

@@ -19,7 +19,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gorilla/websocket"
+	"gorillaws"
 )
 
 var ForkNotAllowedError = errors.New("too many forks active")
@@ -97,7 +97,7 @@ func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					pushHeaders(headers, h.Config.HeadersWs)
 				}
 
-				upgrader := &websocket.Upgrader{
+				upgrader := &gorillaws.Upgrader{
 					HandshakeTimeout: h.Config.HandshakeTimeout,
 					CheckOrigin: func(r *http.Request) bool {
 						// backporting previous checkorigin for use in gorilla/websocket for now

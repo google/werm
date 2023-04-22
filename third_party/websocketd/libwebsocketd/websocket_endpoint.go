@@ -9,7 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/gorilla/websocket"
+	"gorillaws"
 )
 
 // CONVERT GORILLA
@@ -17,21 +17,21 @@ import (
 // message dispatching methods
 
 type WebSocketEndpoint struct {
-	ws     *websocket.Conn
+	ws     *gorillaws.Conn
 	output chan []byte
 	log    *LogScope
 	mtype  int
 }
 
-func NewWebSocketEndpoint(ws *websocket.Conn, bin bool, log *LogScope) *WebSocketEndpoint {
+func NewWebSocketEndpoint(ws *gorillaws.Conn, bin bool, log *LogScope) *WebSocketEndpoint {
 	endpoint := &WebSocketEndpoint{
 		ws:     ws,
 		output: make(chan []byte),
 		log:    log,
-		mtype:  websocket.TextMessage,
+		mtype:  gorillaws.TextMessage,
 	}
 	if bin {
-		endpoint.mtype = websocket.BinaryMessage
+		endpoint.mtype = gorillaws.BinaryMessage
 	}
 	return endpoint
 }
@@ -80,9 +80,9 @@ func (we *WebSocketEndpoint) read_frames() {
 			break
 		}
 		switch mtype {
-		case websocket.TextMessage:
+		case gorillaws.TextMessage:
 			we.output <- append(p, '\n')
-		case websocket.BinaryMessage:
+		case gorillaws.BinaryMessage:
 			we.output <- p
 		default:
 			we.log.Debug("websocket", "Received message of unknown type: %d", mtype)

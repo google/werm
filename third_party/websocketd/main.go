@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/joewalnes/websocketd/libwebsocketd"
+	"libwebsocketd"
 )
 
 func logfunc(l *libwebsocketd.LogScope, level libwebsocketd.LogLevel, levelName string, category string, msg string, args ...interface{}) {

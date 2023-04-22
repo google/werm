@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"gorillaws"
 )
 
 var ScriptNotFoundError = errors.New("script not found")
@@ -58,7 +58,7 @@ func NewWebsocketdHandler(s *WebsocketdServer, req *http.Request, log *LogScope)
 	return wsh, nil
 }
 
-func (wsh *WebsocketdHandler) accept(ws *websocket.Conn, log *LogScope) {
+func (wsh *WebsocketdHandler) accept(ws *gorillaws.Conn, log *LogScope) {
 	defer ws.Close()
 
 	log.Access("session", "CONNECT")

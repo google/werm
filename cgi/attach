@@ -157,15 +157,18 @@ cat <<EOF
 console.log('prep document onload');
 window.onload = function() {
 console.log('document onload');
-var es, title, pream, i;
+var es, title, pream, i, auxjs, int;
 
 es = document.getElementsByClassName('restore-link');
 
 for (i = 0; i < es.length; i++) {
-	title = localStorage.getItem('title-' + es[i].innerText).trim();
-	pream = localStorage.getItem('pream-' + es[i].innerText);
+	int = es[i].innerText;
+	title = localStorage.getItem('title-' + int).trim();
+	pream = localStorage.getItem('pream-' + int);
+	auxjs = localStorage.getItem('js-' + int);
 	if (title) es[i].innerText = title;
 	if (pream) es[i].href += '&pream=' + encodeURIComponent(pream);
+	if (auxjs) es[i].href += '&js=' + encodeURIComponent(auxjs);
 }
 };
 </script>

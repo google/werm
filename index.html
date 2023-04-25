@@ -421,7 +421,10 @@ function term_init()
 	pream = params.get('pream');
 	auxjs.query = params.get('js') || '';
 
-	if (termid) localStorage['pream-' + termid] = pream || '';
+	if (termid) {
+		localStorage['pream-' + termid] = pream || '';
+		localStorage['js-' + termid] = auxjs.query || '';
+	}
 
 	t.setWindowTitle = function(ttl)
 	{

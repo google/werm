@@ -72,12 +72,11 @@ func (wsh *WebsocketdHandler) accept(ws *gorillaws.Conn, log *LogScope) {
 
 	log.Associate("pid", strconv.Itoa(launched.cmd.Process.Pid))
 
-	binary := wsh.server.Config.Binary
-	process := NewProcessEndpoint(launched, binary, log)
+	process := NewProcessEndpoint(launched, false, log)
 	if cms := wsh.server.Config.CloseMs; cms != 0 {
 		process.closetime += time.Duration(cms) * time.Millisecond
 	}
-	wsEndpoint := NewWebSocketEndpoint(ws, binary, log)
+	wsEndpoint := NewWebSocketEndpoint(ws, false, log)
 
 	PipeEndpoints(process, wsEndpoint)
 }

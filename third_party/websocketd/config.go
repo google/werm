@@ -78,7 +78,6 @@ func parseCommandLine() *Config {
 	redirPortFlag := flag.Int("redirport", 0, "HTTP port to redirect to canonical --port address")
 
 	// lib config options
-	binaryFlag := flag.Bool("binary", false, "Set websocketd to experimental binary mode (default is line by line)")
 	reverseLookupFlag := flag.Bool("reverselookup", false, "Perform reverse DNS lookups on remote clients")
 	scriptDirFlag := flag.String("dir", "", "Base directory for WebSocket scripts")
 	staticDirFlag := flag.String("staticdir", "", "Serve static content from this directory over HTTP")
@@ -132,7 +131,6 @@ func parseCommandLine() *Config {
 	config.HeadersHTTP = []string(headersHttp)
 
 	config.CloseMs = *closeMsFlag
-	config.Binary = *binaryFlag
 	config.ReverseLookup = *reverseLookupFlag
 	config.Ssl = *sslFlag
 	config.ScriptDir = *scriptDirFlag

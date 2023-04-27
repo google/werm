@@ -23,7 +23,7 @@ type WebSocketEndpoint struct {
 	mtype  int
 }
 
-func NewWebSocketEndpoint(ws *gorillaws.Conn, bin bool, log *LogScope) *WebSocketEndpoint {
+func NewWebSocketEndpoint(ws *gorillaws.Conn, log *LogScope) *WebSocketEndpoint {
 	endpoint := &WebSocketEndpoint{
 		ws:     ws,
 		output: make(chan []byte),

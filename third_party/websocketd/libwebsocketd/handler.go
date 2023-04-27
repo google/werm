@@ -76,7 +76,7 @@ func (wsh *WebsocketdHandler) accept(ws *gorillaws.Conn, log *LogScope) {
 	if cms := wsh.server.Config.CloseMs; cms != 0 {
 		process.closetime += time.Duration(cms) * time.Millisecond
 	}
-	wsEndpoint := NewWebSocketEndpoint(ws, false, log)
+	wsEndpoint := NewWebSocketEndpoint(ws, log)
 
 	PipeEndpoints(process, wsEndpoint)
 }

@@ -26,7 +26,6 @@ type Config struct {
 	UsingScriptDir bool     // Are we running with a script dir.
 	StaticDir      string   // If set, static files will be served from this dir over HTTP.
 	CgiDir         string   // If set, CGI scripts will be served from this dir over HTTP.
-	DevConsole     bool     // Enable dev console. This disables StaticDir and CgiDir.
 	AllowOrigins   []string // List of allowed origin addresses for websocket upgrade.
 	SameOrigin     bool     // If set, requires websocket upgrades to be performed from same origin only.
 	Headers        []string

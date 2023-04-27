@@ -82,7 +82,6 @@ func parseCommandLine() *Config {
 	scriptDirFlag := flag.String("dir", "", "Base directory for WebSocket scripts")
 	staticDirFlag := flag.String("staticdir", "", "Serve static content from this directory over HTTP")
 	cgiDirFlag := flag.String("cgidir", "", "Serve CGI scripts from this directory over HTTP")
-	devConsoleFlag := flag.Bool("devconsole", false, "Enable development console (cannot be used in conjunction with --staticdir)")
 	passEnvFlag := flag.String("passenv", defaultPassEnv[runtime.GOOS], "List of envvars to pass to subprocesses (others will be cleaned out)")
 	sameOriginFlag := flag.Bool("sameorigin", false, "Restrict upgrades if origin and host headers differ")
 	allowOriginsFlag := flag.String("origin", "", "Restrict upgrades if origin does not match the list")
@@ -136,7 +135,6 @@ func parseCommandLine() *Config {
 	config.ScriptDir = *scriptDirFlag
 	config.StaticDir = *staticDirFlag
 	config.CgiDir = *cgiDirFlag
-	config.DevConsole = *devConsoleFlag
 	config.StartupTime = time.Now()
 	config.ServerSoftware = "websocketd.werm"
 	config.HandshakeTimeout = time.Millisecond * 1500 // only default for now

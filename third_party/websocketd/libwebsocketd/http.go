@@ -64,7 +64,7 @@ func pushHeaders(h http.Header, hdrs []string) {
 	}
 }
 
-// ServeHTTP muxes between WebSocket handler, CGI handler, DevConsole, Static HTML or 404.
+// ServeHTTP muxes between WebSocket handler, CGI handler, Static HTML or 404.
 func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log := h.Log.NewLevel(h.Log.LogFunc)
 	log.Associate("url", h.TellURL("http", req.Host, req.RequestURI))
@@ -125,16 +125,6 @@ func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	pushHeaders(w.Header(), h.Config.HeadersHTTP)
-
-	// Dev console (if enabled)
-	if h.Config.DevConsole {
-		log.Access("http", "DEVCONSOLE")
-		content := ConsoleContent
-		content = strings.Replace(content, "{{license}}", License, -1)
-		content = strings.Replace(content, "{{addr}}", h.TellURL("ws", req.Host, req.RequestURI), -1)
-		http.ServeContent(w, req, ".html", h.Config.StartupTime, strings.NewReader(content))
-		return
-	}
 
 	// CGI scripts, limited to size of h.forks
 	if h.Config.CgiDir != "" {

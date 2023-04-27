@@ -41,17 +41,6 @@ func main() {
 
 	log := libwebsocketd.RootLogScope(config.LogLevel, logfunc)
 
-	if config.DevConsole {
-		if config.StaticDir != "" {
-			log.Fatal("server", "Invalid parameters: --devconsole cannot be used with --staticdir. Pick one.")
-			os.Exit(4)
-		}
-		if config.CgiDir != "" {
-			log.Fatal("server", "Invalid parameters: --devconsole cannot be used with --cgidir. Pick one.")
-			os.Exit(4)
-		}
-	}
-
 	if runtime.GOOS != "windows" { // windows relies on env variables to find its libs... e.g. socket stuff
 		os.Clearenv() // it's ok to wipe it clean, we already read env variables from passenv into config
 	}
@@ -87,11 +76,7 @@ func main() {
 
 	for _, addrSingle := range config.Addr {
 		log.Info("server", "Starting WebSocket server   : %s", handler.TellURL("ws", addrSingle, "/"))
-		if config.DevConsole {
-			log.Info("server", "Developer console enabled   : %s", handler.TellURL("http", addrSingle, "/"))
-		} else if config.StaticDir != "" || config.CgiDir != "" {
-			log.Info("server", "Serving CGI or static files : %s", handler.TellURL("http", addrSingle, "/"))
-		}
+		log.Info("server", "Serving CGI or static files : %s", handler.TellURL("http", addrSingle, "/"))
 		go serve("tcp", addrSingle)
 
 		if config.RedirPort != 0 {

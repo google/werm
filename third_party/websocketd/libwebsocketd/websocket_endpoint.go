@@ -30,9 +30,6 @@ func NewWebSocketEndpoint(ws *gorillaws.Conn, bin bool, log *LogScope) *WebSocke
 		log:    log,
 		mtype:  gorillaws.TextMessage,
 	}
-	if bin {
-		endpoint.mtype = gorillaws.BinaryMessage
-	}
 	return endpoint
 }
 

@@ -68,7 +68,6 @@ func parseCommandLine() *Config {
 	// server config options
 	portFlag := flag.Int("port", 0, "HTTP port to listen on")
 	udsFlag := flag.String("uds", "", "Path of the Unix Domain Socket to listen on")
-	licenseFlag := flag.Bool("license", false, "Print license and exit")
 	logLevelFlag := flag.String("loglevel", "access", "Log level, one of: debug, trace, access, info, error, fatal")
 	sslFlag := flag.Bool("ssl", false, "Use TLS on listening socket (see also --sslcert and --sslkey)")
 	sslCert := flag.String("sslcert", "", "Should point to certificate PEM file when --ssl is used")
@@ -141,11 +140,6 @@ func parseCommandLine() *Config {
 
 	if len(os.Args) == 1 {
 		log.Fatal("Command line arguments are missing.")
-	}
-
-	if *licenseFlag {
-		fmt.Printf("%s\n", libwebsocketd.License)
-		os.Exit(0)
 	}
 
 	// Reading SSL options

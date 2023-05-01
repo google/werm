@@ -167,3 +167,10 @@ stored title length: 128
 do not include altscreen content in scrollback log
 xyz
 abcrest
+move to col
+] 
+cts-tf > run cts -m CtsInitTestCases -t keychords#init_inotify
+move to col 2
+axyz
+shift rest of line then overwrite
+xyz234

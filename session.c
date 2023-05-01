@@ -208,24 +208,36 @@ static _Bool consumeesc(const char *pref, size_t preflen)
  */
 #define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
-void deletechrahead(void)
+static void deletechrahead(void)
 {
 	char *endptr;
 	const char *lesc;
 	unsigned long cnt;
 
 	lesc = (char *)wts.escbuf + wts.escsz - 1;
-	if (wts.escsz < 4 || *lesc != 'P' || wts.escbuf[1] != '[') return;
+	if (wts.escsz < 4 || wts.escbuf[1] != '[') return;
 
 	cnt = strtoul((char *)wts.escbuf+2, &endptr, 10);
 
 	if (endptr != lesc) return;
 
-	if (wts.linesz <= wts.linepos + cnt) return;
+	switch (*lesc) {
+	case 'P':
+		if (wts.linesz <= wts.linepos + cnt) return;
 
-	wts.linesz -= cnt;
-	memmove(wts.linebuf + wts.linepos, wts.linebuf + wts.linepos + cnt,
-		wts.linesz - wts.linepos);
+		wts.linesz -= cnt;
+		memmove(wts.linebuf + wts.linepos,
+			wts.linebuf + wts.linepos + cnt,
+			wts.linesz - wts.linepos);
+		break;
+	case 'G':
+		wts.linepos = cnt - 1;
+		break;
+	default:
+		return;
+	}
+
+	wts.escsz = 0;
 }
 
 /* Obviously this function is a mess. But I'm still planning how to clean it up.
@@ -260,6 +272,15 @@ void process_tty_out(const void *buf_, ssize_t len)
 		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[")) {
 			switch (*buf) {
 			/* delete to EOL */
+			case 'J':
+				/* This clears the screen, either below (0J or
+				 * J) above (1J) or all (2J). We just assume 0J
+				 * and only change the current line. Some day we
+				 * may keep the whole screen in the buffer
+				 * rather than the current line, in which case
+				 * this has to change. Also, once we see 1J or
+				 * 2J in the wild we will implement it.
+				 */
 			case 'K': wts.linesz = wts.linepos; break;
 
 			case 'A': 
@@ -1034,6 +1055,20 @@ static void _Noreturn testmain(void)
 	process_tty_out("defg", -1);
 	process_tty_out("hijk\033[?1049lrest\r\n", -1);
 
+	puts("move to col");
+	testreset();
+	wts.logfd = 1;
+	process_tty_out(test_jumptocol_in, test_jumptocol_in_size);
+
+	puts("move to col 2");
+	testreset();
+	wts.logfd = 1;
+	process_tty_out("asdf\033[2Gxyz\r\n", -1);
+
+	puts("shift rest of line then overwrite");
+	testreset();
+	wts.logfd = 1;
+	process_tty_out("asdf 01234\r\033[4Pxyz\n", -1);
 	exit(0);
 }
 

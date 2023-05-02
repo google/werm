@@ -21,8 +21,7 @@ body {
 
   </head>
   <body>
-    <div id="terminal"
-         style="position:relative; width:100%; height:100%"></div>
+    <div id="terminal" style="position:relative; width:100%; height:100%"></div>
     <script>window['extended_macros'] = {}</script>
 
     <script src="third_party/hterm_all.js"></script>
@@ -184,7 +183,7 @@ function term_init()
 		pend_escape = '', termid, pream, auxjs = {},
 		params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl, host;
 
-	function find_row_ttl()
+	function btm_row_text()
 	{
 		var rows, rowi, txt;
 		rows = t.document_.getElementsByTagName('x-row');
@@ -193,13 +192,17 @@ function term_init()
 		return txt;
 	}
 
+	function cur_row_text()
+	{
+		var s = t.screen_;
+		return s.rowsArray[s.cursorPosition.row].innerText;
+	}
+
 	host = location.host.replace(/^localhost:/, ':');
 
 	function set_locked_title()
 	{
-		var ttl;
-
-		ttl = find_row_ttl();
+		var ttl = this();
 		if (ttl) signal('\\t' + ttl + '\n');
 	}
 
@@ -216,7 +219,7 @@ function term_init()
 		compons = [];
 		if (termid) compons.push(`[${termid}]`);
 
-		if (!locked_ttl) row_ttl = find_row_ttl() || row_ttl;
+		if (!locked_ttl) row_ttl = cur_row_text() || row_ttl;
 
 		if (row_ttl) compons.push(row_ttl);
 		compons.push(host);
@@ -802,7 +805,8 @@ function term_init()
 		['raT ', '\x14'],
 		['ralsT ', '\x1b\x14'],
 		['raD U M P ', signal.bind(0, '\\d')],
-		['raS T ', set_locked_title],
+		['raS T ', set_locked_title.bind(cur_row_text)],
+		['raS B T ', set_locked_title.bind(btm_row_text)],
 		['laU T ', unlock_title],
 		['rarsA T ', function() { window.open('/attach', '_top'); }],
 		['rarsS T ', function() { window.open('/attach', '_blank'); }],

@@ -211,8 +211,10 @@ static _Bool consumeesc(const char *pref, size_t preflen)
 static void deletechrahead(void)
 {
 	char *endptr;
+	unsigned char *posptr;
 	const char *lesc;
 	unsigned long cnt;
+	unsigned mvsz;
 
 	lesc = (char *)wts.escbuf + wts.escsz - 1;
 	if (wts.escsz < 4 || wts.escbuf[1] != '[') return;
@@ -221,18 +223,25 @@ static void deletechrahead(void)
 
 	if (endptr != lesc) return;
 
+	posptr = wts.linebuf + wts.linepos;
+	mvsz = wts.linesz - wts.linepos;
 	switch (*lesc) {
 	case 'P':
 		if (wts.linesz <= wts.linepos + cnt) return;
 
 		wts.linesz -= cnt;
-		memmove(wts.linebuf + wts.linepos,
-			wts.linebuf + wts.linepos + cnt,
-			wts.linesz - wts.linepos);
+		memmove(posptr, posptr + cnt, mvsz);
 		break;
 	case 'G':
 		wts.linepos = cnt - 1;
 		break;
+	case '@':
+		if (cnt + wts.linesz > sizeof(wts.linebuf)) break;
+		memmove(posptr + cnt, posptr, mvsz);
+		memset(posptr, ' ', cnt);
+		wts.linesz += cnt;
+		break;
+
 	default:
 		return;
 	}
@@ -1069,6 +1078,35 @@ static void _Noreturn testmain(void)
 	testreset();
 	wts.logfd = 1;
 	process_tty_out("asdf 01234\r\033[4Pxyz\n", -1);
+
+	puts("shift remaining characters right");
+	testreset();
+	wts.logfd = 1;
+	process_tty_out("asdf\r\033[10@xyz\n", -1);
+
+	puts("shift remaining characters right more");
+	testreset();
+	wts.logfd = 1;
+	/* 10000 is too large; it should be ignored */
+	process_tty_out("asdf\r\033[10000@xyz\r\n", -1);
+	process_tty_out("asdf\r\033[15@xyz\r\n", -1);
+	process_tty_out(":(..more\r:)\033[5@xyz\r\n", -1);
+	process_tty_out(":(..more\r:)\033[1@xyz\r\n", -1);
+
+	/* Make sure we only copy the amount of characters needed. */
+	for (i = 0; i < 100; i++) process_tty_out("123456", -1);
+	process_tty_out("\r\033[552G", -1);
+	process_tty_out("\033[10@", -1);
+	process_tty_out("..more:)\r\n", -1);
+
+	puts("move more characters right than are in the line");
+	process_tty_out("abcd\r\033[1000@!!!!\r\n", -1);
+	process_tty_out("abcd\r\033[50@!!!!\r\n", -1); 
+
+	puts("make long line too big to fit into buffer");
+	for (i = 0; i < sizeof(wts.linebuf) - 1; i++) process_tty_out("*", -1);
+	process_tty_out("\r\033[32@!!!\r\n", -1);
+
 	exit(0);
 }
 

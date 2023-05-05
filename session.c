@@ -265,8 +265,19 @@ void process_tty_out(const void *buf_, ssize_t len)
 	while (len) {
 		if (buf[0] == '\r') {
 			wts.escsz = 0;
-			if (wts.swcol) wts.linepos -= wts.linepos % wts.swcol;
-			else wts.linepos = 0;
+			/* A previous version would move linepos to the start of
+			 * a wrapped line rather than the position of the most
+			 * recent \n.
+			 * That was almost correct, but the boundary condition
+			 * was not handled right. When the cursor is at the end
+			 * of the line but has not written any char to the next
+			 * line yet, it should move to the start of the full
+			 * line, not remain stationary.
+			 *
+			 * TODO make that work correct when I have time to write
+			 * tests.
+			 */
+			wts.linepos = 0;
 			goto eol;
 		}
 

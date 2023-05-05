@@ -131,7 +131,8 @@ static void dump(void)
 	FILE *f;
 	static unsigned dimp;
 
-	xasprintf(&dumpfn, "/tmp/dump.%lld.%u", (long long)getpid(), dimp++);
+	xasprintf(&dumpfn, "/tmp/werm.dump.%lld.%u",
+		  (long long)getpid(), dimp++);
 	f = fopen(dumpfn, "w");
 	if (!f) warn("could not fopen %s for dumping state", dumpfn);
 	free(dumpfn);
@@ -144,6 +145,7 @@ static void dump(void)
 	logescaped(f, wts.escbuf, wts.escsz);
 	fprintf(f, "altscr:  %u\n", wts.altscren);
 	fprintf(f, "appcurs: %u\n", wts.appcursor);
+	fprintf(f, "windim: %u:%u\n", wts.swrow, wts.swcol);
 	fclose(f);
 }
 

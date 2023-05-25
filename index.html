@@ -27,6 +27,8 @@ body {
     <script src="third_party/hterm_all.js"></script>
     <script>
 
+var signal;
+
 var native_to_mn = {
 	'Escape':		'es',
 	'F1':			'f1',
@@ -405,7 +407,7 @@ function term_init()
 
 	prepare_sock();
 
-	function signal(s)
+	signal = function(s)
 	{
 		if (log_send) {
 			console.log('request send:', encodeURI(s));

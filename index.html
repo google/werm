@@ -952,6 +952,8 @@ function term_init()
 
 		if (matching.length) {
 			if (macro_winpos != winpos()) {
+				if (log_macks)
+					console.log('macro reset (win moved)');
 				matching.length = 0;
 				return;
 			}

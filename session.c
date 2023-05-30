@@ -596,15 +596,21 @@ static void prepfordtach(void)
 	time_t now;
 	struct tm tim;
 
-	now = time(NULL);
-	if (!localtime_r(&now, &tim)) err(1, "cannot get time");
-
 	dtach_ephem = !termid;
 
 	/* We need some termid for creating log file or setting argv0 later */
 	if (!termid) xasprintf(&termid, "ephem.%lld", (long long) getpid());
-
 	xasprintf(&dtach_sock, "%s/dtach.%s", rundir(), termid);
+
+	/* Do not save scrollbacks for ephemeral terminals, as these are
+	 * used for grepping scrollback logs, so they can be very large
+	 * and included redundant data that will be confusing to see in
+	 * some recursive analysis of scrollbacks. */
+	if (dtach_ephem) return;
+
+	now = time(NULL);
+	if (!localtime_r(&now, &tim)) err(1, "cannot get time");
+
 	wts.logfd = opnforlog(&tim, "");
 	wts.rawlogfd = opnforlog(&tim, ".raw");
 }

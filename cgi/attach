@@ -121,10 +121,10 @@ cat <<EOF
 <table>
 EOF
 
-lsof -Fn /tmp/dtach.* |
+lsof -Fn $WERMDIR/var/dtach.* |
 awk '
-/^n/ {
-	sub(/^n\/tmp\/dtach[.]/, "");
+/^n/ && !/\/var\/dtach[.]ephem[.]/ {
+	sub(/^n.*\/var\/dtach[.]/, "");
 	count[$1] += 1;
 }
 END {

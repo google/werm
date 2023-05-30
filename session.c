@@ -4,6 +4,7 @@
 #include "shared.h"
 #include "test/data.h"
 
+#include <time.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -541,12 +542,46 @@ void _Noreturn subproc_main(void)
 	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
 }
 
-static int opnforlog(const char *suff)
+static const char *rundir(void)
+{
+	static char *rd;
+	const char *wermdir;
+
+	if (rd) return rd;
+
+	wermdir = getenv("WERMDIR");
+	if (!wermdir) errx(1, "$WERMDIR is unset");
+
+	xasprintf(&rd, "%s/var", wermdir);
+
+	if (mkdir(rd, 0700) && errno != EEXIST) err(1, "cannot create %s", rd);
+
+	return rd;
+}
+
+static void appenddir(char **p, int nmb)
+{
+	char *ch;
+
+	xasprintf(&ch, "%s/%02d", *p, nmb);
+	free(*p);
+	*p = ch;
+	if (mkdir(*p, 0700) && errno != EEXIST) err(1, "cannot create %s", *p);
+}
+
+static int opnforlog(const struct tm *tim, const char *suff)
 {
 	int fd;
-	char *fn;
+	char *dir, *fn;
 
-	xasprintf(&fn, "/tmp/log.%s%s", termid, suff);
+	dir = strdup(rundir());
+	appenddir(&dir, tim->tm_year+1900);
+	appenddir(&dir, tim->tm_mon+1);
+	appenddir(&dir, tim->tm_mday);
+
+	xasprintf(&fn, "%s/%s%s", dir, termid, suff);
+	free(dir);
+
 	fd = open(fn, O_WRONLY | O_CREAT | O_APPEND, 0600);
 	if (fd < 0) {
 		warn("open %s", fn);
@@ -558,21 +593,20 @@ static int opnforlog(const char *suff)
 
 static void prepfordtach(void)
 {
+	time_t now;
+	struct tm tim;
+
+	now = time(NULL);
+	if (!localtime_r(&now, &tim)) err(1, "cannot get time");
+
 	dtach_ephem = !termid;
 
-#define EPHEM_SOCK_PREFIX "/tmp/werm.ephem"
+	/* We need some termid for creating log file or setting argv0 later */
+	if (!termid) xasprintf(&termid, "ephem.%lld", (long long) getpid());
 
-	if (!termid) {
-		xasprintf(&dtach_sock, EPHEM_SOCK_PREFIX ".%lld",
-			  (long long) getpid());
-		/* We need some termid for setting argv0 later */
-		termid = dtach_sock + sizeof(EPHEM_SOCK_PREFIX);
-	}
-	else {
-		xasprintf(&dtach_sock, "/tmp/dtach.%s", termid);
-		wts.logfd = opnforlog("");
-		wts.rawlogfd = opnforlog(".raw");
-	}
+	xasprintf(&dtach_sock, "%s/dtach.%s", rundir(), termid);
+	wts.logfd = opnforlog(&tim, "");
+	wts.rawlogfd = opnforlog(&tim, ".raw");
 }
 
 

@@ -27,3 +27,8 @@ void set_argv0(const char *role);
 
 /* Called if the process was attached to for the first time. */
 void send_pream(int fd);
+
+/* Called by master process. This must only be called by master, and never by
+ * the attaching process, as the attaching process may have a later date on it
+ * and thus create a new log file that doesn't get written to. */
+void maybe_open_logs(void);

@@ -522,9 +522,6 @@ void _Noreturn subproc_main(void)
 {
 	const char *shell;
 
-	if (wts.logfd) close(wts.logfd);
-	if (wts.rawlogfd) close(wts.rawlogfd);
-
 	if (srvargv) {
 		execv(srvargv[0], srvargv);
 		err(1, "execv server");
@@ -591,16 +588,10 @@ static int opnforlog(const struct tm *tim, const char *suff)
 	return fd;
 }
 
-static void prepfordtach(void)
+void maybe_open_logs(void)
 {
 	time_t now;
 	struct tm tim;
-
-	dtach_ephem = !termid;
-
-	/* We need some termid for creating log file or setting argv0 later */
-	if (!termid) xasprintf(&termid, "ephem.%lld", (long long) getpid());
-	xasprintf(&dtach_sock, "%s/dtach.%s", rundir(), termid);
 
 	/* Do not save scrollbacks for ephemeral terminals, as these are
 	 * used for grepping scrollback logs, so they can be very large
@@ -615,6 +606,14 @@ static void prepfordtach(void)
 	wts.rawlogfd = opnforlog(&tim, ".raw");
 }
 
+static void prepfordtach(void)
+{
+	dtach_ephem = !termid;
+
+	/* We need some termid for creating log file or setting argv0 later */
+	if (!termid) xasprintf(&termid, "ephem.%lld", (long long) getpid());
+	xasprintf(&dtach_sock, "%s/dtach.%s", rundir(), termid);
+}
 
 void send_pream(int fd)
 {

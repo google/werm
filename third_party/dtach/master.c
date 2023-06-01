@@ -382,6 +382,8 @@ masterprocess(int s, int statusfd)
 		exit(1);
 	}
 
+	maybe_open_logs();
+
 	/* Set up some signals. */
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGXFSZ, SIG_IGN);

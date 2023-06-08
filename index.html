@@ -138,6 +138,29 @@ var native_to_mn = {
 	'IntlYen':		'j7',
 };
  
+// left and right shift and left and right ctrl can be configured to insert a
+// string if they are pressed without any other key.
+// The string to insert is the second element of each entry in deadkey_map.
+// These are empty strings in the released code. Customize them below.
+// Note that pressing or releasing any of these four keys does not count as
+// "press[ing] any other key" as above. So you can chain these
+// quickly if required, e.g.
+//     press left shift, (press or depress a ctrl key), release left shift
+// will activate the left shift dead key behavior.
+var deadkey_map = [
+	// left shift
+	[/Dls.?(rs|rc|lc)?Uls$/, ''],
+
+	// right shift
+	[/Drs.?(ls|rc|lc)?Urs$/, ''],
+
+	// left ctrl
+	[/Dlc.?(rc|rs|ls)?Ulc$/, ''],
+
+	// right ctrl
+	[/Drc.?(lc|rs|ls)?Urc$/, ''],
+];
+
 function sanit(s)
 {
 	var e = [], c, ci;
@@ -946,7 +969,7 @@ function term_init()
 
 	t.getScrollPort().getDocument().body.onkeyup = function(e)
 	{
-		var hist;
+		var hist, dki;
 
 		if (log_keys) console.log('scrollport key:', e);
 
@@ -975,10 +998,10 @@ function term_init()
 		hist = dead_key_hist.join('');
 		dead_key_hist.splice(0, 2);
 
-		if (hist.endsWith('DlsUls') || hist === 'DlsDrsUls' || hist === 'DlsUrsUls') signal(')');
-		if (hist.endsWith('DrsUrs') || hist === 'DrsUlsUrs' || hist === 'DrsDlsUrs') signal('(');
-		if (hist.endsWith('DrcUrc')) signal('$');
-		if (hist.endsWith('DlcUlc')) signal('"');
+		for (dki = 0; dki < deadkey_map.length; dki++) {
+			if (-1 === hist.search(deadkey_map[dki][0])) continue;
+			signal(deadkey_map[dki][1]);
+		}
 	};
 }
 

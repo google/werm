@@ -161,6 +161,9 @@ var deadkey_map = [
 	[/Drc.?(lc|rs|ls)?Urc$/, ''],
 ];
 
+// String to insert when pressing the ContextMenu (mnemonic: 'me') key.
+var menu_key_inserts = '';
+
 function sanit(s)
 {
 	var e = [], c, ci;
@@ -565,8 +568,10 @@ function term_init()
 			case 'en': signal(pref + '\r');		return true;
 			case 'bs': signal(pref + '\177');	return true;
 			case 'es': signal(pref + '\x1b');	return true;
-			case 'me': signal(pref + '_');		return true;
 			case 'ta': signal(pref + '\t');		return true;
+			case 'me':
+				signal(pref + menu_key_inserts);
+				return true;
 			default:				return false;
 			}
 		}

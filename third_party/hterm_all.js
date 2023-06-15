@@ -5425,39 +5425,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `might not be able to always disable it.`,
   ),
 
-  'mouse-right-click-paste': hterm.PreferenceManager.definePref_(
-      'Mouse right clicks paste content',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      true, 'bool',
-      `Paste on right mouse button clicks.\n` +
-      `\n` +
-      `This option is independent of the "mouse-paste-button" setting.\n` +
-      `\n` +
-      `Note: The primary & secondary buttons are handled for you with left ` +
-      `& right handed mice.`,
-  ),
-
-  'mouse-paste-button': hterm.PreferenceManager.definePref_(
-      'Mouse button paste',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      null, [null, 0, 1, 2, 3, 4, 5, 6],
-      `The mouse button to use for pasting.\n` +
-      `\n` +
-      `For autodetect, we'll use the middle mouse button for non-X11 ` +
-      `platforms (including ChromeOS). On X11, we'll use the right mouse ` +
-      `button (since the window manager should handle pasting via the middle ` +
-      `mouse button).\n` +
-      `\n` +
-      `0 == left (primary) button.\n` +
-      `1 == middle (auxiliary) button.\n` +
-      `2 == right (secondary) button.\n` +
-      `\n` +
-      `This option is independent of the setting for right-click paste.\n` +
-      `\n` +
-      `Note: The primary & secondary buttons are handled for you with left ` +
-      `& right handed mice.`,
-  ),
-
   'screen-padding-size': hterm.PreferenceManager.definePref_(
       'Screen padding size',
       hterm.PreferenceManager.Categories.Appearance,
@@ -5563,14 +5530,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `If true, Meta+1..9 will be handled by the browser. If false, ` +
       `Meta+1..9 will be sent to the host. If null, autodetect based on ` +
       `browser platform and window type.`,
-  ),
-
-  'paste-on-drop': hterm.PreferenceManager.definePref_(
-      'Allow drag & drop to paste',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      true, 'bool',
-      `If true, Drag and dropped text will paste into terminal.\n` +
-      `If false, dropped text will be ignored.`,
   ),
 
   'scroll-wheel-may-send-arrow-keys': hterm.PreferenceManager.definePref_(
@@ -7507,11 +7466,6 @@ hterm.ScrollPort.prototype.setScreenPaddingSize = function(size) {
   this.resize();
 };
 
-/** @param {boolean} pasteOnDrop */
-hterm.ScrollPort.prototype.setPasteOnDrop = function(pasteOnDrop) {
-  this.pasteOnDrop = pasteOnDrop;
-};
-
 /**
  * Get the usable size of the scrollport screen.
  *
@@ -8745,8 +8699,9 @@ hterm.Terminal = function({profileId, storage} = {}) {
   this.enableMouseDragScroll = true;
 
   this.copyOnSelect = null;
-  this.mouseRightClickPaste = null;
-  this.mousePasteButton = null;
+
+  // Use right button to paste.
+  this.mousePasteButton = 2;
 
   // Whether to use the default window copy behavior.
   this.useDefaultWindowCopy = false;
@@ -8924,10 +8879,6 @@ hterm.Terminal.prototype.setProfile = function(
       this.clearSelectionAfterCopy = !!v;
     },
 
-    'paste-on-drop': (v) => {
-      this.scrollPort_.setPasteOnDrop(v);
-    },
-
     'east-asian-ambiguous-as-two-column': (v) => {
       lib.wc.regardCjkAmbiguous = v;
     },
@@ -8947,14 +8898,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'hide-mouse-while-typing': (v) => {
       this.setAutomaticMouseHiding(v);
-    },
-
-    'mouse-right-click-paste': (v) => {
-      this.mouseRightClickPaste = v;
-    },
-
-    'mouse-paste-button': (v) => {
-      this.syncMousePasteButton();
     },
 
     'pass-alt-number': (v) => {
@@ -9279,24 +9222,6 @@ hterm.Terminal.prototype.getFontSize = function() {
  */
 hterm.Terminal.prototype.getFontFamily = function() {
   return this.scrollPort_.getFontFamily();
-};
-
-/**
- * Set this.mousePasteButton based on the mouse-paste-button pref,
- * autodetecting if necessary.
- */
-hterm.Terminal.prototype.syncMousePasteButton = function() {
-  const button = this.prefs_.get('mouse-paste-button');
-  if (typeof button == 'number') {
-    this.mousePasteButton = button;
-    return;
-  }
-
-  if (hterm.os != 'linux') {
-    this.mousePasteButton = 1;  // Middle mouse button.
-  } else {
-    this.mousePasteButton = 2;  // Right mouse button.
-  }
 };
 
 /**
@@ -11895,15 +11820,9 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
       return;
     }
 
-    if (e.type == 'mousedown') {
-      if (e.ctrlKey && e.button == 2 /* right button */) {
-        e.preventDefault();
-        this.contextMenu.show(e, this);
-      } else if (e.button == this.mousePasteButton ||
-          (this.mouseRightClickPaste && e.button == 2 /* right button */)) {
-        if (this.paste() === false) {
-          console.warn('Could not paste manually due to web restrictions');
-        }
+    if (e.type == 'mousedown' && e.button == this.mousePasteButton) {
+      if (this.paste() === false) {
+        console.warn('Could not paste manually due to web restrictions');
       }
     }
 

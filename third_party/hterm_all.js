@@ -7209,7 +7209,7 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   // Some of these attributes are standard while others are browser specific,
   // but should be safely ignored by other browsers.
   this.x_screen = doc.createElement('x-screen');
-  this.x_screen.setAttribute('contenteditable', 'true');
+  this.x_screen.setAttribute('contenteditable', 'false');
   this.x_screen.setAttribute('spellcheck', 'false');
   this.x_screen.setAttribute('autocomplete', 'off');
   this.x_screen.setAttribute('autocorrect', 'off');

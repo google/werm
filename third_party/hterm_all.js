@@ -7165,6 +7165,8 @@ hterm.ScrollPort.prototype.decorate = function(div, callback) {
  * @private
  */
 hterm.ScrollPort.prototype.paintIframeContents_ = function() {
+  var xs;
+
   this.iframe_.contentWindow.addEventListener('resize',
                                               this.resize.bind(this));
 
@@ -7202,13 +7204,18 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   this.userCssLink_ = doc.createElement('link');
   this.userCssLink_.setAttribute('rel', 'stylesheet');
 
-  // We make this field editable even though we don't actually allow anything
-  // to be edited here so that Chrome will do the right thing with virtual
-  // keyboards and IMEs.  But make sure we turn off all the input helper logic
-  // that doesn't make sense here, and might inadvertently mung or save input.
+  xs = this.x_screen = doc.createElement('x-screen');
+  doc.body.onfocus = function() {
+    // x-screen's parent <body> was focused, which may mean the user
+    // Tab'd into the terminal area. Focus the x-screen itself to make the
+    // cursor have the right style (just a known example of possible problems).
+    xs.focus();
+  };
+  // Prevent IME and autocorrect functionality from doing anything.
   // Some of these attributes are standard while others are browser specific,
   // but should be safely ignored by other browsers.
-  this.x_screen = doc.createElement('x-screen');
+  // To enable IMEs, contenteditable would be true, the others would still be
+  // turned off, and more work by the hterm calling code may have to be done.
   this.x_screen.setAttribute('contenteditable', 'false');
   this.x_screen.setAttribute('spellcheck', 'false');
   this.x_screen.setAttribute('autocomplete', 'off');

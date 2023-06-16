@@ -139,6 +139,7 @@ var native_to_mn = {
 	'BrowserForward':	'bf',
 };
 
+// BEGIN deadkey_map
 // left and right shift and left and right ctrl can be configured to insert a
 // string if they are pressed without any other key.
 // The string to insert is the second element of each entry in deadkey_map.
@@ -161,9 +162,30 @@ var deadkey_map = [
 	// right ctrl
 	[/Drc.?(lc|rs|ls)?Urc$/, ''],
 ];
+// END deadkey_map
 
+var wermcfg = {};
+
+// BEGIN pass_ctrl_L
+// set this to truthy to not intercept Ctrl+L. This allows jumping to the
+// address bar with the keyboard. You may also want to add an entry to macro_map
+// to send Ctrl+L to the terminal when you need to do something like refresh or
+// redraw the screen:
+// var macro_map = [
+//   'ralsL ': '\014',
+//   ...
+// ];
+// Note this is not generic such that you can pass arbitrary codes like ^@ as
+// some are processed by the below code in different paths, some are not a
+// browser shortcut at all, and some would cause trouble if the browser
+// processed it, such as Ctrl+A.
+wermcfg.pass_ctrl_L = 0;
+// END pass_ctrl_L
+
+// BEGIN menu_key_inserts
 // String to insert when pressing the ContextMenu (mnemonic: 'me') key.
 var menu_key_inserts = '';
+// END menu_key_inserts
 
 function sanit(s)
 {
@@ -579,9 +601,24 @@ function term_init()
 
 		if (e.ctrlKey) {
 			ch = e.key.charCodeAt(0);
-			if (ch >= 0x7b || ch < 0x40) return;
-			if (ch >= 0x61) ch -= 0x20;
-			ch -= 0x40;
+
+			// Allow {|}~ and <DEL> and everything below space in
+			// ascii(7) to pass to default browser behavior.
+			if (ch >= 0173 || ch < 0100) return false;
+
+			// Convert lowercase to upper.
+			if (ch >= 0141) ch -= 040;
+
+			// Shift key with alphabetic chars should pass.
+			// Note the below check doesn't match if ch is capital
+			// because of the caps lock key and not shift.
+			if (e.shiftKey && ch >=0101 && ch <=0132) return false; 
+
+			// Convert raw character to ctrl code.
+			ch -= 0100;
+
+			if (ch == 014 && wermcfg.pass_ctrl_L && pref == '')
+				return false;
 
 			signal(sanit(pref + String.fromCharCode(ch)));
 			return true;

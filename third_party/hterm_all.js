@@ -7312,24 +7312,6 @@ hterm.ScrollPort.prototype.getScreenSize = function() {
 };
 
 /**
- * Get the usable width of the scrollport screen.
- *
- * @return {number}
- */
-hterm.ScrollPort.prototype.getScreenWidth = function() {
-  return this.getScreenSize().width;
-};
-
-/**
- * Get the usable height of the scrollport screen.
- *
- * @return {number}
- */
-hterm.ScrollPort.prototype.getScreenHeight = function() {
-  return this.getScreenSize().height;
-};
-
-/**
  * Return the document that holds the visible rows of this hterm.ScrollPort.
  *
  * @return {!Document}
@@ -9187,13 +9169,6 @@ hterm.Terminal.prototype.realizeHeight_ = function(rowCount) {
 
   this.setVTScrollRegion(null, null);
   this.restoreCursor(cursor);
-};
-
-/**
- * Scroll the terminal to the top of the scrollback buffer.
- */
-hterm.Terminal.prototype.scrollHome = function() {
-  this.scrollPort_.scrollRowToTop(0);
 };
 
 /**
@@ -11674,10 +11649,11 @@ hterm.Terminal.prototype.onCopy_ = function(e) {
  * programmatic width change.
  */
 hterm.Terminal.prototype.onResize_ = function() {
-  const columnCount = Math.floor(this.scrollPort_.getScreenWidth() /
+  const screensz = this.scrollPort_.getScreenSize();
+  const columnCount = Math.floor(screensz.width /
                                  this.scrollPort_.characterSize.width) || 0;
   const rowCount = lib.f.smartFloorDivide(
-      this.scrollPort_.getScreenHeight(),
+      screensz.height,
       this.scrollPort_.characterSize.height) || 0;
 
   if (columnCount <= 0 || rowCount <= 0) {

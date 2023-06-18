@@ -4128,6 +4128,8 @@ hterm.sanitizeHtml = function(html) {
   return html;
 };
 
+function dpifud(s) { return `calc(var(--hterm-dpi-fudge) * ${s}px)`; }
+
 /**
  * Copy the specified text to the system clipboard.
  *
@@ -4193,7 +4195,7 @@ hterm.copySelectionToClipboard = function(document, str) {
     copySource.style.cssText = (
         'user-select: text;' +
         'position: absolute;' +
-        'top: -99px');
+        'top: ' + dpifud(-99));
 
     document.body.appendChild(copySource);
 
@@ -4845,7 +4847,7 @@ hterm.NotificationCenter = class {
     ele.style.cssText =
         'color: rgb(var(--hterm-background-color));' +
         'background-color: rgb(var(--hterm-foreground-color));' +
-        'border-radius: 12px;' +
+        `border-radius: ${dpifud(12)};` +
         'font: 500 var(--hterm-font-size) "Noto Sans", sans-serif;' +
         'opacity: 0.75;' +
         'padding: 0.923em 1.846em;' +
@@ -6711,6 +6713,18 @@ hterm.ScrollPort = function(vportctx) {
   this.DEBUG_ = false;
 };
 
+hterm.ScrollPort.prototype.physpixdim = function(el) {
+	var r, f;
+
+	r = el.getBoundingClientRect();
+	f = this.vportctx_.getCssVar('dpi-fudge') || 1;
+
+	return {
+		width:	r.width / f,
+		height:	r.height / f,
+	};
+};
+
 /**
  * Proxy for the native selection object which understands how to walk up the
  * DOM to find the containing row node and sort out which comes first.
@@ -7305,7 +7319,7 @@ hterm.ScrollPort.prototype.setScreenPaddingSize = function(size) {
  * @return {{height: number, width: number}}
  */
 hterm.ScrollPort.prototype.getScreenSize = function() {
-  const size = this.x_screen.getBoundingClientRect();
+  const size = this.physpixdim(this.x_screen);
   const rightPadding = this.screenPaddingSize;
   return {
     height: size.height - (2 * this.screenPaddingSize),
@@ -7453,24 +7467,24 @@ hterm.ScrollPort.prototype.syncRowNodesDimensions_ = function() {
   this.visibleRowTopMargin = 0;
   this.visibleRowBottomMargin = screenSize.height - this.visibleRowsHeight;
 
-  this.topFold_.style.marginBottom = this.visibleRowTopMargin + 'px';
+  this.topFold_.style.marginBottom = dpifud(this.visibleRowTopMargin);
 
 
   let topFoldOffset = 0;
   let node = this.topFold_.previousSibling;
   while (node) {
-    topFoldOffset += node.getBoundingClientRect().height;
+    topFoldOffset += this.physpixdim(node).height;
     node = node.previousSibling;
   }
 
   // Set the dimensions of the visible rows container.
-  this.rowNodes_.style.width = screenSize.width + 'px';
+  this.rowNodes_.style.width = dpifud(screenSize.width);
   this.rowNodes_.style.height =
-      this.visibleRowsHeight + topFoldOffset + this.screenPaddingSize + 'px';
+      dpifud(this.visibleRowsHeight + topFoldOffset + this.screenPaddingSize);
   this.rowNodes_.style.left =
-      this.x_screen.offsetLeft + this.screenPaddingSize + 'px';
+      dpifud(this.x_screen.offsetLeft + this.screenPaddingSize);
   this.rowNodes_.style.top =
-      this.x_screen.offsetTop - topFoldOffset + 'px';
+      dpifud(this.x_screen.offsetTop - topFoldOffset);
 };
 
 /**
@@ -7917,7 +7931,7 @@ hterm.ScrollPort.prototype.selectAll = function() {
 hterm.ScrollPort.prototype.getScrollMax_ = function() {
   return this.scrollHeight_ +
          this.visibleRowTopMargin + this.visibleRowBottomMargin -
-         this.x_screen.getBoundingClientRect().height;
+         this.physpixdim(this.x_screen).height;
 };
 
 /**
@@ -8052,7 +8066,7 @@ hterm.ScrollPort.prototype.scrollWheelDelta = function(e) {
       delta.y = e.deltaY * this.characterSize.height;
       break;
     case WheelEvent.DOM_DELTA_PAGE: {
-      const {width, height} = this.x_screen.getBoundingClientRect();
+      const {width, height} = this.physpixdim(this.x_screen);
       delta.x = e.deltaX * this.characterSize.width * width;
       delta.y = e.deltaY * this.characterSize.height * height;
       break;
@@ -8855,9 +8869,9 @@ hterm.Terminal.prototype.getCssVar = function(name, prefix = '--hterm-') {
  * Update CSS character size variables to match the scrollport.
  */
 hterm.Terminal.prototype.updateCssCharsize_ = function() {
-  this.setCssVar('charsize-width', this.scroll_port.characterSize.width + 'px');
+  this.setCssVar('charsize-width', dpifud(this.scroll_port.characterSize.width));
   this.setCssVar('charsize-height',
-                 this.scroll_port.characterSize.height + 'px');
+                 dpifud(this.scroll_port.characterSize.height));
 };
 
 /**
@@ -8866,8 +8880,8 @@ hterm.Terminal.prototype.updateCssCharsize_ = function() {
  * @param {number} px The desired font size, in pixels.
  */
 hterm.Terminal.prototype.setFontSize = function(px) {
-  this.scroll_port.x_screen.style.fontSize = px + 'px';
-  this.setCssVar('font-size', `${px}px`);
+  this.scroll_port.x_screen.style.fontSize = dpifud(px);
+  this.setCssVar('font-size', dpifud(px));
 };
 
 /**
@@ -9009,7 +9023,7 @@ hterm.Terminal.prototype.setCursorShape = function(shape) {
  * @param {number} size
  */
 hterm.Terminal.prototype.setScreenPaddingSize = function(size) {
-  this.setCssVar('screen-padding-size', `${size}px`);
+  this.setCssVar('screen-padding-size', dpifud(size));
   this.scroll_port.setScreenPaddingSize(size);
 };
 
@@ -9019,7 +9033,7 @@ hterm.Terminal.prototype.setScreenPaddingSize = function(size) {
  * @param {number} size
  */
 hterm.Terminal.prototype.setScreenBorderSize = function(size) {
-  this.div_.style.borderWidth = `${size}px`;
+  this.div_.style.borderWidth = dpifud(size);
   this.screenBorderSize_ = size;
   this.scroll_port.resize();
 };
@@ -9420,7 +9434,7 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
 .cursor-node[focus="false"] {
   background-color: transparent !important;
   border-color: var(--hterm-cursor-color);
-  border-width: 2px;
+  border-width: ${dpifud(2)};
   border-style: solid;
 }
 @keyframes cursor-blink {
@@ -9460,8 +9474,8 @@ menuitem:hover {
   line-height: var(--hterm-charsize-height);
 }
 :root {
-  --hterm-charsize-width: ${this.scroll_port.characterSize.width}px;
-  --hterm-charsize-height: ${this.scroll_port.characterSize.height}px;
+  --hterm-charsize-width: ${dpifud(this.scroll_port.characterSize.width)};
+  --hterm-charsize-height: ${dpifud(this.scroll_port.characterSize.height)};
   --hterm-blink-node-duration: 0.7s;
   --hterm-mouse-cursor-default: default;
   --hterm-mouse-cursor-text: text;
@@ -10788,8 +10802,7 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
   // cause the cursor tracking to be off.
   this.setCssVar(
       'cursor-offset-row',
-      `${cursorRowIndex - topRowIndex} + ` +
-      `${this.scroll_port.visibleRowTopMargin}px`);
+      `${cursorRowIndex - topRowIndex + this.scroll_port.visibleRowTopMargin}`);
   this.setCssVar('cursor-offset-col', this.screen_.cursorPosition.column);
 
   this.cursorNode_.setAttribute('title',
@@ -11513,8 +11526,8 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
         // Move the scroll-blocker into place if we want to keep the scrollport
         // from scrolling.
         this.scrollBlockerNode_.engaged = true;
-        this.scrollBlockerNode_.style.top = (e.clientY - 5) + 'px';
-        this.scrollBlockerNode_.style.left = (e.clientX - 5) + 'px';
+        this.scrollBlockerNode_.style.top = dpifud(e.clientY - 5);
+        this.scrollBlockerNode_.style.left = dpifud(e.clientX - 5);
       } else if (e.type == 'mousemove') {
         // Oh.  This means that drag-scroll was disabled AFTER the mouse down,
         // in which case it's too late to engage the scroll-blocker.

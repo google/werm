@@ -6597,19 +6597,19 @@ hterm.Screen.CursorState.prototype.restore = function(vt) {
 // found in the LICENSE file.
 
 /**
- * The RowProvider should return rows rooted by the custom tag name 'x-row'.
+ * The Vportctx should return rows rooted by the custom tag name 'x-row'.
  * This ensures that we can quickly assign the correct display height
  * to the rows with css.
  *
  * @interface
  */
-hterm.RowProvider = function() {};
+hterm.Vportctx = function() {};
 
 /**
  * @abstract
  * @return {number} The current number of rows.
  */
-hterm.RowProvider.prototype.getRowCount = function() {};
+hterm.Vportctx.prototype.getRowCount = function() {};
 
 /**
  * Get specified row.
@@ -6618,16 +6618,18 @@ hterm.RowProvider.prototype.getRowCount = function() {};
  * @param {number} index The index of the row.
  * @return {!Element}
  */
-hterm.RowProvider.prototype.getRowNode = function(index) {};
+hterm.Vportctx.prototype.getRowNode = function(index) {};
+
+hterm.Vportctx.prototype.getCssVar = function(name) {};
 
 /**
  * A 'viewport' view of fixed-height rows with support for selection and
  * copy-to-clipboard.
  *
  * 'Viewport' in this case means that only the visible rows are in the DOM.
- * If the rowProvider has 100,000 rows, but the ScrollPort is only 25 rows
+ * If the vportctx has 100,000 rows, but the ScrollPort is only 25 rows
  * tall, then only 25 dom nodes are created.  The ScrollPort will ask the
- * RowProvider to create new visible rows on demand as they are scrolled in
+ * Vportctx to create new visible rows on demand as they are scrolled in
  * to the visible area.
  *
  * This viewport is designed so that select and copy-to-clipboard still works,
@@ -6637,15 +6639,15 @@ hterm.RowProvider.prototype.getRowNode = function(index) {};
  * of the selection is off screen.  It would be difficult to fix this without
  * adding significant overhead to pathologically large selection cases.
  *
- * @param {!hterm.RowProvider} rowProvider An object capable of providing rows
+ * @param {!hterm.Vportctx} vportctx An object capable of providing rows
  *     as raw text or row nodes.
  * @constructor
  * @extends {hterm.PubSub}
  */
-hterm.ScrollPort = function(rowProvider) {
+hterm.ScrollPort = function(vportctx) {
   hterm.PubSub.addBehavior(this);
 
-  this.rowProvider_ = rowProvider;
+  this.vportctx_ = vportctx;
 
   // SWAG the character size until we can measure it.
   this.characterSize = {width: 10, height: 10};
@@ -6669,7 +6671,7 @@ hterm.ScrollPort = function(rowProvider) {
   // end up with two notions of selection.
   this.selectionEnabled_ = true;
 
-  // The last row count returned by the row provider, re-populated during
+  // The last row count returned by the vportctx, re-populated during
   // syncScrollHeight().
   this.lastRowCount_ = 0;
 
@@ -7341,7 +7343,7 @@ hterm.ScrollPort.prototype.resetCache = function() {
  * Inform the ScrollPort that the root DOM nodes for some or all of the visible
  * rows are no longer valid.
  *
- * Specifically, this should be called if this.rowProvider_.getRowNode() now
+ * Specifically, this should be called if this.vportctx_.getRowNode() now
  * returns an entirely different node than it did before.  It does not
  * need to be called if the content of a row node is the only thing that
  * changed.
@@ -7413,7 +7415,7 @@ hterm.ScrollPort.prototype.assertiveAnnounce_ = function() {
   const bottomRow = this.getBottomRowIndex(topRow);
 
   let percentScrolled = 100 * topRow /
-      Math.max(1, this.rowProvider_.getRowCount() - this.visibleRowCount);
+      Math.max(1, this.vportctx_.getRowCount() - this.visibleRowCount);
   percentScrolled = Math.min(100, Math.round(percentScrolled));
   let currentScreenContent = hterm.msg('ANNOUNCE_CURRENT_SCREEN_HEADER',
                                        [percentScrolled],
@@ -7475,7 +7477,7 @@ hterm.ScrollPort.prototype.syncRowNodesDimensions_ = function() {
  * Resize the scroll area to appear as though it contains every row.
  */
 hterm.ScrollPort.prototype.syncScrollHeight = function() {
-  this.lastRowCount_ = this.rowProvider_.getRowCount();
+  this.lastRowCount_ = this.vportctx_.getRowCount();
   this.scrollHeight_ = (this.characterSize.height *
                         this.lastRowCount_ +
                         (2 * this.screenPaddingSize) +
@@ -7701,7 +7703,7 @@ hterm.ScrollPort.prototype.drawVisibleRows_ = function(
   let node = this.topFold_.nextSibling;
 
   const targetDrawCount = Math.min(this.visibleRowCount,
-                                   this.rowProvider_.getRowCount());
+                                   this.vportctx_.getRowCount());
 
   for (let drawCount = 0; drawCount < targetDrawCount; drawCount++) {
     const rowIndex = topRowIndex + drawCount;
@@ -7840,7 +7842,7 @@ hterm.ScrollPort.prototype.cacheRowNode_ = function(rowNode) {
  * Fetch the row node for the given index.
  *
  * This will return a node from the cache if possible, or will request one
- * from the RowProvider if not.
+ * from the Vportctx if not.
  *
  * If a redraw_ is in progress the row will be added to the current cache.
  *
@@ -7853,7 +7855,7 @@ hterm.ScrollPort.prototype.fetchRowNode_ = function(rowIndex) {
   if (this.previousRowNodeCache_ && rowIndex in this.previousRowNodeCache_) {
     node = this.previousRowNodeCache_[rowIndex];
   } else {
-    node = this.rowProvider_.getRowNode(rowIndex);
+    node = this.vportctx_.getRowNode(rowIndex);
   }
 
   if (this.currentRowNodeCache_) {
@@ -7881,7 +7883,7 @@ hterm.ScrollPort.prototype.selectAll = function() {
     firstRow = this.topFold_.nextSibling;
   }
 
-  const lastRowIndex = this.rowProvider_.getRowCount() - 1;
+  const lastRowIndex = this.vportctx_.getRowCount() - 1;
   let lastRow;
 
   if (this.bottomFold_.previousSibling.rowIndex != lastRowIndex) {
@@ -8115,7 +8117,7 @@ hterm.ScrollPort.prototype.onCopy_ = function(e) {
       endBackfillIndex = this.topFold_.nextSibling.rowIndex;
     }
 
-    this.topSelectBag_.textContent = this.rowProvider_.getRowsText(
+    this.topSelectBag_.textContent = this.vportctx_.getRowsText(
         this.selection.startRow.rowIndex + 1, endBackfillIndex);
     this.rowNodes_.insertBefore(this.topSelectBag_,
                                 this.selection.startRow.nextSibling);
@@ -8134,7 +8136,7 @@ hterm.ScrollPort.prototype.onCopy_ = function(e) {
       startBackfillIndex = this.bottomFold_.previousSibling.rowIndex + 1;
     }
 
-    this.bottomSelectBag_.textContent = this.rowProvider_.getRowsText(
+    this.bottomSelectBag_.textContent = this.vportctx_.getRowsText(
         startBackfillIndex, this.selection.endRow.rowIndex);
     this.rowNodes_.insertBefore(this.bottomSelectBag_, this.selection.endRow);
   }
@@ -8250,7 +8252,7 @@ hterm.ScrollPort.prototype.setScrollWheelMoveMultipler = function(multiplier) {
  *     profileId: The preference profile name.  Defaults to "default".
  *     storage: The backing storage for preferences.  Defaults to local.
  * @constructor
- * @implements {hterm.RowProvider}
+ * @implements {hterm.Vportctx}
  */
 hterm.Terminal = function({profileId, storage} = {}) {
   // Set to true once terminal is initialized and onTerminalReady() is called.
@@ -9592,7 +9594,7 @@ hterm.Terminal.prototype.new_row_node = function(index)
 /**
  * Return the HTML Element for a given row index.
  *
- * This is a method from the RowProvider interface.  The ScrollPort uses
+ * This is a method from the Vportctx interface.  The ScrollPort uses
  * it to fetch rows on demand as they are scrolled into view.
  *
  * TODO(rginda): Consider saving scrollback rows as (HTML source, text content)
@@ -9613,7 +9615,7 @@ hterm.Terminal.prototype.getRowNode = function(index)
 /**
  * Return the text content for a given range of rows.
  *
- * This is a method from the RowProvider interface.  The ScrollPort uses
+ * This is a method from the Vportctx interface.  The ScrollPort uses
  * it to fetch text content on demand when the user attempts to copy their
  * selection to the clipboard.
  *
@@ -9641,7 +9643,7 @@ hterm.Terminal.prototype.getRowsText = function(start, end) {
 /**
  * Return the text content for a given row.
  *
- * This is a method from the RowProvider interface.  The ScrollPort uses
+ * This is a method from the Vportctx interface.  The ScrollPort uses
  * it to fetch text content on demand when the user attempts to copy their
  * selection to the clipboard.
  *
@@ -9659,7 +9661,7 @@ hterm.Terminal.prototype.getRowText = function(index) {
  * Return the total number of rows in the addressable screen and in the
  * scrollback buffer of this terminal.
  *
- * This is a method from the RowProvider interface.  The ScrollPort uses
+ * This is a method from the Vportctx interface.  The ScrollPort uses
  * it to compute the size of the scrollbar.
  *
  * @return {number} The number of rows in this terminal.

@@ -648,11 +648,11 @@ function term_init()
 	{
 		var f = fonts[ndx];
 
-		t.scrollPort_.x_screen.style.fontFamily = f[0];
+		t.scroll_port.x_screen.style.fontFamily = f[0];
 		t.setFontSize(f[1]);
 
-		t.scrollPort_.characterSize = {width: f[2], height: f[3]};
-		t.scrollPort_.resize();
+		t.scroll_port.characterSize = {width: f[2], height: f[3]};
+		t.scroll_port.resize();
 		t.updateCssCharsize_();
 
 		t.setCssVar('bold-weight', f[4]);
@@ -721,7 +721,7 @@ function term_init()
 			${layer*10 - 1} * var(--hterm-charsize-height)
 		)`;
 
-		t.scrollPort_.x_screen.appendChild(box);
+		t.scroll_port.x_screen.appendChild(box);
 	}
 
 	function set_repeat_key(code)
@@ -793,7 +793,7 @@ function term_init()
 	{
 		var col, s;
 
-		if (barrier_div) t.scrollPort_.x_screen.removeChild(barrier_div);
+		if (barrier_div) t.scroll_port.x_screen.removeChild(barrier_div);
 		barrier_div = null;
 
 		col = Number(barrier_dig.join(''));
@@ -811,7 +811,7 @@ function term_init()
 		s.width = 'var(--hterm-charsize-width)'
 		s.top = '0';
 		s.height = '100%';
-		t.scrollPort_.x_screen.appendChild(barrier_div);
+		t.scroll_port.x_screen.appendChild(barrier_div);
 	}
 
 	function match_key(exp, mn)
@@ -989,7 +989,7 @@ function term_init()
 		return true;
 	}
 
-	t.getScrollPort().getDocument().body.onkeydown = function(e)
+	t.scroll_port.getDocument().body.onkeydown = function(e)
 	{
 		var ce;
 
@@ -1010,7 +1010,7 @@ function term_init()
 		e.preventDefault();
 	};
 
-	t.getScrollPort().getDocument().body.onkeyup = function(e)
+	t.scroll_port.getDocument().body.onkeyup = function(e)
 	{
 		var hist, dki;
 

@@ -6717,7 +6717,7 @@ hterm.ScrollPort = function(rowProvider) {
  * @constructor
  */
 hterm.ScrollPort.Selection = function(scrollPort) {
-  this.scrollPort_ = scrollPort;
+  this.scroll_port = scrollPort;
 
   /**
    * The row containing the start of the selection.
@@ -6850,7 +6850,7 @@ hterm.ScrollPort.Selection.prototype.sync = function() {
     this.endOffset = selection.anchorOffset;
   };
 
-  const selection = this.scrollPort_.getDocument().getSelection();
+  const selection = this.scroll_port.getDocument().getSelection();
 
   const clear = () => {
     this.startRow = null;
@@ -6889,12 +6889,12 @@ hterm.ScrollPort.Selection.prototype.sync = function() {
   let focusNode = focusRow;
   let focusOffset = selection.focusOffset;
   const focusIsStartOfTopRow = () => {
-    focusRow = this.scrollPort_.topFold_.nextSibling;
+    focusRow = this.scroll_port.topFold_.nextSibling;
     focusNode = focusRow;
     focusOffset = 0;
   };
   const focusIsEndOfBottomRow = () => {
-    focusRow = this.scrollPort_.bottomFold_.previousSibling;
+    focusRow = this.scroll_port.bottomFold_.previousSibling;
     focusNode = focusRow;
     while (focusNode.lastChild) {
       focusNode = focusNode.lastChild;
@@ -6903,9 +6903,9 @@ hterm.ScrollPort.Selection.prototype.sync = function() {
   };
 
   // If focus is topFold or bottomFold, use adjacent row.
-  if (focusRow === this.scrollPort_.topFold_) {
+  if (focusRow === this.scroll_port.topFold_) {
     focusIsStartOfTopRow();
-  } else if (focusRow === this.scrollPort_.bottomFold_) {
+  } else if (focusRow === this.scroll_port.bottomFold_) {
     focusIsEndOfBottomRow();
   }
 
@@ -8276,13 +8276,13 @@ hterm.Terminal = function({profileId, storage} = {}) {
   this.screenSize = {width: 0, height: 0};
 
   // The scroll port we'll be using to display the visible rows.
-  this.scrollPort_ = new hterm.ScrollPort(this);
-  this.scrollPort_.subscribe('resize', this.onResize_.bind(this));
-  this.scrollPort_.subscribe('scroll', this.onScroll_.bind(this));
-  this.scrollPort_.subscribe('paste', this.onPaste_.bind(this));
-  this.scrollPort_.subscribe('focus', this.onScrollportFocus_.bind(this));
-  this.scrollPort_.subscribe('options', this.onOpenOptionsPage_.bind(this));
-  this.scrollPort_.onCopy = this.onCopy_.bind(this);
+  this.scroll_port = new hterm.ScrollPort(this);
+  this.scroll_port.subscribe('resize', this.onResize_.bind(this));
+  this.scroll_port.subscribe('scroll', this.onScroll_.bind(this));
+  this.scroll_port.subscribe('paste', this.onPaste_.bind(this));
+  this.scroll_port.subscribe('focus', this.onScrollportFocus_.bind(this));
+  this.scroll_port.subscribe('options', this.onOpenOptionsPage_.bind(this));
+  this.scroll_port.onCopy = this.onCopy_.bind(this);
 
   // The div that contains this terminal.
   this.div_ = null;
@@ -8483,11 +8483,11 @@ hterm.Terminal.prototype.setProfile = function(
     },
 
     'background-size': (v) => {
-      this.scrollPort_.setBackgroundSize(v);
+      this.scroll_port.setBackgroundSize(v);
     },
 
     'background-position': (v) => {
-      this.scrollPort_.setBackgroundPosition(v);
+      this.scroll_port.setBackgroundPosition(v);
     },
 
     'character-map-overrides': (v) => {
@@ -8850,19 +8850,12 @@ hterm.Terminal.prototype.getCssVar = function(name, prefix = '--hterm-') {
 };
 
 /**
- * @return {!hterm.ScrollPort}
- */
-hterm.Terminal.prototype.getScrollPort = function() {
-  return this.scrollPort_;
-};
-
-/**
  * Update CSS character size variables to match the scrollport.
  */
 hterm.Terminal.prototype.updateCssCharsize_ = function() {
-  this.setCssVar('charsize-width', this.scrollPort_.characterSize.width + 'px');
+  this.setCssVar('charsize-width', this.scroll_port.characterSize.width + 'px');
   this.setCssVar('charsize-height',
-                 this.scrollPort_.characterSize.height + 'px');
+                 this.scroll_port.characterSize.height + 'px');
 };
 
 /**
@@ -8871,7 +8864,7 @@ hterm.Terminal.prototype.updateCssCharsize_ = function() {
  * @param {number} px The desired font size, in pixels.
  */
 hterm.Terminal.prototype.setFontSize = function(px) {
-  this.scrollPort_.x_screen.style.fontSize = px + 'px';
+  this.scroll_port.x_screen.style.fontSize = px + 'px';
   this.setCssVar('font-size', `${px}px`);
 };
 
@@ -8881,7 +8874,7 @@ hterm.Terminal.prototype.setFontSize = function(px) {
  * @return {number}
  */
 hterm.Terminal.prototype.getFontSize = function() {
-  return this.scrollPort_.getFontSize();
+  return this.scroll_port.getFontSize();
 };
 
 /**
@@ -8890,7 +8883,7 @@ hterm.Terminal.prototype.getFontSize = function() {
  * @return {string}
  */
 hterm.Terminal.prototype.getFontFamily = function() {
-  return this.scrollPort_.getFontFamily();
+  return this.scroll_port.getFontFamily();
 };
 
 /**
@@ -9015,7 +9008,7 @@ hterm.Terminal.prototype.setCursorShape = function(shape) {
  */
 hterm.Terminal.prototype.setScreenPaddingSize = function(size) {
   this.setCssVar('screen-padding-size', `${size}px`);
-  this.scrollPort_.setScreenPaddingSize(size);
+  this.scroll_port.setScreenPaddingSize(size);
 };
 
 /**
@@ -9026,7 +9019,7 @@ hterm.Terminal.prototype.setScreenPaddingSize = function(size) {
 hterm.Terminal.prototype.setScreenBorderSize = function(size) {
   this.div_.style.borderWidth = `${size}px`;
   this.screenBorderSize_ = size;
-  this.scrollPort_.resize();
+  this.scroll_port.resize();
 };
 
 /**
@@ -9161,7 +9154,7 @@ hterm.Terminal.prototype.realizeHeight_ = function(rowCount) {
  * Scroll the terminal to the end.
  */
 hterm.Terminal.prototype.scrollEnd = function() {
-  this.scrollPort_.scrollRowToBottom(this.getRowCount());
+  this.scroll_port.scrollRowToBottom(this.getRowCount());
 };
 
 /**
@@ -9367,7 +9360,7 @@ hterm.Terminal.prototype.decorate = function(div) {
 
   this.accessibilityReader_ = new hterm.AccessibilityReader(div);
 
-  this.scrollPort_.decorate(div, () => this.setupScrollPort_());
+  this.scroll_port.decorate(div, () => this.setupScrollPort_());
 };
 
 /**
@@ -9377,10 +9370,10 @@ hterm.Terminal.prototype.decorate = function(div) {
  * @private
  */
 hterm.Terminal.prototype.setupScrollPort_ = function() {
-  this.scrollPort_.setBackgroundSize(this.prefs_.getString('background-size'));
-  this.scrollPort_.setBackgroundPosition(
+  this.scroll_port.setBackgroundSize(this.prefs_.getString('background-size'));
+  this.scroll_port.setBackgroundPosition(
       this.prefs_.getString('background-position'));
-  this.scrollPort_.setAccessibilityReader(
+  this.scroll_port.setAccessibilityReader(
       lib.notNull(this.accessibilityReader_));
 
   this.div_.focus = this.focus.bind(this);
@@ -9388,7 +9381,7 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
   this.setScrollWheelMoveMultipler(
       this.prefs_.getNumber('scroll-wheel-move-multiplier'));
 
-  this.document_ = this.scrollPort_.getDocument();
+  this.document_ = this.scroll_port.getDocument();
   this.accessibilityReader_.decorate(this.document_);
   this.notifications_ = new hterm.NotificationCenter(
       lib.notNull(this.document_.body), this.accessibilityReader_);
@@ -9396,14 +9389,14 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
   this.document_.body.oncontextmenu = function() { return false; };
 
   const onMouse = this.onMouse_.bind(this);
-  const screenNode = this.scrollPort_.getScreenNode();
+  const screenNode = this.scroll_port.getScreenNode();
   screenNode.addEventListener(
       'mousedown', /** @type {!EventListener} */ (onMouse));
   screenNode.addEventListener(
       'mouseup', /** @type {!EventListener} */ (onMouse));
   screenNode.addEventListener(
       'mousemove', /** @type {!EventListener} */ (onMouse));
-  this.scrollPort_.onScrollWheel = onMouse;
+  this.scroll_port.onScrollWheel = onMouse;
 
   screenNode.addEventListener(
       'keydown',
@@ -9465,8 +9458,8 @@ menuitem:hover {
   line-height: var(--hterm-charsize-height);
 }
 :root {
-  --hterm-charsize-width: ${this.scrollPort_.characterSize.width}px;
-  --hterm-charsize-height: ${this.scrollPort_.characterSize.height}px;
+  --hterm-charsize-width: ${this.scroll_port.characterSize.width}px;
+  --hterm-charsize-height: ${this.scroll_port.characterSize.height}px;
   --hterm-blink-node-duration: 0.7s;
   --hterm-mouse-cursor-default: default;
   --hterm-mouse-cursor-text: text;
@@ -9554,7 +9547,7 @@ opacity: var(--hterm-curs-opac);
        'height: 10px;');
   this.document_.body.appendChild(this.scrollBlockerNode_);
 
-  this.scrollPort_.onScrollWheel = onMouse;
+  this.scroll_port.onScrollWheel = onMouse;
   ['mousedown', 'mouseup', 'mousemove', 'click', 'dblclick',
    ].forEach(function(event) {
        this.scrollBlockerNode_.addEventListener(event, onMouse);
@@ -9570,8 +9563,8 @@ opacity: var(--hterm-curs-opac);
 
   this.setReverseVideo(false);
 
-  this.scrollPort_.focus();
-  this.scrollPort_.scheduleRedraw();
+  this.scroll_port.focus();
+  this.scroll_port.scheduleRedraw();
 };
 
 /**
@@ -9587,14 +9580,14 @@ hterm.Terminal.prototype.getDocument = function() {
  * Focus the terminal.
  */
 hterm.Terminal.prototype.focus = function() {
-  this.scrollPort_.focus();
+  this.scroll_port.focus();
 };
 
 /**
  * Unfocus the terminal.
  */
 hterm.Terminal.prototype.blur = function() {
-  this.scrollPort_.blur();
+  this.scroll_port.blur();
 };
 
 hterm.Terminal.prototype.new_row_node = function(index)
@@ -9773,7 +9766,7 @@ hterm.Terminal.prototype.moveRows_ = function(fromIndex, count, toIndex) {
   }
 
   this.renumberRows_(start, end);
-  this.scrollPort_.scheduleInvalidate();
+  this.scroll_port.scheduleInvalidate();
 };
 
 /**
@@ -10433,7 +10426,7 @@ hterm.Terminal.prototype.scheduleRedraw_ = function() {
 
   this.timeouts_.redraw = setTimeout(() => {
     delete this.timeouts_.redraw;
-    this.scrollPort_.redraw_();
+    this.scroll_port.redraw_();
   });
 };
 
@@ -10453,7 +10446,7 @@ hterm.Terminal.prototype.scheduleScrollDown_ = function() {
 
   this.timeouts_.scrollDown = setTimeout(() => {
     delete this.timeouts_.scrollDown;
-    this.scrollPort_.scrollRowToBottom(this.getRowCount());
+    this.scroll_port.scrollRowToBottom(this.getRowCount());
   }, 10);
 };
 
@@ -10710,11 +10703,11 @@ hterm.Terminal.prototype.setAlternateMode = function(state) {
   // underlying screen to be processed.
   this.realizeWidth_(this.screenSize.width);
   this.realizeHeight_(this.screenSize.height);
-  this.scrollPort_.syncScrollHeight();
-  this.scrollPort_.invalidate();
+  this.scroll_port.syncScrollHeight();
+  this.scroll_port.invalidate();
 
   this.restoreCursor(cursor);
-  this.scrollPort_.resize();
+  this.scroll_port.resize();
 };
 
 /**
@@ -10763,8 +10756,8 @@ hterm.Terminal.prototype.setCursorVisible = function(state) {
  * @return {boolean} True if the cursor is onscreen and synced.
  */
 hterm.Terminal.prototype.syncCursorPosition_ = function() {
-  const topRowIndex = this.scrollPort_.getTopRowIndex();
-  const bottomRowIndex = this.scrollPort_.getBottomRowIndex(topRowIndex);
+  const topRowIndex = this.scroll_port.getTopRowIndex();
+  const bottomRowIndex = this.scroll_port.getBottomRowIndex(topRowIndex);
   const cursorRowIndex = this.discarded_rows + this.screen_.cursorPosition.row;
 
   let forceSyncSelection = false;
@@ -10803,7 +10796,7 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
   this.setCssVar(
       'cursor-offset-row',
       `${cursorRowIndex - topRowIndex} + ` +
-      `${this.scrollPort_.visibleRowTopMargin}px`);
+      `${this.scroll_port.visibleRowTopMargin}px`);
   this.setCssVar('cursor-offset-col', this.screen_.cursorPosition.column);
 
   this.cursorNode_.setAttribute('title',
@@ -11109,7 +11102,7 @@ hterm.Terminal.prototype.displayImage = function(options, onLoad, onError) {
     // right place in the terminal.
     img.onload = () => {
       // Now that we have the image dimensions, figure out how to show it.
-      const screenSize = this.scrollPort_.getScreenSize();
+      const screenSize = this.scroll_port.getScreenSize();
       img.style.objectFit = options.preserveAspectRatio ? 'scale-down' : 'fill';
       img.style.maxWidth = `${screenSize.width}px`;
       img.style.maxHeight = `${screenSize.height}px`;
@@ -11141,7 +11134,7 @@ hterm.Terminal.prototype.displayImage = function(options, onLoad, onError) {
       // Figure out how many rows the image occupies, then add that many.
       // Note: This count will be inaccurate if the font size changes on us.
       const padRows = Math.ceil(img.clientHeight /
-                                this.scrollPort_.characterSize.height);
+                                this.scroll_port.characterSize.height);
       for (let i = 0; i < padRows; ++i) {
         this.newLine();
       }
@@ -11217,7 +11210,7 @@ hterm.Terminal.prototype.displayImage = function(options, onLoad, onError) {
  * @return {string|null}
  */
 hterm.Terminal.prototype.getSelectionText = function() {
-  const selection = this.scrollPort_.selection;
+  const selection = this.scroll_port.selection;
   selection.sync();
 
   if (selection.isCollapsed) {
@@ -11410,12 +11403,12 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
   }
 
   // One based row/column stored on the mouse event.
-  const padding = this.scrollPort_.screenPaddingSize;
+  const padding = this.scroll_port.screenPaddingSize;
   e.terminalRow = Math.floor(
-      (e.clientY - this.scrollPort_.visibleRowTopMargin - padding) /
-      this.scrollPort_.characterSize.height) + 1;
+      (e.clientY - this.scroll_port.visibleRowTopMargin - padding) /
+      this.scroll_port.characterSize.height) + 1;
   e.terminalColumn = Math.floor(
-      (e.clientX - padding) / this.scrollPort_.characterSize.width) + 1;
+      (e.clientX - padding) / this.scroll_port.characterSize.width) + 1;
 
   // Clamp row and column.
   e.terminalRow = lib.f.clamp(e.terminalRow, 1, this.screenSize.height);
@@ -11495,7 +11488,7 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
     // Emulate arrow key presses via scroll wheel events.
     if (e.type == 'wheel') {
       const delta =
-          this.scrollPort_.scrollWheelDelta(/** @type {!WheelEvent} */ (e));
+          this.scroll_port.scrollWheelDelta(/** @type {!WheelEvent} */ (e));
 
       // Helper to turn a wheel event delta into a series of key presses.
       const deltaToArrows = (distance, charSize, arrowPos, arrowNeg) => {
@@ -11512,10 +11505,10 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
       // The order between up/down and left/right doesn't really matter.
       this.io.sendString(
           // Up/down arrow keys.
-          deltaToArrows(delta.y, this.scrollPort_.characterSize.height,
+          deltaToArrows(delta.y, this.scroll_port.characterSize.height,
                         'A', 'B') +
           // Left/right arrow keys.
-          deltaToArrows(delta.x, this.scrollPort_.characterSize.width,
+          deltaToArrows(delta.x, this.scroll_port.characterSize.width,
                         'C', 'D'),
       );
 
@@ -11635,12 +11628,12 @@ hterm.Terminal.prototype.onCopy_ = function(e) {
  * programmatic width change.
  */
 hterm.Terminal.prototype.onResize_ = function() {
-  const screensz = this.scrollPort_.getScreenSize();
+  const screensz = this.scroll_port.getScreenSize();
   const columnCount = Math.floor(screensz.width /
-                                 this.scrollPort_.characterSize.width) || 0;
+                                 this.scroll_port.characterSize.width) || 0;
   const rowCount = lib.f.smartFloorDivide(
       screensz.height,
-      this.scrollPort_.characterSize.height) || 0;
+      this.scroll_port.characterSize.height) || 0;
 
   if (columnCount <= 0 || rowCount <= 0) {
     // We avoid these situations since they happen sometimes when the terminal
@@ -11678,7 +11671,7 @@ hterm.Terminal.prototype.onResize_ = function() {
  * @param {number} multiplier The multiplier to set.
  */
 hterm.Terminal.prototype.setScrollWheelMoveMultipler = function(multiplier) {
-  this.scrollPort_.setScrollWheelMoveMultipler(multiplier);
+  this.scroll_port.setScrollWheelMoveMultipler(multiplier);
 };
 
 /**
@@ -11696,8 +11689,8 @@ hterm.Terminal.prototype.closeBellNotifications_ = function() {
  */
 hterm.Terminal.prototype.onScrollportFocus_ = function() {
   // If the cursor is offscreen we set selection to the last row on the screen.
-  const topRowIndex = this.scrollPort_.getTopRowIndex();
-  const bottomRowIndex = this.scrollPort_.getBottomRowIndex(topRowIndex);
+  const topRowIndex = this.scroll_port.getTopRowIndex();
+  const bottomRowIndex = this.scroll_port.getBottomRowIndex(topRowIndex);
   const selection = this.document_.getSelection();
   if (!this.syncCursorPosition_() && selection) {
     selection.collapse(this.getRowNode(bottomRowIndex));

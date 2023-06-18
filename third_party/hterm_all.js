@@ -7338,20 +7338,6 @@ hterm.ScrollPort.prototype.resetCache = function() {
 };
 
 /**
- * Change the current rowProvider.
- *
- * This will clear the row cache and cause a redraw.
- *
- * @param {!hterm.RowProvider} rowProvider An object capable of providing the
- *     rows in this hterm.ScrollPort.
- */
-hterm.ScrollPort.prototype.setRowProvider = function(rowProvider) {
-  this.resetCache();
-  this.rowProvider_ = rowProvider;
-  this.scheduleRedraw();
-};
-
-/**
  * Inform the ScrollPort that the root DOM nodes for some or all of the visible
  * rows are no longer valid.
  *

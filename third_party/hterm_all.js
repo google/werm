@@ -9568,15 +9568,6 @@ opacity: var(--hterm-curs-opac);
 };
 
 /**
- * Return the HTML document that contains the terminal DOM nodes.
- *
- * @return {!Document}
- */
-hterm.Terminal.prototype.getDocument = function() {
-  return this.document_;
-};
-
-/**
  * Focus the terminal.
  */
 hterm.Terminal.prototype.focus = function() {

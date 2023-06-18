@@ -4809,155 +4809,6 @@ hterm.AccessibilityReader.prototype.addToLiveRegion_ = function() {
   this.liveElement_.innerText = str;
   this.queue_ = [];
 };
-// SOURCE FILE: hterm/js/hterm_contextmenu.js
-// Copyright 2018 The Chromium OS Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-/**
- * @fileoverview Context menu handling.
- */
-
-/**
- * Manage the context menu usually shown when right clicking.
- *
- * @constructor
- */
-hterm.ContextMenu = function() {
-  // The document that contains this context menu.
-  this.document_ = null;
-  // The generated context menu (i.e. HTML elements).
-  this.element_ = null;
-  // The structured menu (i.e. JS objects).
-  /** @type {!Array<!hterm.ContextMenu.Item>} */
-  this.menu_ = [];
-};
-
-/** @typedef {{name:(string|symbol), action:function(!Event)}} */
-hterm.ContextMenu.Item;
-
-/**
- * Constant to add a separator to the context menu.
- */
-hterm.ContextMenu.SEPARATOR = Symbol('-');
-
-/**
- * Bind context menu to a specific document element.
- *
- * @param {!Document} document The document to use when creating elements.
- */
-hterm.ContextMenu.prototype.setDocument = function(document) {
-  if (this.element_) {
-    this.element_.remove();
-    this.element_ = null;
-  }
-  this.document_ = document;
-  this.regenerate_();
-  this.document_.body.appendChild(this.element_);
-};
-
-/**
- * Regenerate the HTML elements based on internal menu state.
- */
-hterm.ContextMenu.prototype.regenerate_ = function() {
-  if (!this.element_) {
-    this.element_ = this.document_.createElement('menu');
-    this.element_.id = 'hterm:context-menu';
-  } else {
-    this.hide();
-  }
-
-  // Clear out existing menu entries.
-  while (this.element_.firstChild) {
-    this.element_.removeChild(this.element_.firstChild);
-  }
-
-  this.menu_.forEach(({name, action}) => {
-    const menuitem = this.document_.createElement('menuitem');
-    if (name === hterm.ContextMenu.SEPARATOR) {
-      menuitem.innerHTML = hterm.sanitizeHtml('<hr>');
-      menuitem.className = 'separator';
-    } else {
-      menuitem.innerText = name;
-      menuitem.addEventListener('mousedown', function(e) {
-        e.preventDefault();
-        action(e);
-      });
-    }
-    this.element_.appendChild(menuitem);
-  });
-};
-
-/**
- * Set all the entries in the context menu.
- *
- * This is an array of arrays.  The first element in the array is the string to
- * display while the second element is the function to call.
- *
- * The first element may also be the SEPARATOR constant to add a separator.
- *
- * This resets all existing menu entries.
- *
- * @param {!Array<!hterm.ContextMenu.Item>} items The menu entries.
- */
-hterm.ContextMenu.prototype.setItems = function(items) {
-  this.menu_ = items;
-  this.regenerate_();
-};
-
-/**
- * Show the context menu.
- *
- * The event is used to determine where to show the menu.
- *
- * If no menu entries are defined, then nothing will be shown.
- *
- * @param {!Event} e The event triggering this display.
- * @param {!hterm.Terminal=} terminal The terminal object to get style info
- *     from.
- */
-hterm.ContextMenu.prototype.show = function(e, terminal) {
-  // If there are no menu entries, then don't try to show anything.
-  if (this.menu_.length == 0) {
-    return;
-  }
-
-  // If we have the terminal, sync the style preferences over.
-  if (terminal) {
-    this.element_.style.fontSize = terminal.getFontSize();
-    this.element_.style.fontFamily = terminal.getFontFamily();
-  }
-
-  this.element_.style.top = `${e.clientY}px`;
-  this.element_.style.left = `${e.clientX}px`;
-  const docSize = this.document_.body.getBoundingClientRect();
-
-  this.element_.style.display = 'block';
-
-  // We can't calculate sizes until after it's displayed.
-  const eleSize = this.element_.getBoundingClientRect();
-  // Make sure the menu isn't clipped outside of the current element.
-  const minY = Math.max(0, docSize.height - eleSize.height);
-  const minX = Math.max(0, docSize.width - eleSize.width);
-  if (minY < e.clientY) {
-    this.element_.style.top = `${minY}px`;
-  }
-  if (minX < e.clientX) {
-    this.element_.style.left = `${minX}px`;
-  }
-};
-
-/**
- * Hide the context menu.
- */
-hterm.ContextMenu.prototype.hide = function() {
-  if (!this.element_) {
-    return;
-  }
-
-  this.element_.style.display = 'none';
-};
-
 // SOURCE FILE: hterm/js/hterm_notifications.js
 // Copyright 2020 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -5488,16 +5339,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `Normally this is a character class to reject specific characters.\n` +
       `\n` +
       `Used to expand the selection surrounding the starting point.`,
-  ),
-
-  'page-keys-scroll': hterm.PreferenceManager.definePref_(
-      'Page Up/Down key scroll behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `If true, Page Up/Page Down controls the terminal scrollbar and ` +
-      `Shift+Page Up/Shift+Page Down are sent to the remote host. If false, ` +
-      `then Page Up/Page Down are sent to the remote host and Shift+Page Up/` +
-      `Shift+Page Down scrolls.`,
   ),
 
   'pass-alt-number': hterm.PreferenceManager.definePref_(
@@ -6846,11 +6687,6 @@ hterm.ScrollPort = function(rowProvider) {
   this.screenPaddingSize = 0;
 
   /**
-   * A guess at the current scrollbar width, fixed in resize().
-   */
-  this.currentScrollbarWidthPx = hterm.ScrollPort.DEFAULT_SCROLLBAR_WIDTH;
-
-  /**
    * Whether to paste on dropped text.
    */
   this.pasteOnDrop = true;
@@ -6872,14 +6708,6 @@ hterm.ScrollPort = function(rowProvider) {
 
   this.DEBUG_ = false;
 };
-
-/**
- * Default width for scrollbar used when the system such as CrOS pretends that
- * scrollbar is zero width.  CrOS currently uses 11px when expanded.
- *
- * @const {number}
- */
-hterm.ScrollPort.DEFAULT_SCROLLBAR_WIDTH = 12;
 
 /**
  * Proxy for the native selection object which understands how to walk up the
@@ -7261,10 +7089,6 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
   const el = (f) => /** @type {!EventListener} */ (f);
   this.x_screen.addEventListener('scroll', el(this.onScroll_.bind(this)));
   this.x_screen.addEventListener('wheel', el(this.onScrollWheel_.bind(this)));
-  this.x_screen.addEventListener('touchstart', el(this.onTouch_.bind(this)));
-  this.x_screen.addEventListener('touchmove', el(this.onTouch_.bind(this)));
-  this.x_screen.addEventListener('touchend', el(this.onTouch_.bind(this)));
-  this.x_screen.addEventListener('touchcancel', el(this.onTouch_.bind(this)));
   this.x_screen.addEventListener('copy', el(this.onCopy_.bind(this)));
   this.x_screen.addEventListener('paste', el(this.onPaste_.bind(this)));
   this.x_screen.addEventListener('drop', el(this.onDragAndDrop_.bind(this)));
@@ -7476,14 +7300,11 @@ hterm.ScrollPort.prototype.setScreenPaddingSize = function(size) {
 /**
  * Get the usable size of the scrollport screen.
  *
- * The width will not include the scrollbar width.
- *
  * @return {{height: number, width: number}}
  */
 hterm.ScrollPort.prototype.getScreenSize = function() {
   const size = this.x_screen.getBoundingClientRect();
-  const rightPadding = Math.max(
-      this.screenPaddingSize, this.currentScrollbarWidthPx);
+  const rightPadding = this.screenPaddingSize;
   return {
     height: size.height - (2 * this.screenPaddingSize),
     width: size.width - this.screenPaddingSize - rightPadding,
@@ -7492,8 +7313,6 @@ hterm.ScrollPort.prototype.getScreenSize = function() {
 
 /**
  * Get the usable width of the scrollport screen.
- *
- * This the widget width minus scrollbar width.
  *
  * @return {number}
  */
@@ -7508,16 +7327,6 @@ hterm.ScrollPort.prototype.getScreenWidth = function() {
  */
 hterm.ScrollPort.prototype.getScreenHeight = function() {
   return this.getScreenSize().height;
-};
-
-/**
- * Get the horizontal position in px where the scrollbar starts.
- *
- * @return {number}
- */
-hterm.ScrollPort.prototype.getScrollbarX = function() {
-  return this.x_screen.getBoundingClientRect().width -
-         this.currentScrollbarWidthPx;
 };
 
 /**
@@ -7616,7 +7425,6 @@ hterm.ScrollPort.prototype.getFontSize = function() {
  * dimensions of the 'x-screen'.
  */
 hterm.ScrollPort.prototype.resize = function() {
-  this.syncScrollbarWidth_();
   this.syncScrollHeight();
   this.syncRowNodesDimensions_();
 
@@ -7696,19 +7504,6 @@ hterm.ScrollPort.prototype.syncRowNodesDimensions_ = function() {
 };
 
 /**
- * Measure scrollbar width.
- *
- * @private
- */
-hterm.ScrollPort.prototype.syncScrollbarWidth_ = function() {
-  const width = this.x_screen.getBoundingClientRect().width -
-                this.x_screen.clientWidth;
-  if (width > 0) {
-    this.currentScrollbarWidthPx = width;
-  }
-};
-
-/**
  * Resize the scroll area to appear as though it contains every row.
  */
 hterm.ScrollPort.prototype.syncScrollHeight = function() {
@@ -7753,7 +7548,7 @@ hterm.ScrollPort.prototype.updateScrollButtonState_ = function() {
 };
 
 /**
- * Redraw the current hterm.ScrollPort based on the current scrollbar position.
+ * Redraw the current hterm.ScrollPort.
  *
  * When redrawing, we are careful to make sure that the rows that start or end
  * the current selection are not touched in any way.  Doing so would disturb
@@ -8176,15 +7971,11 @@ hterm.ScrollPort.prototype.scrollRowToTop = function(rowIndex) {
     scrotop = scrollMax;
   }
 
-  this.set_scroll_top(scrotop);
+  if (scrotop != this.scroll_top) {
+    this.scroll_top = scrotop;
+    setTimeout(this.onScroll_.bind(this, 'whatever'), 0);
+  }
   this.scheduleRedraw();
-};
-
-hterm.ScrollPort.prototype.set_scroll_top = function(t) {
-  if (t == this.scroll_top) return;
-
-  this.scroll_top = t;
-  setTimeout(this.onScroll_.bind(this, 'whatever'), 0);
 };
 
 /**
@@ -8304,100 +8095,6 @@ hterm.ScrollPort.prototype.scrollWheelDelta = function(e) {
   delta.y *= -1;
 
   return delta;
-};
-
-/**
- * Clients can override this if they want to hear touch events.
- *
- * Clients may call event.preventDefault() if they want to keep the scrollport
- * from also handling the events.
- *
- * @param {!TouchEvent} e
- */
-hterm.ScrollPort.prototype.onTouch = function(e) {};
-
-/**
- * Handler for touch events.
- *
- * @param {!TouchEvent} e
- */
-hterm.ScrollPort.prototype.onTouch_ = function(e) {
-  this.onTouch(e);
-
-  if (e.defaultPrevented) {
-    return;
-  }
-
-  // Extract the fields from the Touch event that we need.  If we saved the
-  // event directly, it has references to other objects (like x-row) that
-  // might stick around for a long time.  This way we only have small objects
-  // in our lastTouch_ state.
-  const scrubTouch = function(t) {
-    return {
-      id: t.identifier,
-      y: t.clientY,
-      x: t.clientX,
-    };
-  };
-
-  let i, touch;
-  switch (e.type) {
-    case 'touchstart':
-      // Workaround focus bug on CrOS if possible.
-      // TODO(vapier): Drop this once https://crbug.com/919222 is fixed.
-      if (hterm.os == 'cros' && window.chrome && chrome.windows) {
-        chrome.windows.getCurrent((win) => {
-          if (!win.focused) {
-            chrome.windows.update(win.id, {focused: true});
-          }
-        });
-      }
-
-      // Save the current set of touches.
-      for (i = 0; i < e.changedTouches.length; ++i) {
-        touch = scrubTouch(e.changedTouches[i]);
-        this.lastTouch_[touch.id] = touch;
-      }
-      break;
-
-    case 'touchcancel':
-    case 'touchend':
-      // Throw away existing touches that we're finished with.
-      for (i = 0; i < e.changedTouches.length; ++i) {
-        delete this.lastTouch_[e.changedTouches[i].identifier];
-      }
-      break;
-
-    case 'touchmove': {
-      // Walk all of the touches in this one event and merge all of their
-      // changes into one delta.  This lets multiple fingers scroll faster.
-      let delta = 0;
-      for (i = 0; i < e.changedTouches.length; ++i) {
-        touch = scrubTouch(e.changedTouches[i]);
-        delta += (this.lastTouch_[touch.id].y - touch.y);
-        this.lastTouch_[touch.id] = touch;
-      }
-
-      // Invert to match the touchscreen scrolling direction of browser windows.
-      delta *= -1;
-
-      let top = this.scroll_top - delta;
-      if (top < 0) {
-        top = 0;
-      }
-
-      const scrollMax = this.getScrollMax_();
-      if (top > scrollMax) {
-        top = scrollMax;
-      }
-
-      this.set_scroll_top(top);
-      break;
-    }
-  }
-
-  // To disable gestures or anything else interfering with our scrolling.
-  e.preventDefault();
 };
 
 /**
@@ -8675,9 +8372,6 @@ hterm.Terminal = function({profileId, storage} = {}) {
 
   // The AccessibilityReader object for announcing command output.
   this.accessibilityReader_ = null;
-
-  // The context menu object.
-  this.contextMenu = new hterm.ContextMenu();
 
   this.bellNotificationList_ = [];
 
@@ -9739,7 +9433,6 @@ hterm.Terminal.prototype.setupScrollPort_ = function() {
       lib.notNull(this.document_.body), this.accessibilityReader_);
 
   this.document_.body.oncontextmenu = function() { return false; };
-  this.contextMenu.setDocument(this.document_);
 
   const onMouse = this.onMouse_.bind(this);
   const screenNode = this.scrollPort_.getScreenNode();
@@ -11767,11 +11460,6 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
   e.terminalRow = lib.f.clamp(e.terminalRow, 1, this.screenSize.height);
   e.terminalColumn = lib.f.clamp(e.terminalColumn, 1, this.screenSize.width);
 
-  // Ignore mousedown in the scrollbar area.
-  if (e.type == 'mousedown' && e.clientX >= this.scrollPort_.getScrollbarX()) {
-    return;
-  }
-
   if (!reportMouseEvents && !this.cursorOffScreen_) {
     // If the cursor is visible and we're not sending mouse events to the
     // host app, then we want to hide the terminal cursor when the mouse
@@ -11786,8 +11474,6 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
   }
 
   if (e.type == 'mousedown') {
-    this.contextMenu.hide();
-
     if (e.altKey || !reportMouseEvents) {
       // If VT mouse reporting is disabled, or has been defeated with
       // alt-mousedown, then the mouse will act on the local selection.

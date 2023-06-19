@@ -5343,38 +5343,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `Used to expand the selection surrounding the starting point.`,
   ),
 
-  'pass-alt-number': hterm.PreferenceManager.definePref_(
-      'Alt+1..9 switch tab/app behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      null, 'tristate',
-      `Whether Alt+1..9 is passed to the browser.\n` +
-      `\n` +
-      `This is handy when running hterm in a browser tab, so that you don't ` +
-      `lose Chrome's "switch to tab/app" keyboard shortcuts. When not ` +
-      `running in a tab it's better to send these keys to the host so they ` +
-      `can be used in vim or emacs.\n` +
-      `\n` +
-      `If true, Alt+1..9 will be handled by the browser. If false, Alt+1..9 ` +
-      `will be sent to the host. If null, autodetect based on browser ` +
-      `platform and window type.`,
-  ),
-
-  'pass-meta-number': hterm.PreferenceManager.definePref_(
-      'Meta+1..9 switch tab behavior',
-      hterm.PreferenceManager.Categories.Keyboard,
-      null, 'tristate',
-      `Whether Meta+1..9 is passed to the browser.\n` +
-      `\n` +
-      `This is handy when running hterm in a browser tab, so that you don't ` +
-      `lose Chrome's "switch to tab" keyboard shortcuts. When not running ` +
-      `in a tab it's better to send these keys to the host so they can be ` +
-      `used in vim or emacs.\n` +
-      `\n` +
-      `If true, Meta+1..9 will be handled by the browser. If false, ` +
-      `Meta+1..9 will be sent to the host. If null, autodetect based on ` +
-      `browser platform and window type.`,
-  ),
-
   'scroll-wheel-may-send-arrow-keys': hterm.PreferenceManager.definePref_(
       'Emulate arrow keys with scroll wheel',
       hterm.PreferenceManager.Categories.Scrolling,
@@ -8583,30 +8551,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'hide-mouse-while-typing': (v) => {
       this.setAutomaticMouseHiding(v);
-    },
-
-    'pass-alt-number': (v) => {
-      if (v == null) {
-        // Let Alt+1..9 pass to the browser (to control tab switching) on
-        // non-OS X systems, or if hterm is not opened in an app window.
-        v = (hterm.os !== 'mac' &&
-             hterm.windowType !== 'popup' &&
-             hterm.windowType !== 'app');
-      }
-
-      this.passAltNumber = v;
-    },
-
-    'pass-meta-number': (v) => {
-      if (v == null) {
-        // Let Meta+1..9 pass to the browser (to control tab switching) on
-        // OS X systems, or if hterm is not opened in an app window.
-        v = (hterm.os === 'mac' &&
-             hterm.windowType !== 'popup' &&
-             hterm.windowType !== 'app');
-      }
-
-      this.passMetaNumber = v;
     },
 
     'screen-padding-size': (v) => {

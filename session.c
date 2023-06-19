@@ -41,8 +41,6 @@ static char *pream, *argv0, *termid;
 
 static size_t argv0sz;
 
-#define SAFEPTR(buf, start, regsz) (buf + ((start) % (sizeof(buf)-(regsz)+1)))
-
 /* Name is based on Write To Subproc but this contains process_kbd state too.
  * We put this in a single struct so all logic state can be reset with a single
  * memset call. */
@@ -211,10 +209,48 @@ static _Bool consumeesc(const char *pref, size_t preflen)
  */
 #define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
 
+/* Terminal Machine (TM...) functions are implemented in both Javascript and C.
+ * They consider arguments to be untrusted - memory access must be guarded.
+ * This means out-of-bounds checking to prevent an uncaught exception in
+ * Javascript, and avoiding illegal accesses or UB in C.
+ *
+ * Code that exists above the VM... layer should be syntax-neutral between C and
+ * Javascript. IOW, code that calls it will be executed in Javascript on the
+ * client and in C on the server.
+ */
+#define TMpeek(buf, i) ((buf)[(i) % sizeof(buf)])
+#define TMpoke(buf, i, val) do { (buf)[(i) % sizeof(buf)] = (val); } while (0)
+
+static void TMlineresize(int sz)
+{
+	if (sz < 0 || sz > sizeof(wts.linebuf)) return;
+
+	while (wts.linesz < sz) wts.linebuf[wts.linesz++] = ' ';
+	wts.linesz = sz;
+	if (wts.linepos > sz) wts.linepos = sz;
+}
+
+static void TMlinepos(long pos)
+{
+	if (pos < 0 || pos > wts.linesz) return;
+	wts.linepos = pos;
+}
+
+static void linemov(int to, int fr, int step, unsigned sz)
+{
+	to += wts.linepos;
+	fr += wts.linepos;
+	while (sz--) {
+		TMpoke(wts.linebuf, to, TMpeek(wts.linebuf, fr));
+		TMpoke(wts.linebuf, fr, ' ');
+		to += step;
+		fr += step;
+	}
+}
+
 static void deletechrahead(void)
 {
 	char *endptr;
-	unsigned char *posptr;
 	const char *lesc;
 	unsigned long cnt;
 	unsigned mvsz;
@@ -226,23 +262,18 @@ static void deletechrahead(void)
 
 	if (endptr != lesc) return;
 
-	posptr = wts.linebuf + wts.linepos;
 	mvsz = wts.linesz - wts.linepos;
 	switch (*lesc) {
 	case 'P':
-		if (wts.linesz <= wts.linepos + cnt) return;
-
-		wts.linesz -= cnt;
-		memmove(posptr, posptr + cnt, mvsz);
+		linemov(0, cnt, 1, mvsz);
+		TMlineresize(wts.linesz - cnt);
 		break;
 	case 'G':
 		wts.linepos = cnt - 1;
 		break;
 	case '@':
-		if (cnt + wts.linesz > sizeof(wts.linebuf)) break;
-		memmove(posptr + cnt, posptr, mvsz);
-		memset(posptr, ' ', cnt);
-		wts.linesz += cnt;
+		TMlineresize(wts.linesz + cnt);
+		linemov(cnt + mvsz - 1, mvsz - 1, -1, mvsz);
 		break;
 
 	default:
@@ -284,7 +315,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 
 		if (buf[0] == '\b') {
 			/* move left */
-			if (wts.linepos) wts.linepos--;
+			TMlinepos(wts.linepos-1);
 			goto eol;
 		}
 
@@ -304,15 +335,11 @@ void process_tty_out(const void *buf_, ssize_t len)
 				 * this has to change. Also, once we see 1J or
 				 * 2J in the wild we will implement it.
 				 */
-			case 'K': wts.linesz = wts.linepos; break;
+			case 'K': TMlineresize(wts.linepos);		break;
 
-			case 'A': 
-				wts.linepos -= wts.swcol;
-				if (wts.linepos > wts.linesz) wts.linepos = 0;
-				break;
+			case 'A': TMlinepos(wts.linepos - wts.swcol);	break;
 
-			/* move right */
-			case 'C': wts.linepos++; break;
+			case 'C': TMlinepos(wts.linepos+1); 		break;
 			}
 			goto eol;
 		}
@@ -347,7 +374,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 		}
 		if (buf[0] == '\033' || wts.escsz) {
 			if (buf[0] == '\033') wts.escsz = 0;
-			*SAFEPTR(wts.escbuf, wts.escsz, 1) = *buf;
+			TMpoke(wts.escbuf, wts.escsz, *buf);
 			wts.escsz++;
 			goto eol;
 		}
@@ -355,22 +382,17 @@ void process_tty_out(const void *buf_, ssize_t len)
 		if (*buf == 7) goto eol;
 		if (wts.altscren) goto eol;
 
-		if (*buf == '\n') wts.linepos = wts.linesz;
+		if (*buf == '\n') TMlinepos(wts.linesz);
 
-		*SAFEPTR(wts.linebuf, wts.linepos, 1) = *buf;
-		if (wts.linesz < ++wts.linepos) wts.linesz = wts.linepos;
+		if (wts.linesz == wts.linepos) TMlineresize(wts.linepos+1);
+		TMpoke(wts.linebuf, wts.linepos, *buf);
+		TMlinepos(wts.linepos+1);
 
 		if (*buf != '\n' && wts.linesz < sizeof(wts.linebuf)) goto eol;
 
-		if (wts.linesz > sizeof(wts.linebuf)) {
-			dump();
-			errx(1, "linesz is too large, see dump");
-		}
-
 		if (wts.logfd)
 			fullwrite(wts.logfd, "log", wts.linebuf, wts.linesz);
-		wts.linesz = 0;
-		wts.linepos = 0;
+		TMlineresize(0);
 
 	eol:
 		deletechrahead();

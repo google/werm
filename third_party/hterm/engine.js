@@ -56,7 +56,7 @@ hterm.Screen = function(columnCount = 0) {
   this.columnCount_ = columnCount;
 
   // The current color, bold, underline and blink attributes.
-  this.textAttributes = new hterm.TextAttributes(window.document);
+  this.scrTextAttr = new hterm.TextAttributes(window.document);
 
   // Current zero-based cursor coordinates.
   this.cursorPosition = new hterm.RowCol(0, 0);
@@ -82,15 +82,6 @@ hterm.Screen = function(columnCount = 0) {
  */
 hterm.Screen.prototype.getHeight = function() {
   return this.rowsArray.length;
-};
-
-/**
- * Return the current number of columns in this screen.
- *
- * @return {number} The number of columns in this screen.
- */
-hterm.Screen.prototype.getWidth = function() {
-  return this.columnCount_;
 };
 
 /**
@@ -215,7 +206,7 @@ hterm.Screen.prototype.clearCursorRow = function() {
   this.cursorPosition.overflow = false;
 
   let text;
-  if (this.textAttributes.isDefault()) {
+  if (this.scrTextAttr.isDefault()) {
     text = '';
   } else {
     text = ' '.repeat(this.columnCount_);
@@ -223,16 +214,16 @@ hterm.Screen.prototype.clearCursorRow = function() {
 
   // We shouldn't honor inverse colors when clearing an area, to match
   // xterm's back color erase behavior.
-  const inverse = this.textAttributes.inverse;
-  this.textAttributes.inverse = false;
-  this.textAttributes.syncColors();
+  const inverse = this.scrTextAttr.inverse;
+  this.scrTextAttr.inverse = false;
+  this.scrTextAttr.syncColors();
 
-  const node = this.textAttributes.createContainer(text);
+  const node = this.scrTextAttr.createContainer(text);
   this.cursorRowNode_.appendChild(node);
   this.cursorNode_ = node;
 
-  this.textAttributes.inverse = inverse;
-  this.textAttributes.syncColors();
+  this.scrTextAttr.inverse = inverse;
+  this.scrTextAttr.syncColors();
 };
 
 /**
@@ -458,12 +449,12 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
     // This whitespace should be completely unstyled.  Underline, background
     // color, and strikethrough would be visible on whitespace, so we can't use
     // one of those spans to hold the text.
-    if (!(this.textAttributes.underline ||
-          this.textAttributes.strikethrough ||
-          this.textAttributes.background ||
-          this.textAttributes.wcNode ||
-          !this.textAttributes.asciiNode ||
-          this.textAttributes.tileData != null)) {
+    if (!(this.scrTextAttr.underline ||
+          this.scrTextAttr.strikethrough ||
+          this.scrTextAttr.background ||
+          this.scrTextAttr.wcNode ||
+          !this.scrTextAttr.asciiNode ||
+          this.scrTextAttr.tileData != null)) {
       // Best case scenario, we can just pretend the spaces were part of the
       // original string.
       str = ws + str;
@@ -490,7 +481,7 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
     reverseOffset = 0;
   }
 
-  if (this.textAttributes.matchesContainer(cursorNode)) {
+  if (this.scrTextAttr.matchesContainer(cursorNode)) {
     // The new text can be placed directly in the cursor node.
     if (reverseOffset == 0) {
       cursorNode.textContent = cursorNodeText + str;
@@ -514,14 +505,14 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
     // At the beginning of the cursor node, the check the previous sibling.
     const previousSibling = cursorNode.previousSibling;
     if (previousSibling &&
-        this.textAttributes.matchesContainer(previousSibling)) {
+        this.scrTextAttr.matchesContainer(previousSibling)) {
       previousSibling.textContent += str;
       this.cursorNode_ = previousSibling;
       this.cursorOffset_ = lib.wc.strWidth(previousSibling.textContent);
       return;
     }
 
-    const newNode = this.textAttributes.createContainer(str);
+    const newNode = this.scrTextAttr.createContainer(str);
     this.cursorRowNode_.insertBefore(newNode, cursorNode);
     this.cursorNode_ = newNode;
     this.cursorOffset_ = wcwidth;
@@ -532,14 +523,14 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
     // At the end of the cursor node, the check the next sibling.
     const nextSibling = cursorNode.nextSibling;
     if (nextSibling &&
-        this.textAttributes.matchesContainer(nextSibling)) {
+        this.scrTextAttr.matchesContainer(nextSibling)) {
       nextSibling.textContent = str + nextSibling.textContent;
       this.cursorNode_ = nextSibling;
       this.cursorOffset_ = lib.wc.strWidth(str);
       return;
     }
 
-    const newNode = this.textAttributes.createContainer(str);
+    const newNode = this.scrTextAttr.createContainer(str);
     this.cursorRowNode_.insertBefore(newNode, nextSibling);
     this.cursorNode_ = newNode;
     // We specifically need to include any missing whitespace here, since it's
@@ -551,7 +542,7 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
   // Worst case, we're somewhere in the middle of the cursor node.  We'll
   // have to split it into two nodes and insert our new container in between.
   this.splitNode_(cursorNode, offset);
-  const newNode = this.textAttributes.createContainer(str);
+  const newNode = this.scrTextAttr.createContainer(str);
   this.cursorRowNode_.insertBefore(newNode, cursorNode.nextSibling);
   this.cursorNode_ = newNode;
   this.cursorOffset_ = wcwidth;
@@ -581,7 +572,7 @@ hterm.Screen.prototype.overwriteString = function(str, wcwidth = undefined) {
     wcwidth = lib.wc.strWidth(str);
   }
 
-  if (this.textAttributes.matchesContainer(lib.notNull(this.cursorNode_)) &&
+  if (this.scrTextAttr.matchesContainer(lib.notNull(this.cursorNode_)) &&
       this.cursorNode_.textContent.substr(this.cursorOffset_) ==
           str) {
     // This overwrite would be a no-op, just move the cursor and return.
@@ -640,7 +631,7 @@ hterm.Screen.prototype.deleteChars = function(count) {
       // No characters were deleted when there should be.  We're probably trying
       // to delete one column width from a wide character node.  We remove the
       // wide character node here and replace it with a single space.
-      const spaceNode = this.textAttributes.createContainer(' ');
+      const spaceNode = this.scrTextAttr.createContainer(' ');
       node.parentNode.insertBefore(spaceNode, offset ? node : node.nextSibling);
       node.textContent = '';
       endLength = 0;
@@ -1001,7 +992,7 @@ hterm.Screen_CursorState = function(screen) {
 hterm.Screen_CursorState.prototype.save = function(vt) {
   this.cursor = vt.terminal.saveCursor();
 
-  this.textAttributes = this.screen_.textAttributes.clone();
+  this.textAttributes = this.screen_.scrTextAttr.clone();
 
   this.GL = vt.GL;
   this.GR = vt.GR;
@@ -1024,10 +1015,10 @@ hterm.Screen_CursorState.prototype.restore = function(vt) {
   // the color palette (which are a terminal setting).
   const tattrs = this.textAttributes.clone();
   tattrs.colorPaletteOverrides =
-      this.screen_.textAttributes.colorPaletteOverrides;
+      this.screen_.scrTextAttr.colorPaletteOverrides;
   tattrs.syncColors();
 
-  this.screen_.textAttributes = tattrs;
+  this.screen_.scrTextAttr = tattrs;
 
   vt.GL = this.GL;
   vt.GR = this.GR;
@@ -2770,7 +2761,7 @@ hterm.Terminal = function({profileId, storage} = {}) {
   this.vtScrollBottom_ = null;
 
   // The DIV element for the visible cursor.
-  this.cursorNode_ = null;
+  this.termCursNode = null;
 
   // '_' shape is user preference.
   this.cursorShape_ = '_';
@@ -2992,8 +2983,8 @@ hterm.Terminal.prototype.setProfile = function(
         }
       }
 
-      this.primaryScreen_.textAttributes.colorPaletteOverrides = [];
-      this.alternateScreen_.textAttributes.colorPaletteOverrides = [];
+      this.primaryScreen_.scrTextAttr.colorPaletteOverrides = [];
+      this.alternateScreen_.scrTextAttr.colorPaletteOverrides = [];
     },
 
     'copy-on-select': (v) => {
@@ -3017,8 +3008,8 @@ hterm.Terminal.prototype.setProfile = function(
     },
 
     'enable-bold-as-bright': (v) => {
-      this.primaryScreen_.textAttributes.enableBoldAsBright = !!v;
-      this.alternateScreen_.textAttributes.enableBoldAsBright = !!v;
+      this.primaryScreen_.scrTextAttr.enableBoldAsBright = !!v;
+      this.alternateScreen_.scrTextAttr.enableBoldAsBright = !!v;
     },
 
     'foreground-color': (v) => {
@@ -3221,7 +3212,7 @@ hterm.Terminal.prototype.setRgbColorCssVar = function(name, rgb) {
 hterm.Terminal.prototype.setColorPalette = function(i, rgb) {
   if (i >= 0 && i < 256 && rgb != null && rgb != this.getColorPalette[i]) {
     this.setRgbColorCssVar(`color-${i}`, rgb);
-    this.screen_.textAttributes.colorPaletteOverrides[i] = rgb;
+    this.screen_.scrTextAttr.colorPaletteOverrides[i] = rgb;
   }
 };
 
@@ -3232,7 +3223,7 @@ hterm.Terminal.prototype.setColorPalette = function(i, rgb) {
  * @return {string} rgb color.
  */
 hterm.Terminal.prototype.getColorPalette = function(i) {
-  return this.screen_.textAttributes.colorPaletteOverrides[i] ||
+  return this.screen_.scrTextAttr.colorPaletteOverrides[i] ||
       this.colorPaletteOverrides_.get(i) ||
       lib.colors.stockPalette[i];
 };
@@ -3245,14 +3236,14 @@ hterm.Terminal.prototype.getColorPalette = function(i) {
 hterm.Terminal.prototype.resetColor = function(i) {
   this.setColorPalette(
       i, this.colorPaletteOverrides_.get(i) || lib.colors.stockPalette[i]);
-  delete this.screen_.textAttributes.colorPaletteOverrides[i];
+  delete this.screen_.scrTextAttr.colorPaletteOverrides[i];
 };
 
 /**
  * Reset the current screen color palette to the default state.
  */
 hterm.Terminal.prototype.resetColorPalette = function() {
-  this.screen_.textAttributes.colorPaletteOverrides.forEach(
+  this.screen_.scrTextAttr.colorPaletteOverrides.forEach(
       (c, i) => this.resetColor(i));
 };
 
@@ -3332,16 +3323,16 @@ hterm.Terminal.prototype.saveCursor = function() {
  * @return {!hterm.TextAttributes}
  */
 hterm.Terminal.prototype.getTextAttributes = function() {
-  return this.screen_.textAttributes;
+  return this.screen_.scrTextAttr;
 };
 
 /**
  * Set the text attributes.
  *
- * @param {!hterm.TextAttributes} textAttributes The attributes to set.
+ * @param {!hterm.TextAttributes} ta The attributes to set.
  */
-hterm.Terminal.prototype.setTextAttributes = function(textAttributes) {
-  this.screen_.textAttributes = textAttributes;
+hterm.Terminal.prototype.setTextAttributes = function(ta) {
+  this.screen_.scrTextAttr = ta;
 };
 
 /**
@@ -3486,7 +3477,7 @@ hterm.Terminal.prototype.realizeWidth_ = function(columnCount) {
     throw new Error('Attempt to realize bad width: ' + columnCount);
   }
 
-  const deltaColumns = columnCount - this.screen_.getWidth();
+  const deltaColumns = columnCount - this.screen_.columnCount_;
   if (deltaColumns == 0) {
     // No change, so don't bother recalculating things.
     return;
@@ -3594,8 +3585,8 @@ hterm.Terminal.prototype.reset = function() {
   const resetScreen = (screen) => {
     // We want to make sure to reset the attributes before we clear the screen.
     // The attributes might be used to initialize default/empty rows.
-    screen.textAttributes.reset();
-    screen.textAttributes.colorPaletteOverrides = [];
+    screen.scrTextAttr.reset();
+    screen.scrTextAttr.colorPaletteOverrides = [];
     this.clearHome(screen);
     screen.saveCursorAndState(this.vt);
   };
@@ -3630,8 +3621,8 @@ hterm.Terminal.prototype.softReset = function() {
   const resetScreen = (screen) => {
     // Xterm also resets the color palette on soft reset, even though it doesn't
     // seem to be documented anywhere.
-    screen.textAttributes.reset();
-    screen.textAttributes.colorPaletteOverrides = [];
+    screen.scrTextAttr.reset();
+    screen.scrTextAttr.colorPaletteOverrides = [];
     screen.saveCursorAndState(this.vt);
   };
   resetScreen(this.primaryScreen_);
@@ -3926,10 +3917,10 @@ ${lib.colors.stockPalette.map((c, i) => `
   // way to split the sheet up to before & after the user-css settings.
   this.document_.head.insertBefore(style, this.document_.head.firstChild);
 
-  this.cursorNode_ = this.document_.createElement('div');
-  this.cursorNode_.id = 'hterm:terminal-cursor';
-  this.cursorNode_.className = 'cursor-node';
-  this.cursorNode_.style.cssText = `
+  this.termCursNode = this.document_.createElement('div');
+  this.termCursNode.id = 'hterm:terminal-cursor';
+  this.termCursNode.className = 'cursor-node';
+  this.termCursNode.style.cssText = `
 animation-duration: 0.8s;
 animation-name: cursor-blink;
 animation-iteration-count: infinite;
@@ -3948,7 +3939,7 @@ opacity: var(--hterm-curs-opac);
   this.setCursorBlink('u');
   this.restyleCursor_();
 
-  this.document_.body.appendChild(this.cursorNode_);
+  this.document_.body.appendChild(this.termCursNode);
 
   // When 'enableMouseDragScroll' is off we reposition this element directly
   // under the mouse cursor after a click.  This makes Chrome associate
@@ -3972,13 +3963,13 @@ opacity: var(--hterm-curs-opac);
   ['mousedown', 'mouseup', 'mousemove', 'click', 'dblclick',
    ].forEach(function(event) {
        this.scrollBlockerNode_.addEventListener(event, onMouse);
-       this.cursorNode_.addEventListener(
+       this.termCursNode.addEventListener(
            event, /** @type {!EventListener} */ (onMouse));
        this.document_.addEventListener(
            event, /** @type {!EventListener} */ (onMouse));
      }.bind(this));
 
-  this.cursorNode_.addEventListener('mousedown', function() {
+  this.termCursNode.addEventListener('mousedown', function() {
       setTimeout(this.focus.bind(this));
     }.bind(this));
 
@@ -4259,16 +4250,16 @@ hterm.Terminal.prototype.print = function(str) {
 
     const tokens = hterm.TextAttributes.splitWidecharString(substr);
     for (let i = 0; i < tokens.length; i++) {
-      this.screen_.textAttributes.wcNode = tokens[i].wcNode;
-      this.screen_.textAttributes.asciiNode = tokens[i].asciiNode;
+      this.screen_.scrTextAttr.wcNode = tokens[i].wcNode;
+      this.screen_.scrTextAttr.asciiNode = tokens[i].asciiNode;
 
       if (this.options_.insertMode) {
         this.screen_.insertString(tokens[i].str, tokens[i].wcStrWidth);
       } else {
         this.screen_.overwriteString(tokens[i].str, tokens[i].wcStrWidth);
       }
-      this.screen_.textAttributes.wcNode = false;
-      this.screen_.textAttributes.asciiNode = true;
+      this.screen_.scrTextAttr.wcNode = false;
+      this.screen_.scrTextAttr.asciiNode = true;
     }
 
     this.screen_.maybeClipCurrentRow();
@@ -4453,8 +4444,8 @@ hterm.Terminal.prototype.eraseToRight = function(count = undefined) {
   const maxCount = this.screenSize.width - this.screen_.cursorPosition.column;
   count = count ? Math.min(count, maxCount) : maxCount;
 
-  if (this.screen_.textAttributes.background ===
-      this.screen_.textAttributes.DEFAULT_COLOR) {
+  if (this.screen_.scrTextAttr.background ===
+      this.screen_.scrTextAttr.DEFAULT_COLOR) {
     const cursorRow = this.screen_.rowsArray[this.screen_.cursorPosition.row];
     if (hterm.TextAttributes.nodeWidth(cursorRow) <=
         this.screen_.cursorPosition.column + count) {
@@ -4675,7 +4666,7 @@ hterm.Terminal.prototype.insertSpace = function(count) {
  */
 hterm.Terminal.prototype.deleteChars = function(count) {
   const deleted = this.screen_.deleteChars(count);
-  if (deleted && !this.screen_.textAttributes.isDefault()) {
+  if (deleted && !this.screen_.scrTextAttr.isDefault()) {
     const cursor = this.saveCursor();
     this.setCursorColumn(this.screenSize.width - deleted);
     this.screen_.insertString(' '.repeat(deleted));
@@ -4980,8 +4971,8 @@ hterm.Terminal.prototype.setReverseVideo = function(state) {
  * This will not play the bell audio more than once per second.
  */
 hterm.Terminal.prototype.ringBell = function() {
-  this.cursorNode_.style.backgroundColor = 'rgb(var(--hterm-foreground-color))';
-  this.cursorNode_.style.animationName = '';
+  this.termCursNode.style.backgroundColor = 'rgb(var(--hterm-foreground-color))';
+  this.termCursNode.style.animationName = '';
 
   setTimeout(() => this.restyleCursor_(), 500);
 
@@ -5085,12 +5076,12 @@ hterm.Terminal.prototype.setAlternateMode = function(state) {
   if (state == (this.screen_ == this.alternateScreen_)) {
     return;
   }
-  const oldOverrides = this.screen_.textAttributes.colorPaletteOverrides;
+  const oldOverrides = this.screen_.scrTextAttr.colorPaletteOverrides;
   const cursor = this.saveCursor();
   this.screen_ = state ? this.alternateScreen_ : this.primaryScreen_;
 
   // Swap color overrides.
-  const newOverrides = this.screen_.textAttributes.colorPaletteOverrides;
+  const newOverrides = this.screen_.scrTextAttr.colorPaletteOverrides;
   oldOverrides.forEach((c, i) => {
     if (!newOverrides.hasOwnProperty(i)) {
       this.setRgbColorCssVar(`color-${i}`, this.getColorPalette(i));
@@ -5145,7 +5136,7 @@ hterm.Terminal.prototype.setCursorBlink = function(b) {
   }
 
   this.options_.cursorBlink = !!perm;
-  this.cursorNode_.style.animationName = temp ? 'cursor-blink' : '';
+  this.termCursNode.style.animationName = temp ? 'cursor-blink' : '';
 };
 
 /**
@@ -5192,14 +5183,14 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
   if (cursorRowIndex > bottomRowIndex) {
     // Cursor is scrolled off screen, hide it.
     this.cursorOffScreen_ = true;
-    this.cursorNode_.style.display = 'none';
+    this.termCursNode.style.display = 'none';
     return false;
   }
 
-  if (this.cursorNode_.style.display == 'none') {
+  if (this.termCursNode.style.display == 'none') {
     // Re-display the terminal cursor if it was hidden.
     this.cursorOffScreen_ = false;
-    this.cursorNode_.style.display = '';
+    this.termCursNode.style.display = '';
   }
 
   // Position the cursor using CSS variable math.  If we do the math in JS,
@@ -5210,7 +5201,7 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
       `${cursorRowIndex - topRowIndex + this.scroll_port.visibleRowTopMargin}`);
   this.setCssVar('cursor-offset-col', this.screen_.cursorPosition.column);
 
-  this.cursorNode_.setAttribute('title',
+  this.termCursNode.setAttribute('title',
                                 '(' + this.screen_.cursorPosition.column +
                                 ', ' + this.screen_.cursorPosition.row +
                                 ')');
@@ -5224,16 +5215,16 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
 };
 
 /**
- * Adjusts the style of this.cursorNode_ according to the current cursor shape
+ * Adjusts the style of this.termCursNode according to the current cursor shape
  * and character cell dimensions.
  */
 hterm.Terminal.prototype.restyleCursor_ = function() {
   var opac;
   let shape = this.cursorShape_;
 
-  const style = this.cursorNode_.style;
+  const style = this.termCursNode.style;
 
-  if (this.cursorNode_.getAttribute('focus') == 'false') {
+  if (this.termCursNode.getAttribute('focus') == 'false') {
     // Always show a block cursor when unfocused.
     shape = 'b';
     this.setCursorBlink('p');
@@ -5832,9 +5823,9 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
     // with local text selection.
     if (e.terminalRow - 1 == this.screen_.cursorPosition.row &&
         e.terminalColumn - 1 == this.screen_.cursorPosition.column) {
-      this.cursorNode_.style.display = 'none';
-    } else if (this.cursorNode_.style.display == 'none') {
-      this.cursorNode_.style.display = '';
+      this.termCursNode.style.display = 'none';
+    } else if (this.termCursNode.style.display == 'none') {
+      this.termCursNode.style.display = '';
     }
   }
 
@@ -5970,7 +5961,7 @@ hterm.Terminal.prototype.onMouse = function(e) { };
  * @param {boolean} focused True if focused, false otherwise.
  */
 hterm.Terminal.prototype.onFocusChange_ = function(focused) {
-  this.cursorNode_.setAttribute('focus', focused);
+  this.termCursNode.setAttribute('focus', focused);
   this.restyleCursor_();
 
   if (this.reportFocus) {

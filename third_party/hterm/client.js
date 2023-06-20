@@ -5282,41 +5282,6 @@ hterm.PreferenceManager.defaultPreferences = {
       `create a visible line at the edges of the screen.`,
   ),
 
-  'word-break-match-left': hterm.PreferenceManager.definePref_(
-      'Automatic selection halting (to the left)',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      // TODO(vapier): Switch \u back to ‘“‹« once builders are fixed.
-      '[^\\s[\\](){}<>"\'^!@#$%&*,;:`\u{2018}\u{201c}\u{2039}\u{ab}]', 'string',
-      `Regular expression to halt matching to the left (start) of a ` +
-      `selection.\n` +
-      `\n` +
-      `Normally this is a character class to reject specific characters.\n` +
-      `We allow "~" and "." by default as paths frequently start with those.`,
-  ),
-
-  'word-break-match-right': hterm.PreferenceManager.definePref_(
-      'Automatic selection halting (to the right)',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      // TODO(vapier): Switch \u back to ’”›» once builders are fixed.
-      '[^\\s[\\](){}<>"\'^!@#$%&*,;:~.`\u{2019}\u{201d}\u{203a}\u{bb}]',
-      'string',
-      `Regular expression to halt matching to the right (end) of a ` +
-      `selection.\n` +
-      `\n` +
-      `Normally this is a character class to reject specific characters.`,
-  ),
-
-  'word-break-match-middle': hterm.PreferenceManager.definePref_(
-      'Word break characters',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      '[^\\s[\\](){}<>"\'^]*', 'string',
-      `Regular expression to match all the characters in the middle.\n` +
-      `\n` +
-      `Normally this is a character class to reject specific characters.\n` +
-      `\n` +
-      `Used to expand the selection surrounding the starting point.`,
-  ),
-
   'scroll-wheel-may-send-arrow-keys': hterm.PreferenceManager.definePref_(
       'Emulate arrow keys with scroll wheel',
       hterm.PreferenceManager.Categories.Scrolling,
@@ -5488,3 +5453,26 @@ hterm.PubSub.prototype.publish = function(
     setTimeout(notifyList, 0, 0);
   }
 };
+
+// REGEXES FOR EXPANDING WORD SELECTIONS.
+
+// Regular expression to halt matching to the left (start) of a
+// selection.
+//
+// Normally this is a character class to reject specific characters.
+// We allow "~" and "." by default as paths frequently start with those.
+var wordBreakMatchLeft =
+	'[^\\s[\\](){}<>"\'^!@#$%&*,;:`\u{2018}\u{201c}\u{2039}\u{ab}]';
+
+// Regular expression to halt matching to the right (end) of a selection.
+//
+// Normally this is a character class to reject specific characters.
+var wordBreakMatchRight =
+	'[^\\s[\\](){}<>"\'^!@#$%&*,;:~.`\u{2019}\u{201d}\u{203a}\u{bb}]';
+
+// Regular expression to match all the characters in the middle.
+//
+// Normally this is a character class to reject specific characters.
+//
+// Used to expand the selection surrounding the starting point.
+var wordBreakMatchMiddle = '[^\\s[\\](){}<>"\'^]*';

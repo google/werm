@@ -3,6 +3,6 @@
 echo Content-type: text/javascript
 echo
 
-exec cat \
-	$WERMDIR/third_party/hterm/client.js \
-	$WERMDIR/third_party/hterm/engine.js
+cat $WERMDIR/third_party/hterm/client.js
+
+cpp -P $WERMDIR/third_party/hterm/engine.js

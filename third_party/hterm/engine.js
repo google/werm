@@ -63,7 +63,7 @@ hterm.Screen = function(columnCount = 0) {
 
   // Saved state used by DECSC and related settings.  This is only for saving
   // and restoring specific state, not for the current/active state.
-  this.cursorState_ = new hterm.Screen.CursorState(this);
+  this.cursorState_ = new hterm.Screen_CursorState(this);
 
   // The node containing the row that the cursor is positioned on.
   this.cursorRowNode_ = null;
@@ -73,14 +73,6 @@ hterm.Screen = function(columnCount = 0) {
 
   // The offset in column width into cursorNode_ where the cursor is positioned.
   this.cursorOffset_ = 0;
-
-  // Regexes for expanding word selections.
-  /** @type {?string} */
-  this.wordBreakMatchLeft = null;
-  /** @type {?string} */
-  this.wordBreakMatchRight = null;
-  /** @type {?string} */
-  this.wordBreakMatchMiddle = null;
 };
 
 /**
@@ -940,9 +932,9 @@ hterm.Screen.prototype.expandSelectionWithWordBreakMatches_ =
 hterm.Screen.prototype.expandSelection = function(selection) {
   this.expandSelectionWithWordBreakMatches_(
       selection,
-      lib.notNull(this.wordBreakMatchLeft),
-      lib.notNull(this.wordBreakMatchRight),
-      lib.notNull(this.wordBreakMatchMiddle));
+      lib.notNull(wordBreakMatchLeft),
+      lib.notNull(wordBreakMatchRight),
+      lib.notNull(wordBreakMatchMiddle));
 };
 
 /**
@@ -994,7 +986,7 @@ hterm.Screen.prototype.restoreCursorAndState = function(vt) {
  * @param {!hterm.Screen} screen The screen this cursor is tied to.
  * @constructor
  */
-hterm.Screen.CursorState = function(screen) {
+hterm.Screen_CursorState = function(screen) {
   this.screen_ = screen;
   this.cursor = null;
   this.textAttributes = null;
@@ -1006,7 +998,7 @@ hterm.Screen.CursorState = function(screen) {
  *
  * @param {!hterm.VT} vt The VT object to read graphic codeset details from.
  */
-hterm.Screen.CursorState.prototype.save = function(vt) {
+hterm.Screen_CursorState.prototype.save = function(vt) {
   this.cursor = vt.terminal.saveCursor();
 
   this.textAttributes = this.screen_.textAttributes.clone();
@@ -1025,7 +1017,7 @@ hterm.Screen.CursorState.prototype.save = function(vt) {
  *
  * @param {!hterm.VT} vt The VT object to write graphic codeset details to.
  */
-hterm.Screen.CursorState.prototype.restore = function(vt) {
+hterm.Screen_CursorState.prototype.restore = function(vt) {
   vt.terminal.restoreCursor(this.cursor);
 
   // Cursor restore includes char attributes (bold/etc...), but does not change
@@ -2910,7 +2902,7 @@ hterm.Terminal.prototype.tabWidth = 8;
  */
 hterm.Terminal.prototype.setProfile = function(
     profileId, callback = undefined) {
-  profileId = profileId.replace(/\//g, '');
+  profileId = profileId.replace(/[/]/g, '');
   if (this.profileId_ === profileId) {
     if (callback) {
       callback();
@@ -3065,21 +3057,6 @@ hterm.Terminal.prototype.setProfile = function(
 
     'terminal-encoding': (v) => {
       this.vt.setEncoding(v);
-    },
-
-    'word-break-match-left': (v) => {
-      this.primaryScreen_.wordBreakMatchLeft = v;
-      this.alternateScreen_.wordBreakMatchLeft = v;
-    },
-
-    'word-break-match-right': (v) => {
-      this.primaryScreen_.wordBreakMatchRight = v;
-      this.alternateScreen_.wordBreakMatchRight = v;
-    },
-
-    'word-break-match-middle': (v) => {
-      this.primaryScreen_.wordBreakMatchMiddle = v;
-      this.alternateScreen_.wordBreakMatchMiddle = v;
     },
 
     'allow-images-inline': (v) => {
@@ -3409,7 +3386,7 @@ hterm.Terminal.prototype.clearCursorOverflow = function() {
 /**
  * Save the current cursor state to the corresponding screens.
  *
- * See the hterm.Screen.CursorState class for more details.
+ * See the hterm.Screen_CursorState class for more details.
  *
  * @param {boolean=} both If true, update both screens, else only update the
  *     current screen.
@@ -3426,7 +3403,7 @@ hterm.Terminal.prototype.saveCursorAndState = function(both) {
 /**
  * Restore the saved cursor state in the corresponding screens.
  *
- * See the hterm.Screen.CursorState class for more details.
+ * See the hterm.Screen_CursorState class for more details.
  *
  * @param {boolean=} both If true, update both screens, else only update the
  *     current screen.
@@ -10652,12 +10629,6 @@ lib.resource.add('hterm/images/copy', 'image/svg+xml;utf8',
 '</svg>'
 );
 
-lib.resource.add('hterm/images/close', 'image/svg+xml;utf8',
-'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
-'  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>' +
-'</svg>'
-);
-
 lib.resource.add('hterm/images/icon-96', 'image/png;base64',
 'iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAStklEQVR42u1dBXjrupL+RzIGmjIf' +
 'vAcu42NmZub3lpmZmZmZmRkuMzPDYaYyJG0Sa9b2p2z1eQtp7bzefpv/nKnkkSw7Gg1IshNsDtpo' +
@@ -10746,20 +10717,3 @@ lib.resource.add('hterm/images/icon-96', 'image/png;base64',
 'Tgxos9N1atajtd+S1LytA26p8NKbQE7/0+BtpNakNtpoo4022vgf7lRPtKCE39oAAAAASUVORK5C' +
 'YII='
 );
-
-lib.resource.add('hterm/concat/date', 'text/plain',
-'Wed, 21 Sep 2022 05:56:43 +0000'
-);
-
-lib.resource.add('hterm/changelog/version', 'text/plain',
-'1.92.1'
-);
-
-lib.resource.add('hterm/changelog/date', 'text/plain',
-'2022-03-04'
-);
-
-lib.resource.add('hterm/git/HEAD', 'text/plain',
-'83707c9fbf40758e4923302f5f911003d8bbfeba'
-);
-

@@ -5,4 +5,4 @@ echo
 
 cat $WERMDIR/third_party/hterm/client.js
 
-cpp -P $WERMDIR/third_party/hterm/engine.js
+cpp -DTMint=var -P $WERMDIR/third_party/hterm/engine.js

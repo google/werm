@@ -44,7 +44,7 @@
  *    0 if not provided.
  * @constructor
  */
-hterm.Screen = function(columnCount = 0) {
+hterm.Screen = function() {
   /**
    * Public, read-only access to the rows in this screen.
    *
@@ -53,13 +53,15 @@ hterm.Screen = function(columnCount = 0) {
   this.rowsArray = [];
 
   // The max column width for this screen.
-  this.columnCount_ = columnCount;
+  this.columnCount_ = 0;
 
   // The current color, bold, underline and blink attributes.
   this.scrTextAttr = new hterm.TextAttributes(window.document);
 
   // Current zero-based cursor coordinates.
-  this.cursorPosition = new hterm.RowCol(0, 0);
+  this.cursrow = 0;
+  this.curscol = 0;
+  this.cursovrfl = 0;
 
   // Saved state used by DECSC and related settings.  This is only for saving
   // and restoring specific state, not for the current/active state.
@@ -92,8 +94,8 @@ hterm.Screen.prototype.getHeight = function() {
 hterm.Screen.prototype.setColumnCount = function(count) {
   this.columnCount_ = count;
 
-  if (this.cursorPosition.column >= count) {
-    this.setCursorPosition(this.cursorPosition.row, count - 1);
+  if (this.curscol >= count) {
+    this.setCursorPosition(this.cursrow, count - 1);
   }
 };
 
@@ -202,8 +204,8 @@ hterm.Screen.prototype.clearCursorRow = function() {
   this.cursorRowNode_.innerText = '';
   this.cursorRowNode_.removeAttribute('line-overflow');
   this.cursorOffset_ = 0;
-  this.cursorPosition.column = 0;
-  this.cursorPosition.overflow = false;
+  this.curscol = 0;
+  this.cursovrfl = 0;
 
   let text;
   if (this.scrTextAttr.isDefault()) {
@@ -270,7 +272,7 @@ hterm.Screen.prototype.setCursorPosition = function(row, column) {
     column = 0;
   }
 
-  this.cursorPosition.overflow = false;
+  this.cursovrfl = 0;
 
   const rowNode = this.rowsArray[row];
   let node = rowNode.firstChild;
@@ -283,15 +285,17 @@ hterm.Screen.prototype.setCursorPosition = function(row, column) {
   let currentColumn = 0;
 
   if (rowNode == this.cursorRowNode_) {
-    if (column >= this.cursorPosition.column - this.cursorOffset_) {
+    if (column >= this.curscol - this.cursorOffset_) {
       node = this.cursorNode_;
-      currentColumn = this.cursorPosition.column - this.cursorOffset_;
+      currentColumn = this.curscol - this.cursorOffset_;
     }
   } else {
     this.cursorRowNode_ = rowNode;
   }
 
-  this.cursorPosition.move(row, column);
+  this.cursrow = row;
+  this.curscol = column;
+  this.cursovrfl = 0;
 
   while (node) {
     const offset = column - currentColumn;
@@ -357,23 +361,25 @@ hterm.Screen.prototype.splitNode_ = function(node, offset) {
  * Ensure that text is clipped and the cursor is clamped to the column count.
  */
 hterm.Screen.prototype.maybeClipCurrentRow = function() {
+  TMint currentColumn;
+
   let width = hterm.TextAttributes.nodeWidth(lib.notNull(this.cursorRowNode_));
 
   if (width <= this.columnCount_) {
     // Current row does not need clipping, but may need clamping.
-    if (this.cursorPosition.column >= this.columnCount_) {
-      this.setCursorPosition(this.cursorPosition.row, this.columnCount_ - 1);
-      this.cursorPosition.overflow = true;
+    if (this.curscol >= this.columnCount_) {
+      this.setCursorPosition(this.cursrow, this.columnCount_ - 1);
+      this.cursovrfl = 1;
     }
 
     return;
   }
 
   // Save off the current column so we can maybe restore it later.
-  const currentColumn = this.cursorPosition.column;
+  currentColumn = this.curscol;
 
   // Move the cursor to the final column.
-  this.setCursorPosition(this.cursorPosition.row, this.columnCount_ - 1);
+  this.setCursorPosition(this.cursrow, this.columnCount_ - 1);
 
   // Remove any text that partially overflows.
   width = hterm.TextAttributes.nodeWidth(lib.notNull(this.cursorNode_));
@@ -395,10 +401,10 @@ hterm.Screen.prototype.maybeClipCurrentRow = function() {
   if (currentColumn < this.columnCount_) {
     // If the cursor was within the screen before we started then restore its
     // position.
-    this.setCursorPosition(this.cursorPosition.row, currentColumn);
+    this.setCursorPosition(this.cursrow, currentColumn);
   } else {
     // Otherwise leave it at the the last column in the overflow state.
-    this.cursorPosition.overflow = true;
+    this.cursovrfl = 1;
   }
 };
 
@@ -431,7 +437,7 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
 
   // No matter what, before this function exits the cursor column will have
   // moved this much.
-  this.cursorPosition.column += wcwidth;
+  this.curscol += wcwidth;
 
   // Local cache of the cursor offset.
   let offset = this.cursorOffset_;
@@ -563,7 +569,7 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
  *     up processing as this is a hot codepath.
  */
 hterm.Screen.prototype.overwriteString = function(str, wcwidth = undefined) {
-  const maxLength = this.columnCount_ - this.cursorPosition.column;
+  TMint maxLength = this.columnCount_ - this.curscol;
   if (!maxLength) {
     return;
   }
@@ -577,7 +583,7 @@ hterm.Screen.prototype.overwriteString = function(str, wcwidth = undefined) {
           str) {
     // This overwrite would be a no-op, just move the cursor and return.
     this.cursorOffset_ += wcwidth;
-    this.cursorPosition.column += wcwidth;
+    this.curscol += wcwidth;
     return;
   }
 
@@ -596,10 +602,12 @@ hterm.Screen.prototype.overwriteString = function(str, wcwidth = undefined) {
  * @return {number} The column width of the characters actually deleted.
  */
 hterm.Screen.prototype.deleteChars = function(count) {
+  TMint currentCursorColumn;
+
   let node = this.cursorNode_;
   let offset = this.cursorOffset_;
 
-  const currentCursorColumn = this.cursorPosition.column;
+  currentCursorColumn = this.curscol;
   count = Math.min(count, this.columnCount_ - currentCursorColumn);
   if (!count) {
     return 0;
@@ -3308,13 +3316,40 @@ hterm.Terminal.prototype.syncMouseStyle = function() {
                      'var(--hterm-mouse-cursor-default)');
 };
 
+function readcursrow(c) { return (c >> 15) & 0x7fff; }
+function writcursrow(c, row)
+{
+	c &= ~(0x7fff << 15);
+	c |= (row & 0x7fff) << 15;
+	return c;
+}
+
 /**
  * Return a copy of the current cursor position.
  *
  * @return {!hterm.RowCol} The RowCol object representing the current position.
  */
 hterm.Terminal.prototype.saveCursor = function() {
-  return this.screen_.cursorPosition.clone();
+  return ((this.screen_.cursrow & 0x7fff ) << 15) |
+          (this.screen_.curscol & 0x7fff )        |
+         ((this.screen_.cursovrfl ? 1 : 0) << 30);
+};
+
+/**
+ * Restore a previously saved cursor position.
+ */
+hterm.Terminal.prototype.restoreCursor = function(curs) {
+  TMint rawr = (curs >> 15) & 0x7fff;
+  TMint rawc = curs & 0x7fff;
+  TMint ov = curs >> 30;
+
+  TMint row = lib.f.clamp(rawr, 0, this.screenSize.height - 1);
+  TMint column = lib.f.clamp(rawc, 0, this.screenSize.width - 1);
+
+  this.screen_.setCursorPosition(row, column);
+  if (rawc > column || (rawc == column && ov)) {
+    this.screen_.cursovrfl = 1;
+  }
 };
 
 /**
@@ -3353,25 +3388,10 @@ hterm.Terminal.prototype.setWindowTitle = function(title) {
 hterm.Terminal.prototype.setWindowName = function(name) {};
 
 /**
- * Restore a previously saved cursor position.
- *
- * @param {!hterm.RowCol} cursor The position to restore.
- */
-hterm.Terminal.prototype.restoreCursor = function(cursor) {
-  const row = lib.f.clamp(cursor.row, 0, this.screenSize.height - 1);
-  const column = lib.f.clamp(cursor.column, 0, this.screenSize.width - 1);
-  this.screen_.setCursorPosition(row, column);
-  if (cursor.column > column ||
-      cursor.column == column && cursor.overflow) {
-    this.screen_.cursorPosition.overflow = true;
-  }
-};
-
-/**
  * Clear the cursor's overflow flag.
  */
 hterm.Terminal.prototype.clearCursorOverflow = function() {
-  this.screen_.cursorPosition.overflow = false;
+  this.screen_.cursovrfl = 0;
 };
 
 /**
@@ -3517,6 +3537,8 @@ hterm.Terminal.prototype.realizeWidth_ = function(columnCount) {
  * @param {number} rowCount The number of rows.
  */
 hterm.Terminal.prototype.realizeHeight_ = function(rowCount) {
+  TMint cursor;
+
   if (rowCount <= 0) {
     throw new Error('Attempt to realize bad height: ' + rowCount);
   }
@@ -3529,14 +3551,14 @@ hterm.Terminal.prototype.realizeHeight_ = function(rowCount) {
 
   this.screenSize.height = rowCount;
 
-  const cursor = this.saveCursor();
+  cursor = this.saveCursor();
 
   if (deltaRows < 0) {
     // Screen got smaller.
     deltaRows *= -1;
     while (deltaRows) {
       const lastRow = this.getRowCount() - 1;
-      if (lastRow - this.discarded_rows == cursor.row) {
+      if (lastRow - this.discarded_rows == readcursrow(cursor)) {
         break;
       }
 
@@ -3552,7 +3574,7 @@ hterm.Terminal.prototype.realizeHeight_ = function(rowCount) {
 
     // We just removed rows from the top of the screen, we need to update
     // the cursor to match.
-    cursor.row = Math.max(cursor.row - deltaRows, 0);
+    cursor = writcursrow(cursor, Math.max(readcursrow(cursor) - deltaRows, 0));
   } else if (deltaRows > 0) {
     // Screen got larger.
     this.appendRows_(deltaRows);
@@ -3641,7 +3663,8 @@ hterm.Terminal.prototype.softReset = function() {
  * if no more tab stops are set.
  */
 hterm.Terminal.prototype.forwardTabStop = function() {
-  const column = this.screen_.cursorPosition.column;
+  TMint column = this.screen_.curscol;
+  TMint overflow;
 
   for (let i = 0; i < this.tabStops_.length; i++) {
     if (this.tabStops_[i] > column) {
@@ -3651,9 +3674,9 @@ hterm.Terminal.prototype.forwardTabStop = function() {
   }
 
   // xterm does not clear the overflow flag on HT or CHT.
-  const overflow = this.screen_.cursorPosition.overflow;
+  overflow = this.screen_.cursovrfl;
   this.setCursorColumn(this.screenSize.width - 1);
-  this.screen_.cursorPosition.overflow = overflow;
+  this.screen_.cursovrfl = overflow;
 };
 
 /**
@@ -3661,7 +3684,7 @@ hterm.Terminal.prototype.forwardTabStop = function() {
  * if no previous tab stops are set.
  */
 hterm.Terminal.prototype.backwardTabStop = function() {
-  const column = this.screen_.cursorPosition.column;
+  TMint column = this.screen_.curscol;
 
   for (let i = this.tabStops_.length - 1; i >= 0; i--) {
     if (this.tabStops_[i] < column) {
@@ -3699,7 +3722,7 @@ hterm.Terminal.prototype.setTabStop = function(column) {
  * No effect if there is no tab stop at the current cursor position.
  */
 hterm.Terminal.prototype.clearTabStopAtCursor = function() {
-  const column = this.screen_.cursorPosition.column;
+  TMint column = this.screen_.curscol;
 
   const i = this.tabStops_.indexOf(column);
   if (i == -1) {
@@ -4126,12 +4149,14 @@ hterm.Terminal.prototype.appendRows_ = function(count) {
  * The cursor will be positioned at column 0.
  */
 hterm.Terminal.prototype.insertRow_ = function() {
+  TMint cursorRow;
+
   const row = this.document_.createElement('x-row');
   row.appendChild(this.document_.createTextNode(''));
 
   this.scroll_rows_off(1);
 
-  const cursorRow = this.screen_.cursorPosition.row;
+  cursorRow = this.screen_.cursrow;
   this.screen_.insertRow(cursorRow, row);
 
   this.renumberRows_(cursorRow, this.screen_.rowsArray.length);
@@ -4223,7 +4248,7 @@ hterm.Terminal.prototype.print = function(str) {
   }
 
   while (startOffset < strWidth) {
-    if (this.options_.wraparound && this.screen_.cursorPosition.overflow) {
+    if (this.options_.wraparound && this.screen_.cursovrfl) {
       this.screen_.commitLineOverflow();
       this.newLine(true);
     }
@@ -4232,9 +4257,9 @@ hterm.Terminal.prototype.print = function(str) {
     let didOverflow = false;
     let substr;
 
-    if (this.screen_.cursorPosition.column + count >= this.screenSize.width) {
+    if (this.screen_.curscol + count >= this.screenSize.width) {
       didOverflow = true;
-      count = this.screenSize.width - this.screen_.cursorPosition.column;
+      count = this.screenSize.width - this.screen_.curscol;
     }
 
     if (didOverflow && !this.options_.wraparound) {
@@ -4346,15 +4371,15 @@ hterm.Terminal.prototype.newLine = function(dueToOverflow = false) {
   }
 
   const cursorAtEndOfScreen =
-      (this.screen_.cursorPosition.row == this.screen_.rowsArray.length - 1);
+      (this.screen_.cursrow == this.screen_.rowsArray.length - 1);
   const cursorAtEndOfVTRegion =
-      (this.screen_.cursorPosition.row == this.getVTScrollBottom());
+      (this.screen_.cursrow == this.getVTScrollBottom());
 
   if (this.vtScrollTop_ != null && cursorAtEndOfVTRegion) {
     // A VT Scroll region is active on top, we never append new rows.
     // We're at the end of the VT Scroll Region, perform a VT scroll.
     this.vtScrollUp(1);
-    this.setAbsoluteCursorPosition(this.screen_.cursorPosition.row, 0);
+    this.setAbsoluteCursorPosition(this.screen_.cursrow, 0);
   } else if (cursorAtEndOfScreen) {
     // We're at the end of the screen.  Append a new row to the terminal,
     // shifting the top row into the scrollback.
@@ -4363,7 +4388,7 @@ hterm.Terminal.prototype.newLine = function(dueToOverflow = false) {
     this.insertRow_();
   } else {
     // Anywhere else in the screen just moves the cursor.
-    this.setAbsoluteCursorPosition(this.screen_.cursorPosition.row + 1, 0);
+    this.setAbsoluteCursorPosition(this.screen_.cursrow + 1, 0);
   }
 };
 
@@ -4371,7 +4396,7 @@ hterm.Terminal.prototype.newLine = function(dueToOverflow = false) {
  * Like newLine(), except maintain the cursor column.
  */
 hterm.Terminal.prototype.lineFeed = function() {
-  const column = this.screen_.cursorPosition.column;
+  TMint column = this.screen_.curscol;
   this.newLine();
   this.setCursorColumn(column);
 };
@@ -4393,8 +4418,8 @@ hterm.Terminal.prototype.formFeed = function() {
  * The cursor column is not changed.
  */
 hterm.Terminal.prototype.reverseLineFeed = function() {
-  const scrotop = this.getVTScrollTop();
-  const currentRow = this.screen_.cursorPosition.row;
+  TMint scrotop = this.getVTScrollTop();
+  TMint currentRow = this.screen_.cursrow;
 
   if (currentRow == scrotop) {
     this.insertLines(1);
@@ -4412,9 +4437,9 @@ hterm.Terminal.prototype.reverseLineFeed = function() {
  * position.
  */
 hterm.Terminal.prototype.eraseToLeft = function() {
-  const cursor = this.saveCursor();
+  TMint count = this.screen_.curscol + 1;
+  TMint cursor = this.saveCursor();
   this.setCursorColumn(0);
-  const count = cursor.column + 1;
   this.screen_.overwriteString(' '.repeat(count), count);
   this.restoreCursor(cursor);
 };
@@ -4437,18 +4462,20 @@ hterm.Terminal.prototype.eraseToLeft = function() {
  * @param {number=} count The number of characters to erase.
  */
 hterm.Terminal.prototype.eraseToRight = function(count = undefined) {
-  if (this.screen_.cursorPosition.overflow) {
+  TMint maxCount, cursorRow;
+
+  if (this.screen_.cursovrfl) {
     return;
   }
 
-  const maxCount = this.screenSize.width - this.screen_.cursorPosition.column;
+  maxCount = this.screenSize.width - this.screen_.curscol;
   count = count ? Math.min(count, maxCount) : maxCount;
 
   if (this.screen_.scrTextAttr.background ===
       this.screen_.scrTextAttr.DEFAULT_COLOR) {
-    const cursorRow = this.screen_.rowsArray[this.screen_.cursorPosition.row];
+    cursorRow = this.screen_.rowsArray[this.screen_.cursrow];
     if (hterm.TextAttributes.nodeWidth(cursorRow) <=
-        this.screen_.cursorPosition.column + count) {
+        this.screen_.curscol + count) {
       this.screen_.deleteChars(count);
       this.clearCursorOverflow();
       return;
@@ -4484,7 +4511,7 @@ hterm.Terminal.prototype.eraseAbove = function() {
 
   this.eraseToLeft();
 
-  for (let i = 0; i < cursor.row; i++) {
+  for (let i = 0; i < readcursrow(cursor); i++) {
     this.setAbsoluteCursorPosition(i, 0);
     this.screen_.clearCursorRow();
   }
@@ -4505,7 +4532,7 @@ hterm.Terminal.prototype.eraseBelow = function() {
   this.eraseToRight();
 
   const bottom = this.screenSize.height - 1;
-  for (let i = cursor.row + 1; i <= bottom; i++) {
+  for (let i = readcursrow(cursor) + 1; i <= bottom; i++) {
     this.setAbsoluteCursorPosition(i, 0);
     this.screen_.clearCursorRow();
   }
@@ -4574,12 +4601,15 @@ hterm.Terminal.prototype.clearHome = function(screen = undefined) {
  *     to the current screen.
  */
 hterm.Terminal.prototype.clear = function(screen = undefined) {
+  TMint crow, ccol;
+
   if (!screen) {
     screen = this.screen_;
   }
-  const cursor = screen.cursorPosition.clone();
+  crow = screen.cursrow;
+  ccol = screen.curscol;
   this.clearHome(screen);
-  screen.setCursorPosition(cursor.row, cursor.column);
+  screen.setCursorPosition(crow, ccol);
 };
 
 /**
@@ -4591,7 +4621,7 @@ hterm.Terminal.prototype.clear = function(screen = undefined) {
  * @param {number} count The number of lines to insert.
  */
 hterm.Terminal.prototype.insertLines = function(count) {
-  const cursorRow = this.screen_.cursorPosition.row;
+  TMint cursorRow = this.screen_.cursrow;
 
   const bottom = this.getVTScrollBottom();
   count = Math.min(count, bottom - cursorRow);
@@ -4618,9 +4648,9 @@ hterm.Terminal.prototype.insertLines = function(count) {
  * @param {number} count The number of lines to delete.
  */
 hterm.Terminal.prototype.deleteLines = function(count) {
-  const cursor = this.saveCursor();
+  TMint cursor = this.saveCursor();
+  TMint top = readcursrow(cursor)
 
-  const top = cursor.row;
   const bottom = this.getVTScrollBottom();
 
   const maxCount = bottom - top + 1;
@@ -4783,7 +4813,7 @@ hterm.Terminal.prototype.setAbsoluteCursorPosition = function(row, column) {
  * @param {number} column The new zero-based cursor column.
  */
 hterm.Terminal.prototype.setCursorColumn = function(column) {
-  this.setAbsoluteCursorPosition(this.screen_.cursorPosition.row, column);
+  this.setAbsoluteCursorPosition(this.screen_.cursrow, column);
 };
 
 /**
@@ -4792,7 +4822,7 @@ hterm.Terminal.prototype.setCursorColumn = function(column) {
  * @return {number} The zero-based cursor column.
  */
 hterm.Terminal.prototype.getCursorColumn = function() {
-  return this.screen_.cursorPosition.column;
+  return this.screen_.curscol;
 };
 
 /**
@@ -4804,7 +4834,7 @@ hterm.Terminal.prototype.getCursorColumn = function() {
  * @param {number} row The new cursor row.
  */
 hterm.Terminal.prototype.setAbsoluteCursorRow = function(row) {
-  this.setAbsoluteCursorPosition(row, this.screen_.cursorPosition.column);
+  this.setAbsoluteCursorPosition(row, this.screen_.curscol);
 };
 
 /**
@@ -4813,7 +4843,7 @@ hterm.Terminal.prototype.setAbsoluteCursorRow = function(row) {
  * @return {number} The zero-based cursor row.
  */
 hterm.Terminal.prototype.getCursorRow = function() {
-  return this.screen_.cursorPosition.row;
+  return this.screen_.cursrow;
 };
 
 /**
@@ -4868,13 +4898,14 @@ hterm.Terminal.prototype.cursorUp = function(count) {
  * @param {number} count The number of rows to move the cursor.
  */
 hterm.Terminal.prototype.cursorDown = function(count) {
+  TMint row;
+
   count = count || 1;
   const minHeight = (this.options_.originMode ? this.getVTScrollTop() : 0);
   const maxHeight = (this.options_.originMode ? this.getVTScrollBottom() :
                      this.screenSize.height - 1);
 
-  const row = lib.f.clamp(this.screen_.cursorPosition.row + count,
-                          minHeight, maxHeight);
+  row = lib.f.clamp(this.screen_.cursrow + count, minHeight, maxHeight);
   this.setAbsoluteCursorRow(row);
 };
 
@@ -4887,15 +4918,17 @@ hterm.Terminal.prototype.cursorDown = function(count) {
  * @param {number} count The number of columns to move the cursor.
  */
 hterm.Terminal.prototype.cursorLeft = function(count) {
+  TMint currentColumn, newRow;
+
   count = count || 1;
 
   if (count < 1) {
     return;
   }
 
-  const currentColumn = this.screen_.cursorPosition.column;
+  currentColumn = this.screen_.curscol;
   if (this.options_.reverseWraparound) {
-    if (this.screen_.cursorPosition.overflow) {
+    if (this.screen_.cursovrfl) {
       // If this cursor is in the right margin, consume one count to get it
       // back to the last column.  This only applies when we're in reverse
       // wraparound mode.
@@ -4907,7 +4940,7 @@ hterm.Terminal.prototype.cursorLeft = function(count) {
       }
     }
 
-    let newRow = this.screen_.cursorPosition.row;
+    newRow = this.screen_.cursrow;
     let newColumn = currentColumn - count;
     if (newColumn < 0) {
       newRow = newRow - Math.floor(count / this.screenSize.width) - 1;
@@ -4932,14 +4965,16 @@ hterm.Terminal.prototype.cursorLeft = function(count) {
  * @param {number} count The number of columns to move the cursor.
  */
 hterm.Terminal.prototype.cursorRight = function(count) {
+  TMint column;
+
   count = count || 1;
 
   if (count < 1) {
     return;
   }
 
-  const column = lib.f.clamp(this.screen_.cursorPosition.column + count,
-                             0, this.screenSize.width - 1);
+  column = lib.f.clamp(this.screen_.curscol + count,
+                       0, this.screenSize.width - 1);
   this.setCursorColumn(column);
 };
 
@@ -5159,16 +5194,18 @@ hterm.Terminal.prototype.setCursorVisible = function(state) {
  * @return {boolean} True if the cursor is onscreen and synced.
  */
 hterm.Terminal.prototype.syncCursorPosition_ = function() {
-  const topRowIndex = this.scroll_port.getTopRowIndex();
-  const bottomRowIndex = this.scroll_port.getBottomRowIndex(topRowIndex);
-  const cursorRowIndex = this.discarded_rows + this.screen_.cursorPosition.row;
+  TMint cursorColumnIndex, topRowIndex, bottomRowIndex, cursorRowIndex;
+
+  topRowIndex = this.scroll_port.getTopRowIndex();
+  bottomRowIndex = this.scroll_port.getBottomRowIndex(topRowIndex);
+  cursorRowIndex = this.discarded_rows + this.screen_.cursrow;
 
   let forceSyncSelection = false;
   if (this.accessibilityReader_.accessibilityEnabled) {
     // Report the new position of the cursor for accessibility purposes.
-    const cursorColumnIndex = this.screen_.cursorPosition.column;
+    cursorColumnIndex = this.screen_.curscol;
     const cursorLineText =
-        this.screen_.rowsArray[this.screen_.cursorPosition.row].innerText;
+        this.screen_.rowsArray[this.screen_.cursrow].innerText;
     // This will force the selection to be sync'd to the cursor position if the
     // user has pressed a key. Generally we would only sync the cursor position
     // when selection is collapsed so that if the user has selected something
@@ -5199,11 +5236,11 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
   this.setCssVar(
       'cursor-offset-row',
       `${cursorRowIndex - topRowIndex + this.scroll_port.visibleRowTopMargin}`);
-  this.setCssVar('cursor-offset-col', this.screen_.cursorPosition.column);
+  this.setCssVar('cursor-offset-col', this.screen_.curscol);
 
   this.termCursNode.setAttribute('title',
-                                '(' + this.screen_.cursorPosition.column +
-                                ', ' + this.screen_.cursorPosition.row +
+                                '(' + this.screen_.curscol +
+                                ', ' + this.screen_.cursrow +
                                 ')');
 
   // Update the caret for a11y purposes.
@@ -5219,7 +5256,6 @@ hterm.Terminal.prototype.syncCursorPosition_ = function() {
  * and character cell dimensions.
  */
 hterm.Terminal.prototype.restyleCursor_ = function() {
-  var opac;
   let shape = this.cursorShape_;
 
   const style = this.termCursNode.style;
@@ -5267,6 +5303,8 @@ hterm.Terminal.prototype.restyleCursor_ = function() {
  * prior to the cursor actually changing position.
  */
 hterm.Terminal.prototype.scheduleSyncCursorPosition_ = function() {
+  TMint cursorColumnIndex;
+
   if (this.timeouts_.syncCursor) {
     return;
   }
@@ -5274,10 +5312,10 @@ hterm.Terminal.prototype.scheduleSyncCursorPosition_ = function() {
   if (this.accessibilityReader_.accessibilityEnabled) {
     // Report the previous position of the cursor for accessibility purposes.
     const cursorRowIndex = this.discarded_rows +
-        this.screen_.cursorPosition.row;
-    const cursorColumnIndex = this.screen_.cursorPosition.column;
+        this.screen_.cursrow;
+    cursorColumnIndex = this.screen_.curscol;
     const cursorLineText =
-        this.screen_.rowsArray[this.screen_.cursorPosition.row].innerText;
+        this.screen_.rowsArray[this.screen_.cursrow].innerText;
     this.accessibilityReader_.beforeCursorChange(
         cursorLineText, cursorRowIndex, cursorColumnIndex);
   }
@@ -5821,8 +5859,8 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
     // host app, then we want to hide the terminal cursor when the mouse
     // cursor is over top.  This keeps the terminal cursor from interfering
     // with local text selection.
-    if (e.terminalRow - 1 == this.screen_.cursorPosition.row &&
-        e.terminalColumn - 1 == this.screen_.cursorPosition.column) {
+    if (e.terminalRow - 1 == this.screen_.cursrow &&
+        e.terminalColumn - 1 == this.screen_.curscol) {
       this.termCursNode.style.display = 'none';
     } else if (this.termCursNode.style.display == 'none') {
       this.termCursNode.style.display = '';

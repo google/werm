@@ -246,7 +246,7 @@ function term_init()
 	function cur_row_text()
 	{
 		var s = t.screen_;
-		return s.rowsArray[s.cursorPosition.row].innerText;
+		return s.rowsArray[s.cursrow].innerText;
 	}
 
 	host = location.host.replace(/^localhost:/, ':');

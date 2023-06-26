@@ -148,15 +148,6 @@ hterm.Screen.prototype.pushRow = function(row) {
 };
 
 /**
- * Insert rows at the bottom of the screen.
- *
- * @param {!Array<!Element>} rows The rows to insert.
- */
-hterm.Screen.prototype.pushRows = function(rows) {
-  rows.push.apply(this.rowsArray, rows);
-};
-
-/**
  * Insert a row at the specified row of the screen.
  *
  * @param {number} index The index to insert the row.
@@ -176,16 +167,6 @@ hterm.Screen.prototype.insertRows = function(index, rows) {
   for (let i = 0; i < rows.length; i++) {
     this.rowsArray.splice(index + i, 0, rows[i]);
   }
-};
-
-/**
- * Remove a row from the screen and return it.
- *
- * @param {number} index The index of the row to remove.
- * @return {!Element} The selected row.
- */
-hterm.Screen.prototype.removeRow = function(index) {
-  return this.rowsArray.splice(index, 1)[0];
 };
 
 /**

@@ -1,3 +1,5 @@
+#include <tm_defines>
+
 // SOURCE FILE: hterm/js/hterm_screen.js
 // Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -3343,8 +3345,8 @@ hterm.Terminal.prototype.restoreCursor = function(curs) {
   TMint rawc = curs & 0x7fff;
   TMint ov = curs >> 30;
 
-  TMint row = lib.f.clamp(rawr, 0, this.screenSize.height - 1);
-  TMint column = lib.f.clamp(rawc, 0, this.screenSize.width - 1);
+  TMint row = rangefit(rawr, 0, this.screenSize.height - 1);
+  TMint column = rangefit(rawc, 0, this.screenSize.width - 1);
 
   this.screen_.setCursorPosition(row, column);
   if (rawc > column || (rawc == column && ov)) {
@@ -4790,8 +4792,8 @@ hterm.Terminal.prototype.setCursorPosition = function(row, column) {
  */
 hterm.Terminal.prototype.setRelativeCursorPosition = function(row, column) {
   const scrotop = this.getVTScrollTop();
-  row = lib.f.clamp(row + scrotop, scrotop, this.getVTScrollBottom());
-  column = lib.f.clamp(column, 0, this.screenSize.width - 1);
+  row = rangefit(row + scrotop, scrotop, this.getVTScrollBottom());
+  column = rangefit(column, 0, this.screenSize.width - 1);
   this.screen_.setCursorPosition(row, column);
 };
 
@@ -4802,8 +4804,8 @@ hterm.Terminal.prototype.setRelativeCursorPosition = function(row, column) {
  * @param {number} column
  */
 hterm.Terminal.prototype.setAbsoluteCursorPosition = function(row, column) {
-  row = lib.f.clamp(row, 0, this.screenSize.height - 1);
-  column = lib.f.clamp(column, 0, this.screenSize.width - 1);
+  row = rangefit(row, 0, this.screenSize.height - 1);
+  column = rangefit(column, 0, this.screenSize.width - 1);
   this.screen_.setCursorPosition(row, column);
 };
 
@@ -4905,7 +4907,7 @@ hterm.Terminal.prototype.cursorDown = function(count) {
   const maxHeight = (this.options_.originMode ? this.getVTScrollBottom() :
                      this.screenSize.height - 1);
 
-  row = lib.f.clamp(this.screen_.cursrow + count, minHeight, maxHeight);
+  row = rangefit(this.screen_.cursrow + count, minHeight, maxHeight);
   this.setAbsoluteCursorRow(row);
 };
 
@@ -4973,7 +4975,7 @@ hterm.Terminal.prototype.cursorRight = function(count) {
     return;
   }
 
-  column = lib.f.clamp(this.screen_.curscol + count,
+  column = rangefit(this.screen_.curscol + count,
                        0, this.screenSize.width - 1);
   this.setCursorColumn(column);
 };
@@ -5730,45 +5732,6 @@ hterm.Terminal.prototype.overlaySize = function() {
 };
 
 /**
- * Open the selected url.
- */
-hterm.Terminal.prototype.openSelectedUrl_ = function() {
-  let str = this.getSelectionText();
-
-  // If there is no selection, try and expand wherever they clicked.
-  if (str == null) {
-    this.screen_.expandSelectionForUrl(this.document_.getSelection());
-    str = this.getSelectionText();
-
-    // If clicking in empty space, return.
-    if (str == null) {
-      return;
-    }
-  }
-
-  // Make sure URL is valid before opening.
-  if (str.length > 2048 || str.search(/[\s[\](){}<>"'\\^`]/) >= 0) {
-    return;
-  }
-
-  // If the URI isn't anchored, it'll open relative to the extension.
-  // We have no way of knowing the correct schema, so assume http.
-  if (str.search('^[a-zA-Z][a-zA-Z0-9+.-]*://') < 0) {
-    // We have to allow a few protocols that lack authorities and thus
-    // never use the //.  Like mailto.
-    switch (str.split(':', 1)[0]) {
-      case 'mailto':
-        break;
-      default:
-        str = 'http://' + str;
-        break;
-    }
-  }
-
-  hterm.openUrl(str);
-};
-
-/**
  * Manage the automatic mouse hiding behavior while typing.
  *
  * @param {?boolean=} v Whether to enable automatic hiding.
@@ -5851,8 +5814,8 @@ hterm.Terminal.prototype.onMouse_ = function(e) {
       (e.clientX - padding) / this.scroll_port.characterSize.width) + 1;
 
   // Clamp row and column.
-  e.terminalRow = lib.f.clamp(e.terminalRow, 1, this.screenSize.height);
-  e.terminalColumn = lib.f.clamp(e.terminalColumn, 1, this.screenSize.width);
+  e.terminalRow = rangefit(e.terminalRow, 1, this.screenSize.height);
+  e.terminalColumn = rangefit(e.terminalColumn, 1, this.screenSize.width);
 
   if (!reportMouseEvents && !this.cursorOffScreen_) {
     // If the cursor is visible and we're not sending mouse events to the
@@ -7285,8 +7248,8 @@ hterm.VT.prototype.onTerminalMouse_ = function(e) {
       limit = 2047;
     case this.MOUSE_COORDINATES_X10:
       // X10 reports coordinates by encoding into strings.
-      x = String.fromCharCode(lib.f.clamp(e.terminalColumn + 32, 32, limit));
-      y = String.fromCharCode(lib.f.clamp(e.terminalRow + 32, 32, limit));
+      x = String.fromCharCode(rangefit(e.terminalColumn + 32, 32, limit));
+      y = String.fromCharCode(rangefit(e.terminalRow + 32, 32, limit));
       break;
     case this.MOUSE_COORDINATES_SGR:
       // SGR reports coordinates by transmitting the numbers directly.
@@ -9277,7 +9240,7 @@ hterm.VT.CSI['H'] = function(parseState) {
  */
 hterm.VT.CSI['I'] = function(parseState) {
   let count = parseState.iarg(0, 1);
-  count = lib.f.clamp(count, 1, this.terminal.screenSize.width);
+  count = rangefit(count, 1, this.terminal.screenSize.width);
   for (let i = 0; i < count; i++) {
     this.terminal.forwardTabStop();
   }
@@ -9415,7 +9378,7 @@ hterm.VT.CSI['X'] = function(parseState) {
  */
 hterm.VT.CSI['Z'] = function(parseState) {
   let count = parseState.iarg(0, 1);
-  count = lib.f.clamp(count, 1, this.terminal.screenSize.width);
+  count = rangefit(count, 1, this.terminal.screenSize.width);
   for (let i = 0; i < count; i++) {
     this.terminal.backwardTabStop();
   }

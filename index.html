@@ -629,7 +629,9 @@ function term_init()
 	}
 
 	// [0] font-family, [1] font-size (height), [2] cell-width,
-	// [3] padded-cell-height, [4] allow bold face [5] 0-255 bg brightness
+	// [3] padded-cell-height
+	// [4] weight of bold face - set to 400 to disable
+	// [5] 0-255 bg brightness
 	// [6] 0-255 text brightness.
 	// Small fonts require overriding Chrome's minimum font size setting.
 	var fonts = [
@@ -640,6 +642,7 @@ function term_init()
 		['ibm_vga_9x16',	16,	9,	16,	400, 26, 230],
 		['dos_v_ibm_8x19',	20,	8,	19,	400, 26, 230],
 		['cl_stringray_8x19',	20,	8,	19,	400, 26, 230],
+		['ibm_xga_ai_12x20',	20,	12,	19,	400, 26, 245],
 		['ibm_xga_ai_12x23',	24,	12,	23,	400, 26, 230],
 		['dos_v_re_12x30',	32,	12,	28,	700, 26, 230],
 	];

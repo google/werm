@@ -679,7 +679,7 @@ function term_init()
 	var font_key;
 	function set_font_key(key)
 	{
-		if (!/^[A-Z] $/.test(key)) return false;
+		if (!/^[A-Z] $/.test(key)) return 0;
 
 		font_key = key.charCodeAt(0) - 65;
 		return (font_key >= 0 && font_key < fonts.length) ? 'm' : 0;
@@ -827,7 +827,7 @@ function term_init()
 		case Array.prototype:
 			res = match_key(exp[0], mn);
 			switch (res) {
-			case 0: return 0;
+			case 0: case false: return 0;
 			case 'm':
 				exp = exp.slice(1);
 				if (!exp.length) return 'm';

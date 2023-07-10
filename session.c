@@ -112,8 +112,10 @@ static void putrwout(void)
 	wts.rwoutlen = 0;
 }
 
-static void logescaped(FILE *f, const unsigned char *buf, size_t sz)
+static void logescaped(FILE *f, const void *buf_, size_t sz)
 {
+	const unsigned char *buf = buf_;
+
 	while (sz--) {
 		if (*buf >= ' ' && *buf != 0x7f)
 			fputc(*buf, f);
@@ -123,6 +125,8 @@ static void logescaped(FILE *f, const unsigned char *buf, size_t sz)
 	}
 	fputc('\n', f);
 }
+
+static unsigned ttllen(void) { return strnlen(wts.ttl, sizeof wts.ttl); }
 
 static void dump(void)
 {
@@ -145,6 +149,9 @@ static void dump(void)
 	fprintf(f, "altscr:  %u\n", wts.altscren);
 	fprintf(f, "appcurs: %u\n", wts.appcursor);
 	fprintf(f, "windim: %u:%u\n", wts.swrow, wts.swcol);
+	fprintf(f, "ttl: (sz=%s)\n", ttllen());
+	logescaped(f, wts.ttl, ttllen());
+
 	fclose(f);
 }
 
@@ -404,10 +411,10 @@ void process_tty_out(const void *buf_, ssize_t len)
 	putroutraw("\n", -1);
 }
 
-void recountttl(void)
+static void recountttl(void)
 {
 	putroutraw("\\@title:", -1);
-	putroutraw(wts.ttl, strnlen(wts.ttl, sizeof wts.ttl));
+	putroutraw(wts.ttl, ttllen());
 	putroutraw("\n", -1);
 }
 

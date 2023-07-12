@@ -7,6 +7,20 @@ dl () {
 	cat $logfile
 }
 
+# rflt: Reverse filter. Shows the logfile with lines in reverse order, passing
+# arguments directly to sed. Can use to progressively filter grep results. This
+# would print the log starting from the grep invocation, and omitting all lines
+# that mention tests:
+# rflt '/$ grep/q; /[tT]est/d'
+rflt () {
+	tac $logfile | sed "$@" | less
+}
+
+# Same as rflt but uses `more` instead of `less`.
+rfmt () {
+	tac $logfile | sed "$@" | more
+}
+
 dltf () {
 	tail -f $logfile
 }

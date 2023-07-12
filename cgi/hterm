@@ -5,16 +5,17 @@ echo
 
 cat $WERMDIR/third_party/hterm/client.js
 
-do_cpp () {
-	cpp -P -I$WERMDIR/third_party/hterm/include_js "$@"
-}
+echo -n '
+// TM API implementation for JS
+#include "tm.js"
 
-# Code fully converted to compile as C or JavaScript using TM defines
-do_cpp $WERMDIR/third_party/hterm/teng
+// Code fully converted to compile as C or JavaScript using TM API
+#include "third_party/hterm/teng"
 
-# Code that can pass through the preprocessor and may use TM defines and is a
-# candidate for moving into `teng`. This will eventually be deleted.
-do_cpp $WERMDIR/third_party/hterm/engine.js
+// Code that can pass through the preprocessor and may use TM defines and is a
+// candidate for moving into `teng`. This will eventually be deleted.
+#include "third_party/hterm/engine.js"
+' | cpp -P -I$WERMDIR "$@"
 
 # Stuff that must be defined for transitory engine.js code.
 cat $WERMDIR/third_party/hterm/clientpost.js

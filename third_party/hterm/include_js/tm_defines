@@ -1,3 +1,0 @@
-#define TMint var
-
-#define TMfunc3(name, a0, a1, a2) function name(a0, a1, a2)

@@ -345,11 +345,11 @@ function term_init()
 			else if (s.startsWith('\\s2'))
 				t.setAlternateMode(true);
 			else if (s.startsWith('\\ss'))
-				t.saveCursorAndState();
+				t.saveScrCursAndState();
 			else if (s.startsWith('\\cl'))
 				t.clear();
 			else if (s.startsWith('\\rs'))
-				t.restoreCursorAndState();
+				t.restoreScrCursAndState();
 			else if (s.startsWith('\\@title:')) {
 				row_ttl = s.replace(/^[^:]*:/, '');
 				locked_ttl = !!row_ttl;

@@ -2798,7 +2798,7 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // The VT escape sequence interpreter.
   this.vt = new hterm.VT(this);
 
-  this.saveCursorAndState(true);
+  this.saveScrCursAndState(true);
 
   // General IO interface that can be given to third parties without exposing
   // the entire terminal object.
@@ -3383,7 +3383,7 @@ hterm.Terminal.prototype.clearCursorOverflow = function() {
  * @param {boolean=} both If true, update both screens, else only update the
  *     current screen.
  */
-hterm.Terminal.prototype.saveCursorAndState = function(both) {
+hterm.Terminal.prototype.saveScrCursAndState = function(both) {
   if (both) {
     this.primaryScreen_.saveCursorAndState(this.vt);
     this.alternateScreen_.saveCursorAndState(this.vt);
@@ -3400,7 +3400,7 @@ hterm.Terminal.prototype.saveCursorAndState = function(both) {
  * @param {boolean=} both If true, update both screens, else only update the
  *     current screen.
  */
-hterm.Terminal.prototype.restoreCursorAndState = function(both) {
+hterm.Terminal.prototype.restoreScrCursAndState = function(both) {
   if (both) {
     this.primaryScreen_.restoreCursorAndState(this.vt);
     this.alternateScreen_.restoreCursorAndState(this.vt);
@@ -4675,7 +4675,7 @@ hterm.Terminal.prototype.insertSpace = function(count) {
  *
  * @param {number} count The number of characters to delete.
  */
-hterm.Terminal.prototype.deleteChars = function(count) {
+hterm.Terminal.prototype.deleteScreenChars = function(count) {
   const deleted = this.screen_.deleteChars(count);
   if (deleted && !this.screen_.scrTextAttr.isDefault()) {
     const cursor = this.saveCursor();
@@ -4755,7 +4755,7 @@ hterm.Terminal.prototype.setAccessibilityEnabled = function(enabled) {
  * @param {number} row The new zero-based cursor row.
  * @param {number} column The new zero-based cursor column.
  */
-hterm.Terminal.prototype.setCursorPosition = function(row, column) {
+hterm.Terminal.prototype.moveScreenCursor = function(row, column) {
   if (this.options_.originMode) {
     this.setRelativeCursorPosition(row, column);
   } else {
@@ -4932,7 +4932,7 @@ hterm.Terminal.prototype.cursorLeft = function(count) {
       newColumn = this.screenSize.width + newColumn % this.screenSize.width;
     }
 
-    this.setCursorPosition(Math.max(newRow, 0), newColumn);
+    this.moveScreenCursor(Math.max(newRow, 0), newColumn);
 
   } else {
     const newColumn = Math.max(currentColumn - count, 0);
@@ -5013,7 +5013,7 @@ hterm.Terminal.prototype.ringBell = function() {
  */
 hterm.Terminal.prototype.setOriginMode = function(state) {
   this.options_.originMode = state;
-  this.setCursorPosition(0, 0);
+  this.moveScreenCursor(0, 0);
 };
 
 /**
@@ -7874,9 +7874,9 @@ hterm.VT.prototype.setDECMode = function(code, state) {
 
     case 1048:  // Save cursor as in DECSC.
       if (state) {
-        this.terminal.saveCursorAndState();
+        this.terminal.saveScrCursAndState();
       } else {
-        this.terminal.restoreCursorAndState();
+        this.terminal.restoreScrCursAndState();
       }
       break;
 
@@ -8386,7 +8386,7 @@ hterm.VT.ESC['#'] = function(parseState) {
     const ch = parseState.consumeChar();
     if (ch == '8') {
       // DEC Screen Alignment Test (DECALN).
-      this.terminal.setCursorPosition(0, 0);
+      this.terminal.moveScreenCursor(0, 0);
       this.terminal.fill('E');
     }
 
@@ -8518,7 +8518,7 @@ hterm.VT.ESC['6'] = hterm.VT.ignore;
  * @this {!hterm.VT}
  */
 hterm.VT.ESC['7'] = function() {
-  this.terminal.saveCursorAndState();
+  this.terminal.saveScrCursAndState();
 };
 
 /**
@@ -8527,7 +8527,7 @@ hterm.VT.ESC['7'] = function() {
  * @this {!hterm.VT}
  */
 hterm.VT.ESC['8'] = function() {
-  this.terminal.restoreCursorAndState();
+  this.terminal.restoreScrCursAndState();
 };
 
 /**
@@ -9207,8 +9207,8 @@ hterm.VT.CSI['G'] = function(parseState) {
  * @param {!hterm.VT.ParseState} parseState The current parse state.
  */
 hterm.VT.CSI['H'] = function(parseState) {
-  this.terminal.setCursorPosition(parseState.iarg(0, 1) - 1,
-                                  parseState.iarg(1, 1) - 1);
+  this.terminal.moveScreenCursor(parseState.iarg(0, 1) - 1,
+                                 parseState.iarg(1, 1) - 1);
 };
 
 /**
@@ -9294,7 +9294,7 @@ hterm.VT.CSI['M'] = function(parseState) {
  * @param {!hterm.VT.ParseState} parseState The current parse state.
  */
 hterm.VT.CSI['P'] = function(parseState) {
-  this.terminal.deleteChars(parseState.iarg(0, 1));
+  this.terminal.deleteScreenChars(parseState.iarg(0, 1));
 };
 
 /**
@@ -9969,7 +9969,7 @@ hterm.VT.CSI['r'] = function(parseState) {
   }
   // Convert from 1-based to 0-based with special case for zero.
   this.terminal.setVTScrollRegion(top === 0 ? null : top - 1, bottom - 1);
-  this.terminal.setCursorPosition(0, 0);
+  this.terminal.moveScreenCursor(0, 0);
 };
 
 /**
@@ -9992,7 +9992,7 @@ hterm.VT.CSI['$r'] = hterm.VT.ignore;
  * @this {!hterm.VT}
  */
 hterm.VT.CSI['s'] = function() {
-  this.terminal.saveCursorAndState();
+  this.terminal.saveScrCursAndState();
 };
 
 /**
@@ -10036,7 +10036,7 @@ hterm.VT.CSI[' t'] = hterm.VT.ignore;
  * @this {!hterm.VT}
  */
 hterm.VT.CSI['u'] = function() {
-  this.terminal.restoreCursorAndState();
+  this.terminal.restoreScrCursAndState();
 };
 
 /**

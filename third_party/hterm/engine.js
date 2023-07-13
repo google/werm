@@ -400,19 +400,27 @@ hterm.Screen.prototype.maybeClipCurrentRow = function() {
  * using hterm.Screen..commitLineOverflow().
  *
  * @param {string} str The string to insert.
- * @param {number=} wcwidth The cached lib.wc.strWidth value for |str|.  Will be
- *     calculated on demand if need be.  Passing in a cached value helps speed
- *     up processing as this is a hot codepath.
+ * @param {number} wcwidth The cached lib.wc.strWidth value for |str|.  Will be
+ *     calculated on demand if -1 is passed.  Passing in a cached value helps
+ *     speed up processing as this is a hot codepath.
  */
-hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
+hterm.Screen.prototype.insertString = function(str, wcwidth) {
   let cursorNode = this.cursorNode_;
   let cursorNodeText = cursorNode.textContent;
 
   this.cursorRowNode_.removeAttribute('line-overflow');
 
+#if WERM_JS
+  if (wcwidth === undefined) {
+    alert('porting problem; see console log');
+    console.error('wcwidth was passed undefined');
+    wcwidth = -1;
+  }
+#endif
+
   // We may alter the width of the string by prepending some missing
   // whitespaces, so we need to record the string width ahead of time.
-  if (wcwidth === undefined) {
+  if (wcwidth == -1) {
     wcwidth = lib.wc.strWidth(str);
   }
 
@@ -545,18 +553,14 @@ hterm.Screen.prototype.insertString = function(str, wcwidth = undefined) {
  * using hterm.Screen..commitLineOverflow().
  *
  * @param {string} str The source string for overwriting existing content.
- * @param {number=} wcwidth The cached lib.wc.strWidth value for |str|.  Will be
+ * @param {number} wcwidth The cached lib.wc.strWidth value for |str|.  Will be
  *     calculated on demand if need be.  Passing in a cached value helps speed
  *     up processing as this is a hot codepath.
  */
-hterm.Screen.prototype.overwriteString = function(str, wcwidth = undefined) {
+hterm.Screen.prototype.overwriteString = function(str, wcwidth) {
   TMint maxLength = this.columnCount_ - this.curscol;
   if (!maxLength) {
     return;
-  }
-
-  if (wcwidth === undefined) {
-    wcwidth = lib.wc.strWidth(str);
   }
 
   if (this.scrTextAttr.matchesContainer(lib.notNull(this.cursorNode_)) &&
@@ -4680,7 +4684,7 @@ hterm.Terminal.prototype.deleteScreenChars = function(count) {
   if (deleted && !this.screen_.scrTextAttr.isDefault()) {
     const cursor = this.saveCursor();
     this.setCursorColumn(this.screenSize.width - deleted);
-    this.screen_.insertString(' '.repeat(deleted));
+    this.screen_.insertString(' '.repeat(deleted), -1);
     this.restoreCursor(cursor);
   }
 

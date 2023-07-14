@@ -16,6 +16,3 @@ echo -n '
 // candidate for moving into `teng`. This will eventually be deleted.
 #include "third_party/hterm/engine.js"
 ' | cpp -P -I$WERMDIR "$@"
-
-# Stuff that must be defined for transitory engine.js code.
-cat $WERMDIR/third_party/hterm/clientpost.js

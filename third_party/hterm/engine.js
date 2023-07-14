@@ -77,6 +77,12 @@ hterm.Screen = function() {
   this.cursorOffset_ = 0;
 };
 
+#if WERM_JS
+hterm.Screen.prototype.cur_row_text = function() {
+	return this.rowsArray[this.cursrow].innerText;
+};
+#endif
+
 /**
  * Return the current number of rows in this screen.
  *

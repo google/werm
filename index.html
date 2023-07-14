@@ -234,26 +234,24 @@ function term_init()
 		pend_escape = '', termid, pream, auxjs = {},
 		params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl, host;
 
-	function btm_row_text()
-	{
-		var rows, rowi, txt;
-		rows = t.document_.getElementsByTagName('x-row');
-		rowi = rows.length;
-		while (rowi && !txt) txt = rows[--rowi].innerText;
-		return txt;
-	}
-
-	function cur_row_text()
-	{
-		var s = t.screen_;
-		return s.rowsArray[s.cursrow].innerText;
-	}
-
 	host = location.host.replace(/^localhost:/, ':');
 
-	function set_locked_title()
+	function set_locked_title(type)
 	{
-		var ttl = this();
+		var ttl, rows, rowi;
+
+		switch (type) {
+		case 'b':
+			/* Bottom non-empty row */
+			rows = t.document_.getElementsByTagName('x-row');
+			rowi = rows.length;
+			while (rowi && !ttl) ttl = rows[--rowi].innerText;
+			break;
+		case 'c':
+			/* Current row */
+			ttl = t.screen_.cur_row_text();
+			break;
+		}
 		if (ttl) signal('\\t' + ttl + '\n');
 	}
 
@@ -270,7 +268,7 @@ function term_init()
 		compons = [];
 		if (termid) compons.push(`[${termid}]`);
 
-		if (!locked_ttl) row_ttl = cur_row_text() || row_ttl;
+		if (!locked_ttl) row_ttl = t.screen_.cur_row_text() || row_ttl;
 
 		if (row_ttl) compons.push(row_ttl);
 		compons.push(host);
@@ -877,8 +875,8 @@ function term_init()
 		['raT ', '\x14'],
 		['ralsT ', '\x1b\x14'],
 		['raD U M P ', signal.bind(0, '\\d')],
-		['raS T ', set_locked_title.bind(cur_row_text)],
-		['raS B T ', set_locked_title.bind(btm_row_text)],
+		['raS T ', set_locked_title.bind(0, 'c')],
+		['raS B T ', set_locked_title.bind(0, 'b')],
 		['laU T ', unlock_title],
 		['rarsA T ', function() { window.open('/attach', '_top'); }],
 		['rarsS T ', function() { window.open('/attach', '_blank'); }],

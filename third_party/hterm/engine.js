@@ -2859,9 +2859,9 @@ hterm.Terminal.prototype.openSelectedUrl_ = function() {
     }
   }
 
-  // Make sure URL is valid before opening. \042 is the ", specified this way to
-  // avoid a cpp warning about an unterminated quote.
-  if (str.length > 2048 || str.search(/[\s[\](){}<>\042'\\^`]/) >= 0) {
+  // Make sure URL is valid before opening. The " and ' are specified as octal
+  // escapes to avoid a cpp warning about unterminated quotes.
+  if (str.length > 2048 || str.search(/[\s[\](){}<>\042\047\\^`]/) >= 0) {
     return;
   }
 

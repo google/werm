@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <err.h>
+#include <stdarg.h>
 
 static int xasprintf(char **strp, const char *format, ...)
 {

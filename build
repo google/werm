@@ -1,7 +1,5 @@
 #!/bin/sh
 
-cmd_scratch=/tmp/compile_commands_$$.json
-
 cd `dirname $0`
 
 (
@@ -41,9 +39,7 @@ $!s/$/\\012/
 	done
 )
 
-echo '{' >| compile_commands.json
-
-	clang -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L -MJ $cmd_scratch \
+	cc -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L \
 	 -o session \
 	 session.c \
 	 shared.c \
@@ -51,10 +47,6 @@ echo '{' >| compile_commands.json
 	 third_party/dtach/*.c \
 	 -lutil ||
 		exit 1
-	cat $cmd_scratch >> compile_commands.json
-	rm $cmd_scratch
-
-echo '}' >> compile_commands.json
 
 if ! ctags=`which ctags-exuberant`; then
 	echo '`sudo apt install exuberant-ctags` to make tags file' 2>&1

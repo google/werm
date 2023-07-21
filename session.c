@@ -150,7 +150,7 @@ static void dump(void)
 	fprintf(f, "altscr:  %u\n", wts.altscren);
 	fprintf(f, "appcurs: %u\n", wts.appcursor);
 	fprintf(f, "windim: %u:%u\n", wts.swrow, wts.swcol);
-	fprintf(f, "ttl: (sz=%s)\n", ttllen());
+	fprintf(f, "ttl: (sz=%u)\n", ttllen());
 	logescaped(f, wts.ttl, ttllen());
 
 	fclose(f);

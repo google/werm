@@ -40,6 +40,7 @@ $!s/$/\\012/
 )
 
 	cc -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L \
+	 -Wformat \
 	 -o session \
 	 session.c \
 	 shared.c \

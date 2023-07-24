@@ -1,0 +1,83 @@
+#!/bin/sh
+
+termid=`echo $QUERY_STRING | sed '
+	s/\(.*&\|^\)termid=\([^&]*\)\(&.*\|$\)/\2/
+'`
+
+cat <<EOF
+Content-type: text/html
+
+
+<!DOCTYPE html>
+<meta charset='utf-8'/>
+<meta http-equiv="expires" content="-1" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Cache-Control" content="no-cache" />
+<html>
+<head>
+<title>LOG [$termid]</title>
+<style>
+body {
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-bottom: 0px;
+}
+#content {
+	caret-shape: block;
+	resize: none;
+	background: black;
+	white-space: nowrap;
+	overflow: auto;
+	color: white;
+	width: calc(100vw - 0.5em);
+	height: calc(100vh - 1em);
+}
+</style>
+<script>
+function contentel() { return document.getElementById('content'); }
+
+function scrollbottom()
+{
+	var el = contentel();
+	el.scrollTop = el.scrollHeight;
+	el.setSelectionRange(el.value.length, el.value.length);
+	el.focus();
+}
+
+document.onkeydown = function(ev)
+{
+	if (ev.key != 'Enter') return;
+	if (ev.metaKey || ev.shiftKey || ev.ctrlKey || ev.altKey) return;
+
+	var el = contentel();
+
+	/* Automatically omit the last newline in selection. */
+	if (el.value[el.selectionEnd-1] == '\n') el.selectionEnd--;
+
+	document.execCommand('copy');
+	window.close();
+};
+
+</script>
+</head>
+<body onload="scrollbottom()">
+<textarea id=content>
+EOF
+
+(
+cd "$WERMDIR/var"
+for f in */*/*/"$termid"; do
+	echo "--- $f ---"
+	sed '
+		s/&/\&amp;/g
+		s/</\&lt;/g
+		s/>/\&gt;/g
+	' "$f"
+done
+)
+
+cat <<'EOF'
+</textarea>
+</body>
+</html>
+EOF

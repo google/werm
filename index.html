@@ -888,7 +888,13 @@ function term_init()
 		 set_barrier_dig.bind(2)], show_barrier],
 	];
 
-	if (termid) macro_map.push(['laH L ', open_log_term]);
+	if (termid) {
+		macro_map.push(['laH L ', open_log_term]);
+		macro_map.push(['laH M ', function()
+		{
+			window.open('/scrollback?termid=' + encodeURIComponent(termid));
+		}]);
+	}
 
 	if (auxjs.query) {
 		auxjs.el = document.createElement('script');

@@ -249,7 +249,7 @@ function term_init()
 			break;
 		case 'c':
 			/* Current row */
-			ttl = t.screen_.cur_row_text();
+			ttl = cur_row_text(t.screen_);
 			break;
 		}
 		if (ttl) signal('\\t' + ttl + '\n');
@@ -268,7 +268,7 @@ function term_init()
 		compons = [];
 		if (termid) compons.push(`[${termid}]`);
 
-		if (!locked_ttl) row_ttl = t.screen_.cur_row_text() || row_ttl;
+		if (!locked_ttl) row_ttl = cur_row_text(t.screen_) || row_ttl;
 
 		if (row_ttl) compons.push(row_ttl);
 		compons.push(host);

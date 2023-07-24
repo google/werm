@@ -66,15 +66,19 @@ EOF
 
 (
 cd "$WERMDIR/var"
-for f in */*/*/"$termid"; do
-	echo "--- $f ---"
-	sed '
-		s/&/\&amp;/g
-		s/</\&lt;/g
-		s/>/\&gt;/g
-	' "$f"
+
+ls */*/*/"$termid" \
+| sed '\,hist/[^/]*$,d' \
+| tail -n 2 \
+| while read fn; do
+	echo "--- SCROLLBACK $fn ---"
+	cat "$fn"
 done
-)
+) | sed '
+	s/&/\&amp;/g
+	s/</\&lt;/g
+	s/>/\&gt;/g
+'
 
 cat <<'EOF'
 </textarea>

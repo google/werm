@@ -58,6 +58,8 @@ document.onkeydown = function(ev)
 	if (el.value[el.selectionEnd-1] == '\n') el.selectionEnd--;
 
 	document.execCommand('copy');
+
+	ev.preventDefault();
 	window.close();
 };
 

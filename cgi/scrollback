@@ -18,19 +18,21 @@ Content-type: text/html
 <title>LOG [$termid]</title>
 <style>
 body {
+	background: black;
 	margin-left: 0px;
 	margin-top: 0px;
 	margin-bottom: 0px;
 }
 #content {
-	caret-shape: block;
 	resize: none;
 	background: black;
-	white-space: nowrap;
+	white-space: pre;
 	overflow: auto;
 	color: white;
-	width: calc(100vw - 0.5em);
+	width: calc(100vw - 1em);
 	height: calc(100vh - 1em);
+	margin-left: 0.2em;
+	margin-top: 0.2em;
 }
 </style>
 <script>
@@ -61,7 +63,7 @@ document.onkeydown = function(ev)
 </script>
 </head>
 <body onload="scrollbottom()">
-<textarea id=content>
+<textarea spellcheck=false id=content>
 EOF
 
 (

@@ -236,6 +236,11 @@ function term_init()
 
 	host = location.host.replace(/^localhost:/, ':');
 
+	function visibrows()
+	{
+		return t.document_.getElementsByTagName('x-row');
+	}
+
 	function set_locked_title(type)
 	{
 		var ttl, rows, rowi;
@@ -243,7 +248,7 @@ function term_init()
 		switch (type) {
 		case 'b':
 			/* Bottom non-empty row */
-			rows = t.document_.getElementsByTagName('x-row');
+			rows = visibrows();
 			rowi = rows.length;
 			while (rowi && !ttl) ttl = rows[--rowi].innerText;
 			break;
@@ -895,6 +900,24 @@ function term_init()
 			window.open('/scrollback?termid=' + encodeURIComponent(termid));
 		}]);
 	}
+	macro_map.push(['laH N ', function()
+	{
+		var sbwin, rows, rsi, rstxt = [];
+
+		sbwin = window.open('/scrollback');
+		rows = visibrows();
+		for (rsi = 0; rsi < rows.length; rsi++)
+			rstxt.push(rows[rsi].innerText);
+
+		function attempt()
+		{
+			if (sbwin.contentel)
+				sbwin.contentel().innerHTML = rstxt.join('\n');
+			else
+				setTimeout(attempt, 250);
+		};
+		attempt();
+	}]);
 
 	if (auxjs.query) {
 		auxjs.el = document.createElement('script');

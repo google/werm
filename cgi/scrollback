@@ -1,7 +1,8 @@
 #!/bin/sh
 
 termid=`echo $QUERY_STRING | sed '
-	s/\(.*&\|^\)termid=\([^&]*\)\(&.*\|$\)/\2/
+	/\(.*&\|^\)termid=\([^&]*\)\(&.*\|$\)/!d
+	s//\2/
 '`
 
 cat <<EOF
@@ -66,17 +67,19 @@ document.onkeydown = function(ev)
 <textarea spellcheck=false id=content>
 EOF
 
-(
-cd "$WERMDIR/var"
-
-ls */*/*/"$termid" \
-| sed '\,hist/[^/]*$,d' \
+# Use find rather than ls to avoid extra matches when $termid is empty.
+find "$WERMDIR/var" \
+	-mindepth 4 \
+	-name "$termid" \
+	-type f \
+	-not -path '*/hist/*' \
+| sort \
 | tail -n 2 \
 | while read fn; do
 	echo "--- SCROLLBACK $fn ---"
 	cat "$fn"
-done
-) | sed '
+done \
+| sed '
 	s/&/\&amp;/g
 	s/</\&lt;/g
 	s/>/\&gt;/g

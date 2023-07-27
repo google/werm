@@ -163,7 +163,7 @@ es = document.getElementsByClassName('restore-link');
 
 for (i = 0; i < es.length; i++) {
 	int = es[i].innerText;
-	title = localStorage.getItem('title-' + int).trim();
+	title = (localStorage.getItem('title-' + int) || '').trim();
 	pream = localStorage.getItem('pream-' + int);
 	auxjs = localStorage.getItem('js-' + int);
 	if (title) es[i].innerText = title;

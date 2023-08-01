@@ -39,11 +39,20 @@ body {
 <script>
 function contentel() { return document.getElementById('content'); }
 
-function scrollbottom()
+function initcontentview()
 {
-	var el = contentel();
-	el.scrollTop = el.scrollHeight;
-	el.setSelectionRange(el.value.length, el.value.length);
+	var el = contentel(), loc;
+
+	if (window.scrollbackcontent) {
+		el.value = window.scrollbackcontent;
+		el.scrollTop = 0;
+		el.setSelectionRange(0, 0);
+	}
+	else {
+		el.scrollTop = el.scrollHeight;
+		el.setSelectionRange(el.value.length, el.value.length);
+	}
+
 	el.focus();
 }
 
@@ -57,7 +66,7 @@ document.onkeydown = function(ev)
 	/* Automatically omit the last newline in selection. */
 	if (el.value[el.selectionEnd-1] == '\n') el.selectionEnd--;
 
-	document.execCommand('copy');
+	if (el.selectionEnd != el.selectionStart) document.execCommand('copy');
 
 	ev.preventDefault();
 	window.close();
@@ -65,7 +74,7 @@ document.onkeydown = function(ev)
 
 </script>
 </head>
-<body onload="scrollbottom()">
+<body onload="initcontentview()">
 <textarea spellcheck=false id=content>
 EOF
 

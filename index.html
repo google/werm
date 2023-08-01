@@ -904,19 +904,12 @@ function term_init()
 	{
 		var sbwin, rows, rsi, rstxt = [];
 
-		sbwin = window.open('/scrollback');
 		rows = visibrows();
 		for (rsi = 0; rsi < rows.length; rsi++)
 			rstxt.push(rows[rsi].innerText);
 
-		function attempt()
-		{
-			if (sbwin.contentel)
-				sbwin.contentel().innerHTML = rstxt.join('\n');
-			else
-				setTimeout(attempt, 250);
-		};
-		attempt();
+		sbwin = window.open('/scrollback');
+		sbwin.scrollbackcontent = rstxt.join('\n');
 	}]);
 
 	if (auxjs.query) {

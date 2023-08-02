@@ -27,7 +27,7 @@ body {
     <script src="hterm"></script>
     <script>
 
-var signal;
+var signal, set_locked_title;
 
 var native_to_mn = {
 	'Escape':		'es',
@@ -241,7 +241,7 @@ function term_init()
 		return t.document_.getElementsByTagName('x-row');
 	}
 
-	function set_locked_title(type)
+	set_locked_title = function(type)
 	{
 		var ttl, rows, rowi;
 

@@ -1,0 +1,14 @@
+Name: Shinonome font family
+URL: http://openlab.ring.gr.jp/efont/shinonome/
+License: Public Domain
+
+Notes:
+Werm includes size 7x14 for this family. The font has been converted to ttf.
+We use a couple of local tweaks:
+  * Zero and uppercase O are more distinct because of the slash in the middle of
+    zero.
+  * The vertical pipe is broken in the middle, to help distinguish with
+    lowercase ell.
+  * The number 1 has a larger protruding top and base.
+  * Lowercase a is a smaller second-story roof.
+  * Some extra line-drawing and Kanji characters were added.

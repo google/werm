@@ -1,0 +1,7 @@
+Name: dtach
+URL: https://github.com/crigler/dtach
+License: GNU General Public License
+
+Notes:
+Werm has local modifications. Non-trivial new functionality and Werm-aware
+features are kept outside of the third_party directory whenever feasible.

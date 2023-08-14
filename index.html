@@ -636,18 +636,24 @@ function term_init()
 	// [4] weight of bold face - set to 400 to disable
 	// [5] 0-255 bg brightness
 	// [6] 0-255 text brightness.
+	// [7] font directory
 	// Small fonts require overriding Chrome's minimum font size setting.
 	var fonts = [
-		['ibm_ega_8x8',		8 ,	8 ,	9 ,	400, 26, 230],
-		['hp_100lx_10x11',	12,	10,	13,	400, 26, 230],
-		['jfdot_7x14',		14,	7,	14,	700, 26, 245],
-		['ibm_vga_8x16',	16,	8,	16,	400, 26, 230],
-		['ibm_vga_9x16',	16,	9,	16,	400, 26, 230],
-		['dos_v_ibm_8x19',	20,	8,	19,	400, 26, 230],
-		['cl_stringray_8x19',	20,	8,	19,	400, 26, 230],
-		['ibm_xga_ai_12x20',	20,	12,	19,	400, 26, 245],
-		['ibm_xga_ai_12x23',	24,	12,	23,	400, 26, 230],
-		['dos_v_re_12x30',	32,	12,	28,	700, 26, 230],
+		['ibm_ega_8x8',		8 ,	8 ,	9 ,	400, 26, 230, 1],
+		['hp_100lx_10x11',	12,	10,	13,	400, 26, 230, 1],
+		['jfdot_7x14',		14,	7,	14,	700, 26, 245, 2],
+		['ibm_vga_8x16',	16,	8,	16,	400, 26, 230, 1],
+		['ibm_vga_9x16',	16,	9,	16,	400, 26, 230, 1],
+		['dos_v_ibm_8x19',	20,	8,	19,	400, 26, 230, 1],
+		['cl_stringray_8x19',	20,	8,	19,	400, 26, 230, 1],
+		['ibm_xga_ai_12x20',	20,	12,	19,	400, 26, 245, 1],
+		['ibm_xga_ai_12x23',	24,	12,	23,	400, 26, 230, 1],
+		['dos_v_re_12x30',	32,	12,	28,	700, 26, 230, 1],
+	];
+	var fndirs = [
+		'/',
+		'/third_party/oldschool-pc-fonts',
+		'/third_party/shinonome',
 	];
 
 	function set_font(ndx)
@@ -670,8 +676,10 @@ function term_init()
 	};
 
 	fonts.forEach(function(fnt, ndx) {
-		var name = fnt[0], sz = fnt[1];
-		t.document_.fonts.add(new FontFace(name, `url(/${name}.ttf)`));
+		var name = fnt[0], sz = fnt[1], dir = fndirs[fnt[7]], fce;
+
+		t.document_.fonts.add(
+			new FontFace(name, `url(${dir}/${name}.ttf)`));
 		t.document_.fonts.load(`${sz}px ${name}`).then(function()
 		{
 			if (ndx === 4) set_font(4);

@@ -1,0 +1,6 @@
+Name: hterm
+URL: https://chromium.googlesource.com/apps/libapps/+/master/hterm/
+License: https://developers.google.com/open-source/licenses/bsd
+
+Notes:
+This is heavily modified from upstream and will not merge.

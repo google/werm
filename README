@@ -3,8 +3,6 @@ werm: Web-based terminal multiplexer
 werm is a terminal multiplexer and emulator empowered by browser tabs and your
 OS's desktop features.
 
-WHAT ?
-
 Usually we would use a terminal multiplexer to maintain sessions and manage
 multiple terminals over a single SSH connection. The drawback to this approach
 is you cannot take advantage of your window manager features or more generally,
@@ -20,6 +18,8 @@ them, depending on what window manager you are using.
 
 The purpose of werm is to unlock these features when working with terminal
 sessions.
+
+This is not an officially supported Google product.
 
 FEATURES
 

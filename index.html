@@ -682,6 +682,7 @@ function term_init()
 		t.updateCssCharsize_();
 
 		t.setCssVar('bold-weight', f[4]);
+		t.setCssVar('dpi-fudge', 1/window.devicePixelRatio);
 
 		t.setRgbColorCssVar('background-color',
 				    `rgb(${f[5]}, ${f[5]}, ${f[5]})`);

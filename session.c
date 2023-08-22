@@ -40,7 +40,7 @@ static int xasprintf(char **strp, const char *format, ...)
 	va_start(argp, format);
 	res = vsnprintf(NULL, 0, format, argp);
 	va_end(argp);
-	if (res < 0) errx(1, "vsnprintf: サイズの計算に失敗した");
+	if (res < 0) errx(1, "vsnprintf: failed to calc str length");
 
 	*strp = malloc(res+1);
 

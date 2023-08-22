@@ -114,7 +114,7 @@ func parseCommandLine() *Config {
 			mainConfig.Addr[i] = fmt.Sprintf("%s:%d", addrSingle, port)
 		}
 	} else if !udsOnly {
-		mainConfig.Addr = []string{fmt.Sprintf(":%d", port)}
+		mainConfig.Addr = []string{fmt.Sprintf("localhost:%d", port)}
 	}
 	mainConfig.Uds = *udsFlag
 	mainConfig.MaxForks = *maxForksFlag

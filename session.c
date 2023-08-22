@@ -1227,8 +1227,20 @@ int main(int argc, char **argv)
 		srvargv = argv+1;
 		termid = strdup("~spawner");
 		prepfordtach();
-		warnx("starting daemonized spawner process...");
-		warnx("access http://<host>/attach to get started");
+		fprintf(stderr,
+"--- WARNING ---\n"
+"Saving scrollback logs under: %s\n"
+"Clean this directory periodically to avoid overloading your filesystem.\n"
+"All non-ephemeral sessions are saved here until you remove them. Be\n"
+"aware of what you save here and how fast it grows.\n"
+"\n"
+"This inconvenience will eventually be automated.\n"
+"\n"
+"--- STARTING DAEMONIZED SPAWNER PROCESS ---\n"
+"Access http://<host>/attach to get started\n"
+"\n",
+			rundir());
+
 		cdhome();
 
 		/* Start reading from process immediately. Otherwise the server

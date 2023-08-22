@@ -23,6 +23,7 @@ echo -n '
 #include "tm.js"
 
 // Code fully converted to compile as C or JavaScript using TM API
+#include "teng"
 #include "third_party/hterm/teng"
 
 // Code that can pass through the preprocessor and may use TM defines and is a

@@ -20,15 +20,18 @@ cd `dirname $0`
 
 	echo '#include <unistd.h>' >| data.h
 
-	ls * | sed '/[.][hc]$/d' |
+	find . -type f \
+		-not \( -name '*.c' -o -name '*.h' -o -name .gitignore \) |
 	while read fn
 	do
-		printf 'extern const char test_%s[];\n' "$fn" >> data.h
-		printf 'extern const size_t test_%s_size;\n' "$fn" >> data.h
+		fnb=`basename $fn`
+
+		printf 'extern const char test_%s[];\n' "$fnb" >> data.h
+		printf 'extern const size_t test_%s_size;\n' "$fnb" >> data.h
 
 		printf '#include "test/data.h"\n' >| $fn.c
-		printf 'const size_t test_%s_size = %d;\n' "$fn"  `wc -c <"$fn"` >> "$fn.c"
-		printf 'const char test_%s[] = ' "$fn" >> "$fn.c"
+		printf 'const size_t test_%s_size = %d;\n' "$fnb"  `wc -c <"$fn"` >> "$fn.c"
+		printf 'const char test_%s[] = ' "$fnb" >> "$fn.c"
 
 		touch /tmp/line.$$
 		while :; do
@@ -59,6 +62,7 @@ $!s/$/\\012/
 	 shared.c \
 	 test/*.c \
 	 third_party/dtach/*.c \
+	 tm.c \
 	 -lutil ||
 		exit 1
 
@@ -73,10 +77,9 @@ else
 fi
 
 echo 'running session test...' >&2
-if ! ./session test >|/tmp/testout.$$; then
-	echo 'test session proc terminated with error' >&2
-	exit 1
-fi
+for tfn in 'session test' testtm; do
+	./$tfn || echo "TEST $tfn TERMINATED WITH ERROR !!1!"
+done >/tmp/testout.$$ 2>&1
 
 err=
 

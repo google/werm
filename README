@@ -85,8 +85,13 @@ QUICKSTART
 
    Run: $ ./run --port=8090 --address=localhost
 
-   Note that any remotely logged in users will get access to your shells, since
-   the port is accessible to any local user.
+   Note that any logged in user will be able to start a shell as the user, since
+   the port is accessible on localhost.
+
+   This is sufficient for single-user machines. The opened port can be accessed
+   in a local web browser or remotely with local ssh port forwarding:
+
+   $ ssh ... -L 8090:werm-server:8090
 
    FOR THE WEB SERVER TO OPERATE A REMOTE MACHINE, or your local machine on
    which other users may log in, you should host the server on a Unix domain

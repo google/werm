@@ -41,7 +41,7 @@ body {
     <script src="hterm"></script>
     <script>
 
-var signal, set_locked_title;
+var signal, set_locked_title, wfns;
 
 var native_to_mn = {
 	'Escape':		'es',
@@ -652,7 +652,7 @@ function term_init()
 	// [6] 0-255 text brightness.
 	// [7] font directory
 	// Small fonts require overriding Chrome's minimum font size setting.
-	var fonts = [
+	wfns = [
 		['ibm_ega_8x8',		8 ,	8 ,	9 ,	400, 26, 230, 1],
 		['hp_100lx_10x11',	12,	10,	13,	400, 26, 230, 1],
 		['jfdot_7x14',		14,	7,	14,	700, 26, 245, 2],
@@ -672,7 +672,7 @@ function term_init()
 
 	function set_font(ndx)
 	{
-		var f = fonts[ndx];
+		var f = wfns[ndx];
 
 		t.scroll_port.x_screen.style.fontFamily = f[0];
 		t.setFontSize(f[1]);
@@ -690,7 +690,7 @@ function term_init()
 				    `rgb(${f[6]}, ${f[6]}, ${f[6]})`);
 	};
 
-	fonts.forEach(function(fnt, ndx) {
+	wfns.forEach(function(fnt, ndx) {
 		var name = fnt[0], sz = fnt[1], dir = fndirs[fnt[7]], fce;
 
 		t.document_.fonts.add(
@@ -708,7 +708,7 @@ function term_init()
 		if (!/^[A-Z] $/.test(key)) return 0;
 
 		font_key = key.charCodeAt(0) - 65;
-		return (font_key >= 0 && font_key < fonts.length) ? 'm' : 0;
+		return (font_key >= 0 && font_key < wfns.length) ? 'm' : 0;
 	}
 	function set_font_macro() { set_font(font_key); }
 

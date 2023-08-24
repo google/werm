@@ -10,5 +10,6 @@ We use a couple of local tweaks:
   * The vertical pipe is broken in the middle, to help distinguish with
     lowercase ell.
   * The number 1 has a larger protruding top and base.
-  * Lowercase a is a smaller second-story roof.
+  * Lowercase a has a shorter second-story roof.
+  * The tilde is wavy instead of straight.
   * Some extra line-drawing and Kanji characters were added.

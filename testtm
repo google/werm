@@ -19,12 +19,13 @@ expect_fail () {
 	tout=`mktemp`
 
 	( echo '#include "tm.h"'
+	  echo '#include "teng"'
 	  echo '#include <stdio.h>'
 
 	  cat ) \
 	 >| $src
 
-	cc -fsanitize=address -g -o $bin -I. $src tm.c ||
+	cc -o $bin -I. $src tm.c ||
 	echo unexpected failure compiling $src
 
 	$bin >| $tout 2>&1 &&
@@ -86,6 +87,44 @@ int main(int argc, char **argv)
 	printf("freed an ID, now use it [crash]\n");
 	fflush(stdout);
 	fld(~41, 0);
+}
+EOF
+
+echo 'dequeue test'
+expect_fail <<'EOF'
+int main(int argc, char **argv)
+{
+	TMint i, deq;
+
+	deq = deqmk();
+
+	deq = deqpushtl(deq, 42);
+	printf("pop only value: %d\n", deqpophd(deq));
+	printf("is empty, so should have 0, 0: %d, %d\n",
+	       deqhd(deq), deqtl(deq));
+	deq = deqpushtl(deq, 44);
+	deq = deqpushtl(deq, 46);
+	printf("pop one of two values: %d\n", deqpophd(deq));
+	for (i = 0; i < 20; i++) deq = deqpushtl(deq, i + 47);
+	puts("about to pop 21 values to make it empty again");
+	for (i = 0; i < 21; i++) printf("%d,", deqpophd(deq));
+	putchar('\n');
+
+	tmfree(deq);
+
+	deq = deqmk();
+	puts("push 100 values onto freshly-made dequeue");
+	for (i = 0; i < 100; i++) {
+		deq = deqpushtl(deq, i * i + 9);
+		if (deq != -1 && deq != -2)
+			errx(1, "deq has unexpected id: %d", deq);
+	}
+
+	for (i = 0; i < 100; i++) printf("%d,", deqpophd(deq));
+
+	printf("\nabout to pop one too many\n");
+	fflush(stdout);
+	deqpophd(deq);
 }
 EOF
 

@@ -58,3 +58,5 @@ function tmfree(bref)
 	bufsa[~bref] = bufsfreehead;
 	bufsfreehead = ~bref;
 }
+
+function sriously(...a) { throw a; }

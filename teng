@@ -12,4 +12,103 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. */
 
-/* First-party, i.e. non-hterm code to implement the terminal engine. */
+/* Code in this file is first-party code (i.e. non-hterm) to implement the
+ * terminal engine. */
+
+/* Pull in terminal engine code translated from hterm-licensed code */
+#include "third_party/hterm/teng"
+
+fn0(deqmk)
+{
+	/* deqcap: capacity, including the standard fields
+	 *
+	 * deqhd/deqtl: head/tail indices: if zero, they should both be zero,
+	 * and it indicates the dequeue is empty. If non-zero, each field points
+	 * to a valid slot.
+	 *
+	 * deqbasicflds: number of fields in the object that aren't used as
+	 * dequeue slots.
+	 */
+	#define deqcap(d)	fld(d, 0)
+	#define deqhd(d)	fld(d, 1)
+	#define deqtl(d)	fld(d, 2)
+	#define deqbasicflds	3
+
+	TMint dcp = 16;
+	TMint deq = tmalloc(dcp);
+	deqcap(deq) = dcp;
+
+	return deq;
+}
+
+fn1(deqpophd, dq)
+{
+	TMint res = fld(dq, deqhd(dq));
+	TMint last = deqhd(dq) == deqtl(dq);
+
+	if (!deqhd(dq))
+		sriously("dequeue %d is already empty; cannot pop", dq);
+
+	fld(dq, deqhd(dq)++) = 0;
+
+	if (last) deqhd(dq) = deqtl(dq) = 0;
+	if (deqhd(dq) == deqcap(dq)) deqhd(dq) = deqbasicflds;
+
+	return res;
+}
+
+/* Grows dequeue capacity with new space at tail end. */
+fn1(deqgrowtl, dq)
+{
+	TMint newdq, newcap;
+
+	newcap = deqcap(dq) * 3 / 2;
+	newdq = tmalloc(newcap);
+	deqcap(newdq) = newcap;
+
+	deqhd(newdq) = deqbasicflds;
+	deqtl(newdq) = deqbasicflds-1;
+
+	do {
+		fld(newdq, ++deqtl(newdq)) = deqpophd(dq);
+	}
+	while (deqhd(dq));
+
+	tmfree(dq);
+
+	return newdq;
+}
+
+fn2(deqpushtl, dq, val)
+{
+	if (!deqhd(dq)) {
+		/* Push first element. We don't allow zero-capacity
+		 * dequeues so it's safe to push. */
+		deqhd(dq) = deqbasicflds;
+		deqtl(dq) = deqbasicflds-1;
+	}
+	else if (deqtl(dq)+1 == deqhd(dq)) {
+		/* Dequeue is at capacity because tail is the slot right before
+		 * head. */
+		dq = deqgrowtl(dq);
+	}
+	else if (deqtl(dq) != deqcap(dq) - 1) {
+		/* Dequeue is non at capacity yet, since we don't match the
+		 * prior case [0] and tail is not at last slot. This means that
+		 * the slot after tail is valid and unoccupied. */
+	}
+	else if (deqhd(dq) != deqbasicflds) {
+		/* Tail is last slot in buffer, but dequeue is not at capacity
+		 * because there is still at least one slot before the head. */
+		deqtl(dq) = deqbasicflds-1;
+	}
+	else {
+		/* Tail is last slot in buffer and head is first slot, so the
+		 * dequeue is at capapcity. */
+		dq = deqgrowtl(dq);
+	}
+
+	fld(dq, ++deqtl(dq)) = val;
+
+	return dq;
+}

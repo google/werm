@@ -64,13 +64,42 @@ func pushHeaders(h http.Header, hdrs []string) {
 	}
 }
 
+func xsiteForbid(secFetcher string, uri string) string {
+	if (strings.HasPrefix(uri, "/index.html")) {
+		// Make later checks easier by forbidding this alias.
+		return "cannot access /index.html directly"
+	}
+
+	if (uri == "/" || uri == "/attach") {
+		// Allow basic terminal or attach page to be opened by a link
+		// from any site, though we don't allow embedding because of
+		// X-Frame-Options.
+		return ""
+	}
+
+	if (secFetcher == "same-origin" || secFetcher == "same-site" || secFetcher == "none" || secFetcher == "") {
+		return ""
+	}
+
+	return "possible cross-site access of " + uri + ": " + secFetcher
+}
+
 // ServeHTTP muxes between WebSocket handler, CGI handler, Static HTML or 404.
 func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log := h.Log.NewLevel(h.Log.LogFunc)
 	log.Associate("url", h.TellURL("http", req.Host, req.RequestURI))
 
+	hdrs := req.Header
+	if errm := xsiteForbid(hdrs.Get("Sec-fetch-site"), req.RequestURI); errm != "" {
+		http.Error(w, "403 FORBIDDEN: " + errm + " from referrer: " + req.Referer(), 403);
+		log.Access("session", "FORBIDDEN: %s", errm)
+		return
+	}
+
+	// Do not allow index.html or similar to be in an iframe.
+	w.Header().Set("X-Frame-Options", "DENY");
+
 	if h.Config.CommandName != "" || h.Config.UsingScriptDir {
-		hdrs := req.Header
 		upgradeRe := regexp.MustCompile(`(?i)(^|[,\s])Upgrade($|[,\s])`)
 		// WebSocket, limited to size of h.forks
 		if strings.ToLower(hdrs.Get("Upgrade")) == "websocket" && upgradeRe.MatchString(hdrs.Get("Connection")) {
@@ -160,6 +189,11 @@ func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if h.Config.StaticDir != "" {
 		handler := http.FileServer(http.Dir(h.Config.StaticDir))
 		log.Access("http", "STATIC")
+
+		// We are not serving anything big, and we want index.html to
+		// be re-read to verify the Sec-fetch-site header each time.
+		w.Header().Set("Cache-Control", "no-cache");
+
 		handler.ServeHTTP(w, req)
 		return
 	}

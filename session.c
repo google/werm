@@ -83,6 +83,10 @@ static struct {
 	unsigned appcursor	: 1;
 	unsigned sendsigwin	: 1;
 
+	/* rwout* contains bytes to send to each attach process. It grows
+	 * dynamically and is exposed to dtach code through
+	 * get_rout_for_attached and reset with clear_rout. session module
+	 * writes to it with putrout* methods. */
 	unsigned char *rwoutbuf;
 	size_t rwoutsz, rwoutlen;
 

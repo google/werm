@@ -108,23 +108,13 @@ QUICKSTART
  * Open localhost:8090 in your browser to get an ephemeral shell. This will
    terminate the shell as soon as the tab is closed or the connection is lost.
 
- * To open a non-ephemeral shell, do one of the following:
-
-   a) Open localhost:8090/attach in your browser and click on the one-letter
-      links at the top of the page to open a non-ephemeral shell (using
-      single-letter names at top of page)
-
-   b) Open localhost:8090/attach and use a link in the "Active sessions" section
-      to open an existing non-ephemeral session
-
- * You can open localhost:8090/attach by typing "rarsS T " (see HOW TO READ
-   MACRO SHORTCUTS below) or "rarsA T " in a terminal tab. The former shortcut
-   uses a new tab (Separate) w while the latter replaces the current tab.
+ * To open a persistent shell, use the localhost:8090/attach page. See
+   ATTACH PAGE for details.
 
  * Rather than use the attach page to reconnect to a shell, you can also re-open
    the URL e.g. with a bookmark or Ctrl+Shift+T.
 
- * While any shell is open, type "laH T " to start a new non-ephemeral shell
+ * While any shell is open, type "laH T " to start a new persistent shell
 
 HOW TO READ MACRO SHORTCUTS
 
@@ -159,26 +149,51 @@ mnemonics and the human-readable name used by the JS Event API.
 
 BASIC USE
 
- * To close an ephemeral shell, just use Ctrl+W or close the tab.
+ * An ephemeral shell will terminate if you close the tab. You will create one
+   simply by navigating to http://localhost:<port>/. To close an ephemeral
+   shell, just use Ctrl+W or close the tab.
 
- * To close a non-ephemeral shell, terminate the shell with Ctrl+D or the "exit"
-   command before closing the tab.
+ * A persistent shell stays alive even when the tab closes or the connection is
+   lost. Terminate such a shell with Ctrl+D or the "exit" command before closing
+   the tab.
+
+ * Press Shift+Backspace to send Ctrl+W (delete word) to the shell.
 
  * To add or remove macros, look for macro_map in index.html.
 
    The left-hand side is the macro shortcut or mnemonic.
 
    The right-hand side is the string to enter or function to invoke. Use \r for
-   return. Do not use mnemonics here, just the raw string. 
+   return. Do not use macro shortcuts like "es" (escape) here, just the raw
+   string.
 
  * Fonts are changed with "raF N **" where ** is 'A ' to 'I ' in roughly
-   increasing size. Ctrl-= and Ctrl-minus also work to change zoom, though this
+   increasing size. E.g. press right-alt, F, N, A in sequence to choose the
+   smallest font. Ctrl-= and Ctrl-minus also work to change zoom, though this
    will cause blur if it is not 200% or 300% zoom.
 
  * Meta (i.e. super, apple on MacOS, search on ChromeOS) key is used in place of
    Alt for the terminal process. This is to allow Alt to be used for the start
-   of macros. Note that on ChromeOS, meta pressed alone cannot be intercepted by
-   Javascript, so meta is not used for macros.
+   of macros. Note that on ChromeOS and e.g. Windows, meta pressed alone cannot
+   be intercepted by Javascript, so meta is not used for macros.
+
+ATTACH PAGE
+
+Open the attach page by going to http://localhost:8090/attach, or using the
+"rarsS T " or "rarsA T " macros from within a terminal (see HOW TO READ MACRO
+SHORTCUTS). The former shortcut uses a new tab (Separate) while the latter
+replaces the current tab.
+
+From the attach page you can create or reconnect to persistent sessions.
+
+ * the "scratch" persistent sessions are named with a single capital letter,
+   and are accessible with the 26 single-letter links at the top of /attach
+
+ * use a link in the "Persistent sessions" section to open an existing persisent
+   session
+
+ * the "Common" list at the left of /attach contains a line for every defined
+   "profile." This list is empty until you add your first profile (see PROFILES)
 
 SCROLLBACK FEATURES
 
@@ -200,5 +215,14 @@ SCROLLBACK FEATURES
    with editor and UI screens, unlike 'laH M '. But everything else about its
    use is the same (Enter to copy text and close the tab).
 
-TODO document Advanced Usage and Configuration, add screenshots and videos. See
-go/web-term until then.
+PROFILES
+
+A profile is meant to label and setup a starting state for a shell session. It
+can be used to quickly accomplish a certain task or prepare to enter a certain
+personalized workflow.
+
+Profiles are divided into groups, and each profile has a NAME, an initialization
+COMMAND, and an optional list of JAVASCRIPT files that the client will load,
+generally to just define macros.
+
+TODO document Advanced Usage and Configuration, add screenshots and videos.

@@ -35,6 +35,10 @@ h1 {
 	padding-bottom:8pt;
 	border-bottom: solid 1px yellow;
 }
+.ephemeral-sessions {
+	padding-top: 1em;
+	font-size: 0.8em;
+}
 .column {
 	padding-top: 6pt;
 	padding-bottom: 6pt;
@@ -49,13 +53,16 @@ h1 {
 }
 a {
 	color: white;
-	font-size: 14px;
 	text-decoration: none;
 }
 a.scratch-link {
 	text-decoration: none;
 	margin-left: 7pt;
-	font-size:12pt;
+	font-size:1.2em;
+}
+.feedback {
+	padding: 0.5em;
+	font-size: 0.7em;
 }
 </style>
 </head>
@@ -134,10 +141,13 @@ cat <<EOF
 <table>
 EOF
 
-lsof -Fn $WERMDIR/var/dtach.* |
+# We redundantly verify a part of the path printed by lsof within awk because I
+# have seen lsof return totally different paths (also sockets) in the case of
+# files that are deleted but still open: Linux 6.3.11, lsof 4.95.0, Debian
+lsof -Fn $WERMDIR/var/socks/prsist.* |
 awk '
-/^n/ && !/\/var\/dtach[.]ephem[.]/ {
-	sub(/^n.*\/var\/dtach[.]/, "");
+/^n.*\/var\/socks\/prsist\./ {
+	sub(/^n.*\/var\/socks\/prsist[.]/, "", $1);
 	count[$1] += 1;
 }
 END {
@@ -153,7 +163,7 @@ do
 	printf '<tr>
 		<td class="loose">[<strong>%s</strong>]
 		<td>%s
-		<td><a style='font-size:14px' class='restore-link' href="/?termid=%s">%s</a>
+		<td><a class='restore-link' href="/?termid=%s">%s</a>
 		</tr>\n' \
 		$sess \
 		"$att" \
@@ -163,6 +173,16 @@ done
 
 cat <<EOF
 </table>
+<div class=ephemeral-sessions>Ephemeral sessions:
+EOF
+find $WERMDIR/var/socks/ephemr.* | wc -l
+cat <<EOF
+</div>
+</tr>
+<tr>
+<td colspan=2 class=feedback>
+Werm issue tracker on <a href="https://github.com/google/werm">GitHub</a><br>
+Other feedback welcome at <a href="matvore@chromium.org">matvore@chromium.org</a>
 </tr>
 </table>
 

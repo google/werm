@@ -584,10 +584,20 @@ static const char *rundir(void)
 	if (!wermdir) errx(1, "$WERMDIR is unset");
 
 	xasprintf(&rd, "%s/var", wermdir);
-
 	if (mkdir(rd, 0700) && errno != EEXIST) err(1, "cannot create %s", rd);
 
 	return rd;
+}
+
+static const char *socksdir(void)
+{
+	static char *sd;
+	if (sd) return sd;
+
+	xasprintf(&sd, "%s/socks", rundir());
+	if (mkdir(sd, 0700) && errno != EEXIST) err(1, "cannot create %s", sd);
+
+	return sd;
 }
 
 static void appenddir(char **p, int nmb)
@@ -646,7 +656,10 @@ static void prepfordtach(void)
 
 	/* We need some termid for creating log file or setting argv0 later */
 	if (!termid) xasprintf(&termid, "ephem.%lld", (long long) getpid());
-	xasprintf(&dtach_sock, "%s/dtach.%s", rundir(), termid);
+
+	if (dtach_sock) errx(1, "dtach_sock already set: %s", dtach_sock);
+	xasprintf(&dtach_sock, "%s/%s.%s",
+		  socksdir(), dtach_ephem ? "ephemr" : "prsist", termid);
 }
 
 void send_pream(int fd)
@@ -1221,8 +1234,8 @@ int main(int argc, char **argv)
 "--- WARNING ---\n"
 "Saving scrollback logs under: %s\n"
 "Clean this directory periodically to avoid overloading your filesystem.\n"
-"All non-ephemeral sessions are saved here until you remove them. Be\n"
-"aware of what you save here and how fast it grows.\n"
+"All persistent sessions are saved here until you remove them. Be aware of\n"
+"what you save here and how fast it grows.\n"
 "\n"
 "This inconvenience will eventually be automated.\n"
 "\n"

@@ -225,4 +225,19 @@ Profiles are divided into groups, and each profile has a NAME, an initialization
 COMMAND, and an optional list of JAVASCRIPT files that the client will load,
 generally to just define macros.
 
+SUGGESTED UTILITIES
+
+These are tools unaffiliated with Werm or Google which may make Werm more
+convenient.
+
+Tiling Window Manager for Chrome OS: tiles a screen into more than two windows
+with the keyboard. You may not need this to only get two windows on the screen
+at one time. In chromeOS, Alt+[ and Alt+] and Meta+Alt+M are sufficient to get
+two windows per monitor, on any attached monitor.
+https://chromewebstore.google.com/detail/aikaaejchodabfpkipfonnekofgepakh
+
+New tab redirect: opens an ephemeral terminal in a new tab (see also
+pass_ctrl_L in index.html for easier access to address bar in new tabs)
+https://chromewebstore.google.com/detail/icpgjfneehieebagbmdbhnlpiopdcmna
+
 TODO document Advanced Usage and Configuration, add screenshots and videos.

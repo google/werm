@@ -91,7 +91,7 @@ int32_t tmlen(int32_t bref)
 	errx(1, "TODO");
 }
 
-int32_t tmfree(int32_t id)
+void tmfree(int32_t id)
 {
 	struct tmobj *fro = id2obj(id);
 

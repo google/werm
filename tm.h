@@ -47,6 +47,6 @@ struct tmobj {
 int32_t *fld_ptr(int32_t id, int32_t fdx);
 int32_t tmalloc(int32_t nfct);
 int32_t tmlen(int32_t id);
-int32_t tmfree(int32_t id);
+void tmfree(int32_t id);
 
 #define sriously(...) errx(1, __VA_ARGS__);

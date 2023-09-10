@@ -16,7 +16,7 @@
 cd `dirname $0`
 
 (
-	cd test || exit 1
+	cd test/raw || exit 1
 
 	echo '#include <unistd.h>' >| data.h
 
@@ -29,7 +29,7 @@ cd `dirname $0`
 		printf 'extern const char test_%s[];\n' "$fnb" >> data.h
 		printf 'extern const size_t test_%s_size;\n' "$fnb" >> data.h
 
-		printf '#include "test/data.h"\n' >| $fn.c
+		printf '#include "test/raw/data.h"\n' >| $fn.c
 		printf 'const size_t test_%s_size = %d;\n' "$fnb"  `wc -c <"$fn"` >> "$fn.c"
 		printf 'const char test_%s[] = ' "$fnb" >> "$fn.c"
 
@@ -60,8 +60,9 @@ $!s/$/\\012/
 	 -Werror=return-type \
 	 -o session \
 	 session.c \
+	 fdbuf.c \
 	 shared.c \
-	 test/*.c \
+	 test/raw/*.c \
 	 third_party/dtach/*.c \
 	 tm.c \
 	 -lutil ||

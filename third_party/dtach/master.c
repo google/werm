@@ -345,10 +345,10 @@ client_activity(struct client *p)
 		free(p);
 		return;
 	}
-	if (!p->attached) recount_state();
+	if (!p->attached) recount_state(p->fd);
 	p->attached = 1;
 
-	process_kbd(the_pty.fd, buf, len);
+	process_kbd(the_pty.fd, p->fd, buf, len);
 }
 
 /* The master process - It watches over the pty process and the attached */

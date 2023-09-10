@@ -16,17 +16,17 @@
 echo Content-type: text/javascript
 echo
 
-echo $QUERY_STRING | (
-echo '
-genjs () {
-	if test -x $1; then
-		$1
-	elif test -e $1; then
-		cat $1
-	fi
-}
-'
-sed '
-s_[^,]*_genjs $WERMDIR/js/\0.js; genjs $HOME/.config/werm/js/\0.js_g
-s_,_;_g
-' ) | /bin/sh
+printf '%s\n' "$QUERY_STRING" \
+| tr ',' '\n' \
+| while read jsnam; do
+	printf '%s\n' "${WERMJSPATH:-$WERMDIR/js:$HOME/.config/werm/js}" \
+	| tr ':' '\n' \
+	| while read jsdir; do
+		full="$jsdir/$jsnam.js"
+		if test -x "$full"; then
+			"$full"
+		elif test -e "$full"; then
+			cat "$full"
+		fi
+	done
+done

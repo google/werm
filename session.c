@@ -16,8 +16,9 @@
 #define _GNU_SOURCE
 
 #include "shared.h"
-#include "test/data.h"
+#include "test/raw/data.h"
 
+#include <limits.h>
 #include <time.h>
 #include <errno.h>
 #include <stdio.h>
@@ -30,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <err.h>
 #include <stdarg.h>
+#include <dirent.h>
 
 static int xasprintf(char **strp, const char *format, ...)
 {
@@ -52,7 +54,7 @@ static int xasprintf(char **strp, const char *format, ...)
 	return res;
 }
 
-static char *pream, *argv0, *termid;
+static char *argv0, *termid, *logview;
 
 static size_t argv0sz;
 
@@ -86,7 +88,10 @@ static struct {
 	/* rwout* contains bytes to send to each attach process. It grows
 	 * dynamically and is exposed to dtach code through
 	 * get_rout_for_attached and reset with clear_rout. session module
-	 * writes to it with putrout* methods. */
+	 * writes to it with putrout* methods.
+	 * This grows on demand because dtach logic treats it as a single
+	 * buffer in a loop somewhere. It would be risky to statically allocate
+	 * it without verifying the amount of bytes it can possibly grow to. */
 	unsigned char *rwoutbuf;
 	size_t rwoutsz, rwoutlen;
 
@@ -103,7 +108,7 @@ void get_rout_for_attached(const unsigned char **buf, size_t *len)
 	*len = wts.rwoutlen;
 }
 
-static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
+void full_write(int fd, const char *desc, const void *buf_, ssize_t sz)
 {
 	ssize_t writn;
 	const unsigned char *buf = buf_;
@@ -111,15 +116,17 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 	/* This is convenient for tests. */
 	if (1 == fd) fflush(stdout);
 
+	if (sz < 0) sz = strlen(buf_);
 	while (sz) {
 		writn = write(fd, buf, sz);
-		if (!writn) errx(1, "should be blocking: %s", desc);
+		if (!writn)
+			errx(1, "should be blocking: %s", desc);
 		if (writn > 0) {
 			sz -= writn;
 			buf += writn;
 		}
 		else if (errno != EINTR) {
-			warn("write to %s", desc);
+			warn("write %s", desc);
 			return;
 		}
 	}
@@ -127,7 +134,7 @@ static void fullwrite(int fd, const char *desc, const void *buf_, size_t sz)
 
 static void putrwout(void)
 {
-	fullwrite(1, "rwout2stdout", wts.rwoutbuf, wts.rwoutlen);
+	full_write(1, "rwout2stdout", wts.rwoutbuf, wts.rwoutlen);
 	wts.rwoutlen = 0;
 }
 
@@ -318,7 +325,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 
 	if (len < 0) len = strlen(buf_);
 
-	if (wts.rawlogfd) fullwrite(wts.rawlogfd, "raw log", buf, len);
+	if (wts.rawlogfd) full_write(wts.rawlogfd, "raw log", buf, len);
 
 	while (len) {
 		if (buf[0] == '\r') {
@@ -417,7 +424,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 		if (*buf != '\n' && wts.linesz < sizeof(wts.linebuf)) goto eol;
 
 		if (wts.logfd)
-			fullwrite(wts.logfd, "log", wts.linebuf, wts.linesz);
+			full_write(wts.logfd, "log", wts.linebuf, wts.linesz);
 		TMlineresize(0);
 
 	eol:
@@ -430,17 +437,11 @@ void process_tty_out(const void *buf_, ssize_t len)
 	putroutraw("\n", -1);
 }
 
-static void recountttl(void)
+static void recountttl(int fd)
 {
-	putroutraw("\\@title:", -1);
-	putroutraw(wts.ttl, ttllen());
-	putroutraw("\n", -1);
-}
-
-void recount_state(void)
-{
-	putroutraw(wts.altscren ? "\\s2" : "\\s1", -1);
-	if (wts.ttl[0]) recountttl();
+	full_write(fd, "title 1", "\\@title:", -1);
+	full_write(fd, "title 2", wts.ttl, ttllen());
+	full_write(fd, "title 3", "\n", -1);
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)
@@ -497,11 +498,10 @@ static void proccgienv(void)
 			continue;
 		}
 
-		val = extract_query_arg(&qs, "pream=");
+		val = extract_query_arg(&qs, "logview=");
 		if (val) {
-			free(pream);
-			pream = val;
-			val = NULL;
+			free(logview);
+			logview = strdup(val);
 			continue;
 		}
 
@@ -666,55 +666,287 @@ static void prepfordtach(void)
 		  socksdir(), dtach_ephem ? "ephemr" : "prsist", termid);
 }
 
-void send_pream(int fd)
+struct iterprofspec {
+	/* fd to which to send any non-log, non-diagnostic output. */
+	int sigfd;
+
+	/* output canon term link for each profile to sigfd */
+	unsigned canonterm	: 1;
+
+	unsigned sendauxjs	: 1;  /* send auxiliary js list to sigfd */
+	unsigned sendpream	: 1;  /* send preamble for termid to sigfd */
+
+	/* diagnostic logging, not used during tests as it is not deterministic.
+	 * Always sent to stderr
+	 */
+	unsigned diaglog	: 1;
+
+	/* whether to annotate and escape output send to sigfd, in order to make
+	 * it more human-readable and separate from other output going to the
+	 * same stream. */
+	unsigned annotsig	: 1;
+};
+
+/* Transfers the prior recbyts bytes from srcf, measured from one byte before
+ * the current seek position of srcf, to dstfd. Returns with the seek position
+ * of srcf in the same position as when called. */
+static void recallfiletofd(FILE *srcf, int recbyts, struct fdbuf *dstfd)
 {
-	if (!pream) return;
-	fullwrite(fd, "pream", pream, strlen(pream));
+	char c;
 
-	/* Theoretically unneeded as send_pream is never called more than
-	 * once: */
-	free(pream);
-	pream = NULL;
-}
+	if (fseek(srcf, -1-recbyts, SEEK_CUR) < 0)
+		err(1, "fseek by -%d", 1+recbyts);
 
-
-static unsigned kbufsz;
-static unsigned char kbuf[8];
-
-static void finishkbuf(int outfd)
-{
-	unsigned bi;
-
-	if (!kbufsz) return;
-
-	if (outfd != 1)
-		fullwrite(outfd, "keyboard buffer", kbuf, kbufsz);
-	else {
-		fputs("kbd[", stdout);
-		for (bi = 0; bi < kbufsz; bi++) {
-			if (kbuf[bi] >= ' ' && kbuf[bi] != '\\') putchar(kbuf[bi]);
-			else printf("\\%03o", kbuf[bi]);
-		}
-		puts("]");
+	clearerr(srcf);
+	while (recbyts--) {
+		c = getc(srcf);
+		if (ferror(srcf)) err(1, "transferring byte");
+		fdb_apnd(dstfd, &c, 1);
 	}
 
-	kbufsz = 0;
+	if (getc(srcf) == EOF) err(1, "ignoring last byte");
 }
 
-static void addkeybyte(int outfd, int c)
+static int proflines(
+	const char *grpname, FILE *pff, const struct iterprofspec *spc)
 {
-	if (kbufsz == sizeof(kbuf)) finishkbuf(outfd);
-	kbuf[kbufsz++] = c;
+	const char *cmpname;
+	int lineno = 0, namematc = 0, namelen;
+
+	char fld, eofield, namemat, err = 0, startedjs;
+	char begunprenam, c;
+
+	struct fdbuf sigbuf = {
+		.fd = spc->sigfd,
+		.escannot = spc->annotsig ? "profsig" : 0,
+	};
+
+	if (spc->canonterm) {
+		fdb_apnd(&sigbuf, "<ul id=\"ctl-", -1);
+		fdb_apnd(&sigbuf, grpname, -1);
+		fdb_apnd(&sigbuf, "\" class=\"canonterm-list\">", -1);
+	}
+
+	c = '\n';
+	do {
+		if (c == '\n') {
+			cmpname = termid;
+			namemat = 0;
+			fld = 'n';
+			startedjs = 0;
+			begunprenam = 0;
+			namelen = 0;
+			lineno++;
+		}
+
+		clearerr(pff);
+		c = getc(pff);
+		if (c == EOF && ferror(pff)) {
+			perror("getc for profile def file");
+			break;
+		}
+		eofield = c == '\n' || c == EOF || c == '\t';
+
+		switch (fld) {
+		/* n = name field, p = preamble, j = auxjs list */
+		case 'n':
+			if (eofield) {
+				namemat = cmpname &&
+					(!*cmpname || '.' == *cmpname);
+				namematc += namemat;
+				fld = 'p';
+
+				if (spc->canonterm && namelen > 0) {
+					fdb_apnd(&sigbuf,
+						 "<li><a class=\"canonterm-link\" href=\"/?termid=", -1);
+					recallfiletofd(pff, namelen, &sigbuf);
+					fdb_apnd(&sigbuf, "\">", -1);
+					recallfiletofd(pff, namelen, &sigbuf);
+					fdb_apnd(&sigbuf, "</a>", -1);
+				}
+				break;
+			}
+			switch (c) {
+			case '.': case '&': case '?': case '+': case '%':
+			case ' ': case '=': case '/': case '\\': case '"':
+				fprintf(stderr,
+					"illegal char '%c' in profile name", c);
+				err = 1;
+				cmpname = NULL;
+				namelen = INT_MIN;
+			}
+			if (cmpname && *cmpname++ != c) cmpname = NULL;
+			namelen++;
+
+			break;
+		case 'p':
+			if (eofield) {
+				fld = 'j';
+				if (begunprenam) fdb_apnd(&sigbuf, "\n", -1);
+				break;
+			}
+			if (namemat && spc->sendpream) {
+				fdb_apnd(&sigbuf, &c, 1);
+				begunprenam = 1;
+			}
+
+			break;
+
+		case 'j':
+			if (eofield) {
+				if (startedjs) fdb_apnd(&sigbuf, "\n", -1);
+				break;
+			}
+			if (namemat && spc->sendauxjs) {
+				if (!startedjs)
+					fdb_apnd(&sigbuf, "\\@auxjs:", -1);
+				startedjs = 1;
+				fdb_apnd(&sigbuf, &c, 1);
+			}
+
+			break;
+
+		default: errx(1, "BUG unexpected field type %d", fld);
+		}
+
+		if (err) {
+			fprintf(stderr, " group=%s line=%d\n",
+				grpname, lineno);
+			err = 0;
+		}
+	} while (c != EOF);
+
+	if (spc->canonterm) fdb_apnd(&sigbuf, "</ul>\n", -1);
+
+	fdb_flsh(&sigbuf);
+
+	return namematc;
+}
+
+static void iterprofs(const char *ppaths_, const struct iterprofspec *spc)
+{
+	DIR *pd;
+	char *ppaths = strdup(ppaths_), *tkn, *savepp, *ppitr, *ffn;
+	struct dirent *den;
+	FILE *pff;
+	int namematc = 0;
+
+	for (ppitr = ppaths; ; ppitr = NULL) {
+		if (!(tkn = strtok_r(ppitr, ":", &savepp))) break;
+		fprintf(stderr, "reading profile dir at: %s\n", tkn);
+
+		pd = opendir(tkn);
+		if (!pd) {
+			perror("opendir");
+			continue;
+		}
+
+		for (;;) {
+			errno = 0;
+			den = readdir(pd);
+			if (!den) {
+				if (errno) perror("readdir");
+				break;
+			}
+
+			xasprintf(&ffn, "%s/%s", tkn, den->d_name);
+
+			if (den->d_name[0] == '.') {
+				if (spc->diaglog)
+					fprintf(stderr,
+						"  skipped file '%s'\n",
+						den->d_name);
+				continue;
+			}
+
+			if (spc->diaglog)
+				fprintf(stderr, "  group %s\n", den->d_name);
+
+			pff = fopen(ffn, "r");
+			if (!pff) {
+				perror("fopen");
+				goto doneproffile;
+			}
+
+			namematc += proflines(den->d_name, pff, spc);
+
+doneproffile:
+			free(ffn);
+			ffn = NULL;
+		}
+	}
+
+	free(ppaths);
+
+	if (!namematc && (spc->sendauxjs || spc->sendpream))
+		fprintf(stderr, "profile with name '%s' not found\n", termid);
+}
+
+static const char *profpath(void)
+{
+	static const char *p;
+	char *def;
+
+	if (!p) p = getenv("WERMPROFPATH");
+	if (!p) {
+		xasprintf(&def, "%s/profiles:%s/.config/werm/profiles",
+			  getenv("WERMDIR"), getenv("HOME"));
+		p = def;
+	}
+
+	return p;
+}
+
+void recount_state(int fd)
+{
+	full_write(fd, "altscreen recount", wts.altscren ? "\\s2" : "\\s1", -1);
+	if (wts.ttl[0]) recountttl(fd);
+
+	if (termid) {
+		iterprofs(profpath(), &((struct iterprofspec){
+			.sigfd = fd,
+			.sendauxjs = 1,
+			.diaglog = 1,
+		}));
+	}
+}
+
+void send_pream(int fd)
+{
+	if (logview) {
+		full_write(fd, "logview init 1", ". $WERMDIR/logview ", -1);
+		full_write(fd, "logview init 2", logview, -1);
+		full_write(fd, "logview init 3", "\r", -1);
+		return;
+	}
+
+	if (!termid) return;
+
+	iterprofs(profpath(), &((struct iterprofspec){
+		.sigfd = fd,
+		.sendpream = 1,
+		.diaglog = 1,
+	}));
 }
 
 static void writetosubproccore(
-	int outfd, const unsigned char *buf, unsigned bufsz)
+	/* Where to send output for the process; this is raw keyboard input. */
+	int outfd,
+
+	/* Where to send output for attached client. */
+	int clioutfd,
+
+	/* Data received from client which is the escaped keyboard input. */
+	const unsigned char *buf,
+	unsigned bufsz)
 {
 	unsigned wi, ri, row, col;
 	unsigned char byte, cursmvbyte;
+	struct fdbuf kbdb = {
+		.fd = outfd,
+		.escannot = outfd == 1 ? "kbd" : NULL,
+	};
 
-	if (kbufsz != 0)
-		errx(1, "expected kbuf to be empty, has %u bytes", kbufsz);
 	wts.sendsigwin = 0;
 
 	wi = 0;
@@ -728,7 +960,7 @@ static void writetosubproccore(
 			if (byte == '\\')
 				wts.escp = '1';
 			else
-				addkeybyte(outfd, byte);
+				fdb_apnd(&kbdb, &byte, 1);
 			break;
 
 		case '1':
@@ -737,11 +969,11 @@ static void writetosubproccore(
 
 			switch (byte) {
 			case 'n':
-				addkeybyte(outfd, '\n');
+				fdb_apnd(&kbdb, "\n", -1);
 				break;
 
 			case '\\':
-				addkeybyte(outfd, '\\');
+				fdb_apnd(&kbdb, "\\", -1);
 				break;
 
 			case 'w':
@@ -771,10 +1003,10 @@ static void writetosubproccore(
 			}
 
 			if (!cursmvbyte) break;
-			addkeybyte(outfd, 033);
+			fdb_apnd(&kbdb, "\033", 1);
 			/* application cursor mode does O rather than [ */
-			addkeybyte(outfd, wts.appcursor ? 'O' : '[');
-			addkeybyte(outfd, cursmvbyte);
+			fdb_apnd(&kbdb, wts.appcursor ? "O" : "[", -1);
+			fdb_apnd(&kbdb, &cursmvbyte, 1);
 			break;
 
 		case 'w':
@@ -797,7 +1029,7 @@ static void writetosubproccore(
 			}
 			if (wts.altbufsz < sizeof wts.ttl)
 				wts.ttl[wts.altbufsz++] = byte;
-			if (!byte) recountttl();
+			if (!byte) recountttl(clioutfd);
 
 			break;
 
@@ -805,7 +1037,7 @@ static void writetosubproccore(
 		}
 	}
 
-	finishkbuf(outfd);
+	fdb_flsh(&kbdb);
 }
 
 void forward_stdin(int sock)
@@ -817,14 +1049,14 @@ void forward_stdin(int sock)
 	if (!red) errx(1, "nothing on stdin");
 	if (red == -1) err(1, "read from stdin");
 
-	fullwrite(sock, "forward stdin", buf, red);
+	full_write(sock, "forward stdin", buf, red);
 }
 
-void process_kbd(int ptyfd, unsigned char *buf, size_t bufsz)
+void process_kbd(int ptyfd, int clioutfd, unsigned char *buf, size_t bufsz)
 {
 	struct winsize ws = {0};
 
-	writetosubproccore(ptyfd, buf, bufsz);
+	writetosubproccore(ptyfd, clioutfd, buf, bufsz);
 
 	if (!wts.sendsigwin) return;
 
@@ -837,6 +1069,11 @@ static void testreset(void)
 {
 	free(wts.rwoutbuf);
 	memset(&wts, 0, sizeof(wts));
+
+	free(termid);
+	termid = NULL;
+
+	fflush(stdout);
 }
 
 static void writetosp0term(const char *s)
@@ -845,9 +1082,148 @@ static void writetosp0term(const char *s)
 
 	len = strlen(s);
 
-	writetosubproccore(1, (const unsigned char *)s, len);
+	writetosubproccore(1, 1, (const unsigned char *)s, len);
 
 	if (wts.sendsigwin) printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
+}
+
+static void testiterprofs(void)
+{
+	puts("empty WERMPROFPATH");
+	testreset();
+
+	iterprofs("", &((struct iterprofspec){ 0 }));
+
+	puts("non-existent and empty dirs in WERMPROFPATH");
+	testreset();
+	iterprofs(
+		"test/profilesnoent::test/profiles1",
+		&((struct iterprofspec){ 0 }));
+
+	puts("match js and print");
+	testreset();
+	termid = strdup("hasstuff");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendauxjs = 1,
+	}));
+
+	puts("name error but matches other line to print auxjs");
+	testreset();
+	termid = strdup("bad.name");
+	iterprofs("test/profiles2", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendauxjs = 1,
+	}));
+
+	puts("name error no match");
+	testreset();
+	termid = strdup("xyz");
+	iterprofs("test/profiles2", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendauxjs = 1,
+	}));
+
+	puts("name error but matches other line to print preamble");
+	testreset();
+	termid = strdup("bad");
+	iterprofs("test/profiles2", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendpream = 1,
+	}));
+
+	puts("empty preamble for match 1");
+	testreset();
+	termid = strdup("allempty");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendpream = 1,
+	}));
+
+	puts("empty preamble for match 2");
+	testreset();
+	termid = strdup("emptypream");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendpream = 1,
+	}));
+
+	puts("empty preamble for match 3");
+	testreset();
+	termid = strdup("emptypreamjs");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendpream = 1,
+	}));
+
+	puts("long preamble 1");
+	testreset();
+	termid = strdup("longpream1");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendpream = 1,
+	}));
+
+	puts("long preamble 2");
+	testreset();
+	termid = strdup("longpream2");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendpream = 1,
+	}));
+
+	puts("empty js for match 1");
+	testreset();
+	termid = strdup("emptypreamjs");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendauxjs = 1,
+	}));
+
+	puts("empty js for match 2");
+	testreset();
+	termid = strdup("allempty");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendauxjs = 1,
+	}));
+
+	puts("empty js for match 3");
+	testreset();
+	termid = strdup("emptyjs1");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendauxjs = 1,
+	}));
+
+	puts("empty js for match 4");
+	testreset();
+	termid = strdup("emptyjs2");
+	iterprofs("test/profiles1", &((struct iterprofspec) {
+		.sigfd = 1,
+		.sendauxjs = 1,
+	}));
+
+	puts("url-encoding-related chars not allowed in termid");
+	testreset();
+	iterprofs("test/profiles3", &((struct iterprofspec) {
+		.sigfd = 1,
+	}));
+
+	puts("bad names while outputting canonical terminal list");
+	testreset();
+	iterprofs("test/profiles3", &((struct iterprofspec) {
+		.sigfd = 1,
+		.canonterm = 1,
+		.annotsig = 1,
+	}));
+
+	puts("dump canonterm list");
+	testreset();
+	iterprofs("test/profilesname", &((struct iterprofspec) {
+		.sigfd = 1,
+		.canonterm = 1,
+	}));
 }
 
 static void _Noreturn testmain(void)
@@ -1091,16 +1467,16 @@ static void _Noreturn testmain(void)
 
 	puts("dump of state");
 	testreset();
-	recount_state(); putrwout(); putchar('\n');
-	process_tty_out("\033[?47h", -1);
-	recount_state(); putrwout(); putchar('\n');
-	recount_state(); putrwout(); putchar('\n');
-	process_tty_out("\033[?47l", -1);
-	recount_state(); putrwout(); putchar('\n');
-	process_tty_out("\033[?1049h", -1);
-	recount_state(); putrwout(); putchar('\n');
-	process_tty_out("\033[?1049l", -1);
-	recount_state(); putrwout(); putchar('\n');
+	recount_state(1); full_write(1, "newline", "\n", -1);
+	process_tty_out("\033[?47h", -1); putrwout();
+	recount_state(1); full_write(1, "newline", "\n", -1);
+	recount_state(1); full_write(1, "newline", "\n", -1);
+	process_tty_out("\033[?47l", -1); putrwout();
+	recount_state(1); full_write(1, "newline", "\n", -1);
+	process_tty_out("\033[?1049h", -1); putrwout();
+	recount_state(1); full_write(1, "newline", "\n", -1);
+	process_tty_out("\033[?1049l", -1); putrwout();
+	recount_state(1); full_write(1, "newline", "\n", -1);
 
 	puts("do not save bell character in plain text log");
 	testreset();
@@ -1138,14 +1514,14 @@ static void _Noreturn testmain(void)
 	writetosp0term("\\tsometitle\n");
 	putrwout();
 	printf("  recount: ");
-	recount_state();
+	recount_state(1);
 	putrwout();
 
 	puts("... continued: unset title, respond with empty title");
 	writetosp0term("thisisnormalkeybinput\\t\n");
 	putrwout();
 	printf("  recount (should not include title here): ");
-	recount_state();
+	recount_state(1);
 	putrwout(); putchar('\n');
 
 	puts("title is too long");
@@ -1210,6 +1586,8 @@ static void _Noreturn testmain(void)
 	for (i = 0; i < sizeof(wts.linebuf) - 1; i++) process_tty_out("*", -1);
 	process_tty_out("\r\033[32@!!!\r\n", -1);
 
+	testiterprofs();
+
 	exit(0);
 }
 
@@ -1229,8 +1607,18 @@ int main(int argc, char **argv)
 	argv++;
 
 	if (1 == argc && !strcmp("test", *argv)) testmain();
+	if (1 == argc && !strcmp("canontermlinks", *argv)) {
+		iterprofs(profpath(), &((struct iterprofspec){
+			.sigfd = 1,
+			.canonterm = 1,
+			.diaglog = 1,
+		}));
+		exit(0);
+	}
 
 	if (argc >= 1 && !strcmp("serve", *argv)) {
+		iterprofs(profpath(), &((struct iterprofspec){ .diaglog = 1 }));
+
 		srvargv = argv+1;
 		termid = strdup("~spawner");
 		prepfordtach();
@@ -1257,9 +1645,13 @@ int main(int argc, char **argv)
 		first_attach = 1;
 		exit(dtach_master());
 	}
-	else {
-		proccgienv();
-		prepfordtach();
-		dtach_main();
+
+	if (argc) {
+		fprintf(stderr, "unrecognized arguments\n");
+		exit(1);
 	}
+
+	proccgienv();
+	prepfordtach();
+	dtach_main();
 }

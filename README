@@ -225,6 +225,70 @@ Profiles are divided into groups, and each profile has a NAME, an initialization
 COMMAND, and an optional list of JAVASCRIPT files that the client will load,
 generally to just define macros.
 
+Each profile group is defined by a single file in $WERMDIR/profiles or
+$HOME/.config/werm/profiles. If $WERMPROFPATH is defined when running |run|,
+the paths in *that* are searched instead. To include more than one path in
+$WERMPROFPATH, separate separate them with a ':'.
+
+The "group" feature is optional, meaning you may choose to put all of your
+profiles in a single group. Multiple groups are useful because the /attach page
+displays vertical space between each group. Multiple groups also allow you to
+define profiles across multiple files and directories.
+
+The profile associated with a terminal ID is the portion of the terminal ID
+before the first '.', or the entire terminal ID if there is no '.'.
+
+Profile names may not contain the characters: %.+=&?\/" and space and tab.
+
+A profile is defined by one line in its group file, and each line contains 1, 2,
+or 3 fields separated by a tab. Field one is the profile name. Field two is the
+preamble. Field three is the Javascript files to load with that profile, without
+the .js extension, separated by commas. Here is an example group file:
+
+profile-foo<--TAB-->source ~/.foorc<--TAB-->foo-macros1,foo-macros2,common-macros
+bar-profile<--TAB-->source ~/.barrc<--TAB-->bar-macros,common-macros
+basic<--TAB-->source ~/.basicrc
+no-preamble<--TAB--><--TAB-->common-macros
+
+The first two profiles have all fields defined. The third profile has no extra
+JS to load, and the fourth profile has no preamble.
+
+The preamble is typed automatically for you into the terminal when a new process
+has been started. If the preamble is not empty, a \n is automatically typed
+after it as well.
+
+CUSTOM PROFILES: JAVASCRIPT
+
+JS is loaded from directories listed in $WERMJSPATH, which is specified in the
+environment when running "$WERMDIR/run", and lists directories separated by
+colons, i.e. :
+
+If $WERMJSPATH is not defined, it defaults to $WERMDIR/js:$HOME/.local/werm/js
+
+For instance, if the JS field of a profile is "a,b,c", then Javascript will be
+loaded from any file named a.js, b.js, or c.js, in any directory in $WERMJSPATH.
+If the .js file is executable, it is executed and its stdout taken. Otherwise,
+the files contents are taken as-is.
+
+For a given profile, each .js file is concatenated together and loaded as a
+single <script> element. To see the final .js file in use in a profile, open a
+terminal with the profile and enter the macro "laO P J S ". This will re-generate
+the .js file *again* and show it, rather than simply show what was really loaded
+and in effect for the page. (FIXME: this is not ideal)
+
+The Javascript generally takes the form of extra macro maps put in the map at
+window.extended_macros, which look like the macro_map in index.html, e.g.:
+
+(in foo.js)
+window.extended_macros.foo_macros = [
+	['raD T ', 'third_party/dtach'],
+	['raW S ', 'third_party/websocketd'],
+];
+(in bar.js)
+window.extended_macros.bar_macros = [
+	...
+];
+
 SUGGESTED UTILITIES
 
 These are tools unaffiliated with Werm or Google which may make Werm more

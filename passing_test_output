@@ -1,8 +1,6 @@
 WRITE_TO_SUBPROC_CORE
 should ignore newline:
-kbd[hello ho]
-kbd[w are yo]
-kbd[u]
+kbd[hello how are you]
 empty string:
 no-op escape \N:
 change window size after \N:
@@ -10,26 +8,14 @@ sigwin r=99 c=11
 missing newline:
 kbd[asdf]
 sending sigwinch:
-kbd[about to]
-kbd[ resize.]
-kbd[.....all]
-kbd[ done]
+kbd[about to resize......all done]
 sigwin r=91 c=42
 escape seqs:
-kbd[line one]
-kbd[\012line tw]
-kbd[o\012line 3]
-kbd[ \134 (reve]
-kbd[rse soli]
-kbd[dus)\012]
+kbd[line one\012line two\012line 3 \134 (reverse solidus)\012]
 escape seqs straddling:
-kbd[line one]
-kbd[\012line tw]
-kbd[o]
+kbd[line one\012line two]
 kbd[\012line 3 ]
-kbd[\134 (rever]
-kbd[se solid]
-kbd[us)\012]
+kbd[\134 (reverse solidus)\012]
 sigwin r=120 c=140
 TEE_TTY_CONTENT
 pending line
@@ -73,23 +59,13 @@ something makes the logs stop
 foo
 arrow keys are translated to escape sequences
 app cursor off: up,down,right,left=ESC [ A,B,C,D
-kbd[left (\033[]
-kbd[D \033[D)\015]
-kbd[up down ]
-kbd[up (\033[A ]
-kbd[\033[B \033[A)]
-kbd[\015]
-kbd[right (\033]
-kbd[[C)\015]
+kbd[left (\033[D \033[D)\015]
+kbd[up down up (\033[A \033[B \033[A)\015]
+kbd[right (\033[C)\015]
 app cursor on: same codes as when off but O instead of [
-kbd[left (\033O]
-kbd[D \033OD)\015]
-kbd[up down ]
-kbd[up (\033OA ]
-kbd[\033OB \033OA)]
-kbd[\015]
-kbd[right (\033]
-kbd[OC)\015]
+kbd[left (\033OD \033OD)\015]
+kbd[up down up (\033OA \033OB \033OA)\015]
+kbd[right (\033OC)\015]
 bad input tolerance: terminate OS cmd without char 7
 don't hide me
 backward to negative linepos, then dump line to log
@@ -154,14 +130,12 @@ title in recounted state
 \@title:sometitle
   recount: \s1\@title:sometitle
 ... continued: unset title, respond with empty title
-kbd[thisisno]
-kbd[rmalkeyb]
-kbd[input]
 \@title:
+kbd[thisisnormalkeybinput]
   recount (should not include title here): \s1
 title is too long
-rout buffer: this is plain terminal text
 \@title:abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab
+rout buffer: this is plain terminal text
 log: this is plain terminal text
 stored title length: 128
 do not include altscreen content in scrollback log
@@ -187,6 +161,73 @@ move more characters right than are in the line
 !!!!                                              abcd
 make long line too big to fit into buffer
 !!!                             *******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
+empty WERMPROFPATH
+non-existent and empty dirs in WERMPROFPATH
+reading profile dir at: test/profilesnoent
+opendir: No such file or directory
+reading profile dir at: test/profiles1
+match js and print
+reading profile dir at: test/profiles1
+\@auxjs:myjsjs,stuffmacrosjs
+name error but matches other line to print auxjs
+reading profile dir at: test/profiles2
+illegal char '.' in profile name group=errgrp line=1
+\@auxjs:okjs
+name error no match
+reading profile dir at: test/profiles2
+illegal char '.' in profile name group=errgrp line=1
+profile with name 'xyz' not found
+name error but matches other line to print preamble
+reading profile dir at: test/profiles2
+illegal char '.' in profile name group=errgrp line=1
+better
+empty preamble for match 1
+reading profile dir at: test/profiles1
+empty preamble for match 2
+reading profile dir at: test/profiles1
+empty preamble for match 3
+reading profile dir at: test/profiles1
+long preamble 1
+reading profile dir at: test/profiles1
+abcdefghijklmnopqrstuvwxyz1234abcdefghijklmnopqrstuvwxyz1234abcdefghijklmnopqrstuvwxyz1234
+long preamble 2
+reading profile dir at: test/profiles1
+ABCDEFGHIJKLMNOPQRSTUVWXYZ1234ABCDEFGHIJKLMNOPQRSTUVWXYZ1234ABCDEFGHIJKLMNOPQRSTUVWXYZ1234
+empty js for match 1
+reading profile dir at: test/profiles1
+empty js for match 2
+reading profile dir at: test/profiles1
+empty js for match 3
+reading profile dir at: test/profiles1
+empty js for match 4
+reading profile dir at: test/profiles1
+url-encoding-related chars not allowed in termid
+reading profile dir at: test/profiles3
+illegal char '&' in profile name group=badnames line=1
+illegal char '+' in profile name group=badnames line=2
+illegal char '=' in profile name group=badnames line=2
+illegal char ' ' in profile name group=badnames line=3
+illegal char '%' in profile name group=badnames line=5
+illegal char '?' in profile name group=badnames line=6
+illegal char '\' in profile name group=badnames line=7
+illegal char '/' in profile name group=badnames line=7
+illegal char '"' in profile name group=badnames line=8
+bad names while outputting canonical terminal list
+reading profile dir at: test/profiles3
+illegal char '&' in profile name group=badnames line=1
+illegal char '+' in profile name group=badnames line=2
+illegal char '=' in profile name group=badnames line=2
+illegal char ' ' in profile name group=badnames line=3
+profsig[<ul id="ctl-badnames" class="canonterm-list"><li><a class="canon]
+illegal char '%' in profile name group=badnames line=5
+illegal char '?' in profile name group=badnames line=6
+illegal char '\' in profile name group=badnames line=7
+illegal char '/' in profile name group=badnames line=7
+illegal char '"' in profile name group=badnames line=8
+profsig[term-link" href="/?termid=okname">okname</a></ul>\012]
+dump canonterm list
+reading profile dir at: test/profilesname
+<ul id="ctl-thegrp" class="canonterm-list"><li><a class="canonterm-link" href="/?termid=item1">item1</a><li><a class="canonterm-link" href="/?termid=foo">foo</a><li><a class="canonterm-link" href="/?termid=item3">item3</a></ul>
 access obj with bad ID
 [binary_name]: bad id: -2
 valid use of new obj, then access invalid fld

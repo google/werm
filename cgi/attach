@@ -46,7 +46,7 @@ h1 {
 	padding-right: 24pt;
 	border: 2px solid yellow;
 }
-.common-list {
+.canonterm-list {
 	margin-top: 1em;
 	padding-left: 0;
 	list-style-type: none;
@@ -109,33 +109,9 @@ a.scratch-link {
 <h1>Common</h1>
 EOF
 
-# werm repo subdir should have profiles to use
-for p in $WERMDIR/profiles/* $HOME/.config/werm/profiles/*
-do
-	echo '<ul class=common-list>'
-	sed '
-s_\([^	]*\)	\([^	]*\)\(	\(.*\)\)\{0,1\}_<li><a href="/?js=\4\&termid=\1\&pream=\2%0d">\1</a>_
-:r
-/\( [^ ]*\) /{
-	s//\1%20/
-	br
-}
-:s
-/\(pream=.*\)&/{
-	s//\1%26/
-	bs
-}
-:t
-/\(?[^?]*\)?/{
-	s//\1%3f/
-	bt
-}
-	' "$p"
-	echo '</ul>'
-done
+$WERMDIR/session canontermlinks | sort
 
 cat <<EOF
-
 <td class=column style="vertical-align: top">
 <h1>Active sessions</h1>
 <table>
@@ -190,18 +166,14 @@ Other feedback welcome at <a href="matvore@chromium.org">matvore@chromium.org</a
 console.log('prep document onload');
 window.onload = function() {
 console.log('document onload');
-var es, title, pream, i, auxjs, int;
+var es, title, i, auxjs, int;
 
 es = document.getElementsByClassName('restore-link');
 
 for (i = 0; i < es.length; i++) {
 	int = es[i].innerText;
 	title = (localStorage.getItem('title-' + int) || '').trim();
-	pream = localStorage.getItem('pream-' + int);
-	auxjs = localStorage.getItem('js-' + int);
 	if (title) es[i].innerText = title;
-	if (pream) es[i].href += '&pream=' + encodeURIComponent(pream);
-	if (auxjs) es[i].href += '&js=' + encodeURIComponent(auxjs);
 }
 };
 </script>

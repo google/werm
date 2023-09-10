@@ -245,7 +245,7 @@ var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
 function term_init()
 {
 	var t, pend_send = [], term_ready = false, sock, pend_display = [],
-		pend_escape = '', termid, pream, auxjs = {},
+		pend_escape = '', termid,
 		params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl, host;
 
 	host = location.host.replace(/^localhost:/, ':');
@@ -311,6 +311,30 @@ function term_init()
 		}, 2000);
 	}
 
+	function loadauxjs(spec)
+	{
+		var el, url;
+
+		el = document.createElement('script');
+		url = '/aux.js?' + spec;
+		el.setAttribute('src', url);
+		el.addEventListener('load', function() {
+			var k, mels;
+			for (k in window.extended_macros) {
+				mels = window.extended_macros[k];
+				while (mels.length) macro_map.push(mels.pop());
+			}
+		});
+		document.body.appendChild(el);
+
+		macro_map.push(['laO P J S ', function()
+		{
+			window.open(url);
+		}]);
+	}
+
+	function aftcolon(s) { return s.replace(/^[^:]*:/, ''); }
+
 	function display(s)
 	{
 		var next_esc, pend_i, c, pend_remain;
@@ -368,9 +392,13 @@ function term_init()
 			else if (s.startsWith('\\rs'))
 				t.restoreScrCursAndState();
 			else if (s.startsWith('\\@title:')) {
-				row_ttl = s.replace(/^[^:]*:/, '');
+				row_ttl = aftcolon(s);
 				locked_ttl = !!row_ttl;
 				set_title();
+				break;
+			}
+			else if (s.startsWith('\\@auxjs:')) {
+				loadauxjs(aftcolon(s));
 				break;
 			}
 			else
@@ -489,13 +517,6 @@ function term_init()
 	params = new URLSearchParams(window.location.search);
 
 	termid = params.get('termid');
-	pream = params.get('pream');
-	auxjs.query = params.get('js') || '';
-
-	if (termid) {
-		localStorage['pream-' + termid] = pream || '';
-		localStorage['js-' + termid] = auxjs.query || '';
-	}
 
 	t.setWindowTitle = function(ttl)
 	{
@@ -508,18 +529,12 @@ function term_init()
 
 		rand_ltr = String.fromCharCode(97 + 26*Math.random());
 		newid = (termid || '') + '.' + rand_ltr;
-		window.open(
-			'/?termid=' + encodeURIComponent(newid) +
-			'&pream=' + encodeURIComponent(pream || '') +
-			'&js=' + encodeURIComponent(auxjs.query));
+		window.open('/?termid=' + encodeURIComponent(newid));
 	}
 
 	function open_log_term()
 	{
-		var pream;
-
-		pream = 'source $WERMDIR/logview ' + termid + '\r';
-		window.open('/?pream=' + encodeURIComponent(pream));
+		window.open('/?logview=' + encodeURIComponent(termid));
 	}
 
 	t.onTerminalReady = function()
@@ -934,25 +949,6 @@ function term_init()
 		sbwin = window.open('/scrollback');
 		sbwin.scrollbackcontent = rstxt.join('\n');
 	}]);
-
-	if (auxjs.query) {
-		auxjs.el = document.createElement('script');
-		auxjs.url = '/aux.js?' + auxjs.query;
-		auxjs.el.setAttribute('src', auxjs.url);
-		auxjs.el.addEventListener('load', function() {
-			var k, el;
-			for (k in window.extended_macros) {
-				el = window.extended_macros[k];
-				while (el.length) macro_map.push(el.pop());
-			}
-		});
-		document.body.appendChild(auxjs.el);
-
-		macro_map.push(['laO P J S ', function()
-		{
-			window.open(auxjs.url);
-		}]);
-	}
 
 	var got_key_up = false, matching = [], macro_winpos;
 

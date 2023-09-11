@@ -16,7 +16,7 @@
 echo Content-type: text/javascript
 echo
 
-cat $WERMDIR/third_party/hterm/client.js
+cat $WERMSRCDIR/third_party/hterm/client.js
 
 echo -n '
 // TM API implementation for JS
@@ -29,4 +29,4 @@ echo -n '
 // Code that can pass through the preprocessor and may use TM defines and is a
 // candidate for moving into `teng`. This will eventually be deleted.
 #include "third_party/hterm/engine.js"
-' | cpp -P -I$WERMDIR "$@"
+' | cpp -P -I$WERMSRCDIR "$@"

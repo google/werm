@@ -567,8 +567,8 @@ static const char *rundir(void)
 
 	if (rd) return rd;
 
-	wermdir = getenv("WERMDIR");
-	if (!wermdir) errx(1, "$WERMDIR is unset");
+	wermdir = getenv("WERMSRCDIR");
+	if (!wermdir) errx(1, "$WERMSRCDIR is unset");
 
 	xasprintf(&rd, "%s/var", wermdir);
 	if (mkdir(rd, 0700) && errno != EEXIST) err(1, "cannot create %s", rd);
@@ -873,7 +873,7 @@ static const char *profpath(void)
 	if (!p) p = getenv("WERMPROFPATH");
 	if (!p) {
 		xasprintf(&def, "%s/profiles:%s/.config/werm/profiles",
-			  getenv("WERMDIR"), getenv("HOME"));
+			  getenv("WERMSRCDIR"), getenv("HOME"));
 		p = def;
 	}
 
@@ -899,7 +899,7 @@ void send_pream(int fd)
 	struct wrides de = { fd };
 
 	if (logview) {
-		full_write(&de, ". $WERMDIR/logview ", -1);
+		full_write(&de, ". $WERMSRCDIR/logview ", -1);
 		full_write(&de, logview, -1);
 		full_write(&de, "\r", -1);
 		return;

@@ -69,15 +69,20 @@ QUICKSTART
  * The Werm server only runs on Linux
 
  * On your local or remote Linux machine, clone this repo to a convenient place
-   and build. I recommend ~/.local/werm:
+   and build. I recommend ~/.local/werm/src:
 
-   $ cd ~/.local
-   $ git clone <repo_url>
-   $ cd werm
+   $ mkdir -p ~/.local/werm
+   $ cd ~/.local/werm
+   $ git clone <repo_url> src
+   $ cd src
    $ ./build
 
    The first time you build it will download Go to compile a third-party
    component. This takes a little longer. It keeps Go inside the werm directory.
+
+   ~/.local/werm/src, or wherever you choose to put the Werm source, is known as
+   $WERMSRCDIR. This environment variable is available to all child processes of
+   the server, including terminal sessions.
 
  * Start the server.
 
@@ -225,7 +230,7 @@ Profiles are divided into groups, and each profile has a NAME, an initialization
 COMMAND, and an optional list of JAVASCRIPT files that the client will load,
 generally to just define macros.
 
-Each profile group is defined by a single file in $WERMDIR/profiles or
+Each profile group is defined by a single file in $WERMSRCDIR/profiles or
 $HOME/.config/werm/profiles. If $WERMPROFPATH is defined when running |run|,
 the paths in *that* are searched instead. To include more than one path in
 $WERMPROFPATH, separate separate them with a ':'.
@@ -260,10 +265,10 @@ after it as well.
 CUSTOM PROFILES: JAVASCRIPT
 
 JS is loaded from directories listed in $WERMJSPATH, which is specified in the
-environment when running "$WERMDIR/run", and lists directories separated by
+environment when running "$WERMSRCDIR/run", and lists directories separated by
 colons, i.e. :
 
-If $WERMJSPATH is not defined, it defaults to $WERMDIR/js:$HOME/.config/werm/js
+If $WERMJSPATH is not defined, it defaults to $WERMSRCDIR/js:$HOME/.config/werm/js
 
 For instance, if the JS field of a profile is "a,b,c", then Javascript will be
 loaded from any file named a.js, b.js, or c.js, in any directory in $WERMJSPATH.

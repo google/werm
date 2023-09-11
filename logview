@@ -13,7 +13,7 @@
 # limitations under the License.
 
 termid=$1
-logfile=`find $WERMDIR/var -path '*/hist' -prune -o -name $termid -print \
+logfile=`find $WERMSRCDIR/var -path '*/hist' -prune -o -name $termid -print \
 | sort -r \
 | head -n 1`
 shift

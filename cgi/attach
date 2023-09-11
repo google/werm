@@ -109,7 +109,7 @@ a.scratch-link {
 <h1>Common</h1>
 EOF
 
-$WERMDIR/session canontermlinks | sort
+$WERMSRCDIR/session canontermlinks | sort
 
 cat <<EOF
 <td class=column style="vertical-align: top">
@@ -120,7 +120,7 @@ EOF
 # We redundantly verify a part of the path printed by lsof within awk because I
 # have seen lsof return totally different paths (also sockets) in the case of
 # files that are deleted but still open: Linux 6.3.11, lsof 4.95.0, Debian
-lsof -Fn $WERMDIR/var/socks/prsist.* |
+lsof -Fn $WERMSRCDIR/var/socks/prsist.* |
 awk '
 /^n.*\/var\/socks\/prsist\./ {
 	sub(/^n.*\/var\/socks\/prsist[.]/, "", $1);
@@ -151,7 +151,7 @@ cat <<EOF
 </table>
 <div class=ephemeral-sessions>Ephemeral sessions:
 EOF
-find $WERMDIR/var/socks/ephemr.* | wc -l
+find $WERMSRCDIR/var/socks/ephemr.* | wc -l
 cat <<EOF
 </div>
 </tr>

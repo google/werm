@@ -19,7 +19,7 @@ echo
 printf '%s\n' "$QUERY_STRING" \
 | tr ',' '\n' \
 | while read jsnam; do
-	printf '%s\n' "${WERMJSPATH:-$WERMDIR/js:$HOME/.config/werm/js}" \
+	printf '%s\n' "${WERMJSPATH:-$WERMSRCDIR/js:$HOME/.config/werm/js}" \
 	| tr ':' '\n' \
 	| while read jsdir; do
 		full="$jsdir/$jsnam.js"

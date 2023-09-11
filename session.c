@@ -16,6 +16,7 @@
 #define _GNU_SOURCE
 
 #include "shared.h"
+#include "outstreams.h"
 #include "test/raw/data.h"
 
 #include <limits.h>
@@ -84,6 +85,8 @@ static struct {
 	unsigned altscren	: 1;
 	unsigned appcursor	: 1;
 	unsigned sendsigwin	: 1;
+	unsigned writelg	: 1;
+	unsigned writerawlg	: 1;
 
 	/* rwout* contains bytes to send to each attach process. It grows
 	 * dynamically and is exposed to dtach code through
@@ -96,8 +99,8 @@ static struct {
 	size_t rwoutsz, rwoutlen;
 
 	/* Logs (either text only, or raw subproc output) are written to these
-	 * fd's if not 0. */
-	int logfd, rawlogfd;
+	 * fd's if writelg,writerawlg are 1. */
+	struct wrides logde, rawlogde;
 } wts;
 
 void clear_rout(void) { wts.rwoutlen = 0; }
@@ -108,33 +111,10 @@ void get_rout_for_attached(const unsigned char **buf, size_t *len)
 	*len = wts.rwoutlen;
 }
 
-void full_write(int fd, const char *desc, const void *buf_, ssize_t sz)
-{
-	ssize_t writn;
-	const unsigned char *buf = buf_;
-
-	/* This is convenient for tests. */
-	if (1 == fd) fflush(stdout);
-
-	if (sz < 0) sz = strlen(buf_);
-	while (sz) {
-		writn = write(fd, buf, sz);
-		if (!writn)
-			errx(1, "should be blocking: %s", desc);
-		if (writn > 0) {
-			sz -= writn;
-			buf += writn;
-		}
-		else if (errno != EINTR) {
-			warn("write %s", desc);
-			return;
-		}
-	}
-}
-
 static void putrwout(void)
 {
-	full_write(1, "rwout2stdout", wts.rwoutbuf, wts.rwoutlen);
+	full_write(&((struct wrides){1, "putrwout"}),
+		   wts.rwoutbuf, wts.rwoutlen);
 	wts.rwoutlen = 0;
 }
 
@@ -325,7 +305,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 
 	if (len < 0) len = strlen(buf_);
 
-	if (wts.rawlogfd) full_write(wts.rawlogfd, "raw log", buf, len);
+	if (wts.writerawlg) full_write(&wts.rawlogde, buf, len);
 
 	while (len) {
 		if (buf[0] == '\r') {
@@ -423,8 +403,8 @@ void process_tty_out(const void *buf_, ssize_t len)
 
 		if (*buf != '\n' && wts.linesz < sizeof(wts.linebuf)) goto eol;
 
-		if (wts.logfd)
-			full_write(wts.logfd, "log", wts.linebuf, wts.linesz);
+		if (wts.writelg)
+			full_write(&wts.logde, wts.linebuf, wts.linesz);
 		TMlineresize(0);
 
 	eol:
@@ -437,11 +417,14 @@ void process_tty_out(const void *buf_, ssize_t len)
 	putroutraw("\n", -1);
 }
 
-static void recountttl(int fd)
+static void recountttl(struct wrides *de)
 {
-	full_write(fd, "title 1", "\\@title:", -1);
-	full_write(fd, "title 2", wts.ttl, ttllen());
-	full_write(fd, "title 3", "\n", -1);
+	struct fdbuf b = {.de = de};
+
+	fdb_apnd(&b, "\\@title:", -1);
+	fdb_apnd(&b, wts.ttl, ttllen());
+	fdb_apnd(&b, "\n", -1);
+	fdb_flsh(&b);
 }
 
 static char *extract_query_arg(const char **qs, const char *pref)
@@ -650,8 +633,9 @@ void maybe_open_logs(void)
 	now = time(NULL);
 	if (!localtime_r(&now, &tim)) err(1, "cannot get time");
 
-	wts.logfd = opnforlog(&tim, "");
-	wts.rawlogfd = opnforlog(&tim, ".raw");
+	wts.logde.fd = opnforlog(&tim, "");
+	wts.rawlogde.fd = opnforlog(&tim, ".raw");
+	wts.writelg = wts.writerawlg = 1;
 }
 
 static void prepfordtach(void)
@@ -667,8 +651,8 @@ static void prepfordtach(void)
 }
 
 struct iterprofspec {
-	/* fd to which to send any non-log, non-diagnostic output. */
-	int sigfd;
+	/* where to send any non-log, non-diagnostic output. */
+	struct wrides *sigde;
 
 	/* output canon term link for each profile to sigfd */
 	unsigned canonterm	: 1;
@@ -716,10 +700,7 @@ static int proflines(
 	char fld, eofield, namemat, err = 0, startedjs;
 	char begunprenam, c;
 
-	struct fdbuf sigbuf = {
-		.fd = spc->sigfd,
-		.escannot = spc->annotsig ? "profsig" : 0,
-	};
+	struct fdbuf sigbuf = {spc->sigde};
 
 	if (spc->canonterm) {
 		fdb_apnd(&sigbuf, "<ul id=\"ctl-", -1);
@@ -856,7 +837,7 @@ static void iterprofs(const char *ppaths_, const struct iterprofspec *spc)
 					fprintf(stderr,
 						"  skipped file '%s'\n",
 						den->d_name);
-				continue;
+				goto doneproffile;
 			}
 
 			if (spc->diaglog)
@@ -874,6 +855,8 @@ doneproffile:
 			free(ffn);
 			ffn = NULL;
 		}
+
+		closedir(pd);
 	}
 
 	free(ppaths);
@@ -897,14 +880,14 @@ static const char *profpath(void)
 	return p;
 }
 
-void recount_state(int fd)
+void recount_state(struct wrides *de)
 {
-	full_write(fd, "altscreen recount", wts.altscren ? "\\s2" : "\\s1", -1);
-	if (wts.ttl[0]) recountttl(fd);
+	full_write(de, wts.altscren ? "\\s2" : "\\s1", -1);
+	if (wts.ttl[0]) recountttl(de);
 
 	if (termid) {
 		iterprofs(profpath(), &((struct iterprofspec){
-			.sigfd = fd,
+			.sigde = de,
 			.sendauxjs = 1,
 			.diaglog = 1,
 		}));
@@ -913,17 +896,19 @@ void recount_state(int fd)
 
 void send_pream(int fd)
 {
+	struct wrides de = { fd };
+
 	if (logview) {
-		full_write(fd, "logview init 1", ". $WERMDIR/logview ", -1);
-		full_write(fd, "logview init 2", logview, -1);
-		full_write(fd, "logview init 3", "\r", -1);
+		full_write(&de, ". $WERMDIR/logview ", -1);
+		full_write(&de, logview, -1);
+		full_write(&de, "\r", -1);
 		return;
 	}
 
 	if (!termid) return;
 
 	iterprofs(profpath(), &((struct iterprofspec){
-		.sigfd = fd,
+		.sigde = &de,
 		.sendpream = 1,
 		.diaglog = 1,
 	}));
@@ -931,10 +916,10 @@ void send_pream(int fd)
 
 static void writetosubproccore(
 	/* Where to send output for the process; this is raw keyboard input. */
-	int outfd,
+	struct wrides *procde,
 
 	/* Where to send output for attached client. */
-	int clioutfd,
+	struct wrides *clioutde,
 
 	/* Data received from client which is the escaped keyboard input. */
 	const unsigned char *buf,
@@ -942,10 +927,7 @@ static void writetosubproccore(
 {
 	unsigned wi, ri, row, col;
 	unsigned char byte, cursmvbyte;
-	struct fdbuf kbdb = {
-		.fd = outfd,
-		.escannot = outfd == 1 ? "kbd" : NULL,
-	};
+	struct fdbuf kbdb = {procde};
 
 	wts.sendsigwin = 0;
 
@@ -1029,7 +1011,7 @@ static void writetosubproccore(
 			}
 			if (wts.altbufsz < sizeof wts.ttl)
 				wts.ttl[wts.altbufsz++] = byte;
-			if (!byte) recountttl(clioutfd);
+			if (!byte) recountttl(clioutde);
 
 			break;
 
@@ -1042,6 +1024,8 @@ static void writetosubproccore(
 
 void forward_stdin(int sock)
 {
+	struct wrides de = { sock };
+
 	ssize_t red;
 	unsigned char buf[512];
 
@@ -1049,14 +1033,16 @@ void forward_stdin(int sock)
 	if (!red) errx(1, "nothing on stdin");
 	if (red == -1) err(1, "read from stdin");
 
-	full_write(sock, "forward stdin", buf, red);
+	full_write(&de, buf, red);
 }
 
 void process_kbd(int ptyfd, int clioutfd, unsigned char *buf, size_t bufsz)
 {
+	struct wrides ptyde = { ptyfd }, clide = { clioutfd };
+
 	struct winsize ws = {0};
 
-	writetosubproccore(ptyfd, clioutfd, buf, bufsz);
+	writetosubproccore(&ptyde, &clide, buf, bufsz);
 
 	if (!wts.sendsigwin) return;
 
@@ -1072,195 +1058,211 @@ static void testreset(void)
 
 	free(termid);
 	termid = NULL;
-
-	fflush(stdout);
 }
 
 static void writetosp0term(const char *s)
 {
+	struct wrides pty = {1, "pty"}, cli = {1, "cli"};
+
 	size_t len;
 
 	len = strlen(s);
 
-	writetosubproccore(1, 1, (const unsigned char *)s, len);
+	writetosubproccore(&pty, &cli, (const unsigned char *)s, len);
 
-	if (wts.sendsigwin) printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
+	if (wts.sendsigwin)
+		dprintf(1, "sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
 }
+
+static void tstdesc(const char *d) { dprintf(1, "TEST: %s\n", d); }
 
 static void testiterprofs(void)
 {
-	puts("empty WERMPROFPATH");
+	struct wrides sigde = {1, "profsig"};
+
+	tstdesc("empty WERMPROFPATH");
 	testreset();
 
 	iterprofs("", &((struct iterprofspec){ 0 }));
 
-	puts("non-existent and empty dirs in WERMPROFPATH");
+	tstdesc("non-existent and empty dirs in WERMPROFPATH");
 	testreset();
 	iterprofs(
 		"test/profilesnoent::test/profiles1",
 		&((struct iterprofspec){ 0 }));
 
-	puts("match js and print");
+	tstdesc("match js and print");
 	testreset();
 	termid = strdup("hasstuff");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendauxjs = 1,
 	}));
 
-	puts("name error but matches other line to print auxjs");
+	tstdesc("name error but matches other line to print auxjs");
 	testreset();
 	termid = strdup("bad.name");
 	iterprofs("test/profiles2", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendauxjs = 1,
 	}));
 
-	puts("name error no match");
+	tstdesc("name error no match");
 	testreset();
 	termid = strdup("xyz");
 	iterprofs("test/profiles2", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendauxjs = 1,
 	}));
 
-	puts("name error but matches other line to print preamble");
+	tstdesc("name error but matches other line to print preamble");
 	testreset();
 	termid = strdup("bad");
 	iterprofs("test/profiles2", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendpream = 1,
 	}));
 
-	puts("empty preamble for match 1");
+	tstdesc("empty preamble for match 1");
 	testreset();
 	termid = strdup("allempty");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendpream = 1,
 	}));
 
-	puts("empty preamble for match 2");
+	tstdesc("empty preamble for match 2");
 	testreset();
 	termid = strdup("emptypream");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendpream = 1,
 	}));
 
-	puts("empty preamble for match 3");
+	tstdesc("empty preamble for match 3");
 	testreset();
 	termid = strdup("emptypreamjs");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendpream = 1,
 	}));
 
-	puts("long preamble 1");
+	tstdesc("long preamble 1");
 	testreset();
 	termid = strdup("longpream1");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendpream = 1,
 	}));
 
-	puts("long preamble 2");
+	tstdesc("long preamble 2");
 	testreset();
 	termid = strdup("longpream2");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendpream = 1,
 	}));
 
-	puts("empty js for match 1");
+	tstdesc("empty js for match 1");
 	testreset();
 	termid = strdup("emptypreamjs");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendauxjs = 1,
 	}));
 
-	puts("empty js for match 2");
+	tstdesc("empty js for match 2");
 	testreset();
 	termid = strdup("allempty");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendauxjs = 1,
 	}));
 
-	puts("empty js for match 3");
+	tstdesc("empty js for match 3");
 	testreset();
 	termid = strdup("emptyjs1");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendauxjs = 1,
 	}));
 
-	puts("empty js for match 4");
+	tstdesc("empty js for match 4");
 	testreset();
 	termid = strdup("emptyjs2");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.sendauxjs = 1,
 	}));
 
-	puts("url-encoding-related chars not allowed in termid");
+	tstdesc("url-encoding-related chars not allowed in termid");
 	testreset();
 	iterprofs("test/profiles3", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 	}));
 
-	puts("bad names while outputting canonical terminal list");
+	tstdesc("bad names while outputting canonical terminal list");
 	testreset();
 	iterprofs("test/profiles3", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.canonterm = 1,
-		.annotsig = 1,
 	}));
 
-	puts("dump canonterm list");
+	tstdesc("dump canonterm list");
 	testreset();
 	iterprofs("test/profilesname", &((struct iterprofspec) {
-		.sigfd = 1,
+		&sigde,
 		.canonterm = 1,
 	}));
+}
+
+static void recountstate4test(void)
+{
+	recount_state(&((struct wrides){ 1, "recount_state" }));
+}
+
+static void writelgon(void)
+{
+	wts.logde.fd = 1;
+	wts.writelg = 1;
+	wts.logde.escannot = "sblog";
 }
 
 static void _Noreturn testmain(void)
 {
 	int i;
 
-	puts("WRITE_TO_SUBPROC_CORE");
+	tstdesc("WRITE_TO_SUBPROC_CORE");
 
-	puts("should ignore newline:");
+	tstdesc("should ignore newline:");
 	testreset();
 	writetosp0term("hello\n how are you\n");
 
-	puts("empty string:");
+	tstdesc("empty string:");
 	testreset();
 	writetosp0term("");
 
-	puts("no-op escape \\N:");
+	tstdesc("no-op escape \\N:");
 	testreset();
 	writetosp0term("\\N");
 
-	puts("change window size after \\N:");
+	tstdesc("change window size after \\N:");
 	testreset();
 	writetosp0term("\\N\\w00990011");
 
-	puts("missing newline:");
+	tstdesc("missing newline:");
 	testreset();
 	writetosp0term("asdf");
 
-	puts("sending sigwinch:");
+	tstdesc("sending sigwinch:");
 	testreset();
 	writetosp0term("about to resize...\\w00910042...all done");
 
-	puts("escape seqs:");
+	tstdesc("escape seqs:");
 	testreset();
 	writetosp0term("line one\\nline two\\nline 3 \\\\ (reverse solidus)\\n\n");
 
-	puts("escape seqs straddling:");
+	tstdesc("escape seqs straddling:");
 	testreset();
 
 	writetosp0term("line one\\nline two\\");
@@ -1271,14 +1273,14 @@ static void _Noreturn testmain(void)
 
 	writetosp0term("00140");
 
-	puts("TEE_TTY_CONTENT");
+	tstdesc("TEE_TTY_CONTENT");
 
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("hello", -1);
-	puts("pending line");
+	tstdesc("pending line");
 	process_tty_out("\r\n", -1);
-	puts("finished line");
+	tstdesc("finished line");
 
 	do {
 		int i = 0;
@@ -1290,42 +1292,42 @@ static void _Noreturn testmain(void)
 	process_tty_out("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
 	process_tty_out("abcdef\b\r\n", -1);
 
-	puts("move back x2 and delete to eol");
+	tstdesc("move back x2 and delete to eol");
 	process_tty_out("abcdef\b\b\033[K\r\n", -1);
 
-	puts("move back x1 and insert");
+	tstdesc("move back x1 and insert");
 	process_tty_out("asdf\bxy\r\n", -1);
 
-	puts("move back and forward");
+	tstdesc("move back and forward");
 	process_tty_out("asdf\b\033[C\r\n", -1);
 
-	puts("move back x2 and forward x1, then del to EOL");
+	tstdesc("move back x2 and forward x1, then del to EOL");
 	process_tty_out("asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
 
-	puts("as above, but in separate calls");
+	tstdesc("as above, but in separate calls");
 	process_tty_out("asdf\b\b", -1);
 	process_tty_out("\033[C", -1);
 	process_tty_out("\033[K", -1);
 	process_tty_out("\r\n", -1);
 
-	puts("move left x3, move right x2, del EOL; 'right' seq in sep calls");
+	tstdesc("move left x3, move right x2, del EOL; 'right' seq in sep calls");
 	process_tty_out("123 UIO\b\b\b" "\033[", -1);
 	process_tty_out("C" "\033", -1);
 	process_tty_out("[C", -1);
 	process_tty_out("\033[K", -1);
 	process_tty_out("\r\n", -1);
 
-	puts("drop console title escape seq");
+	tstdesc("drop console title escape seq");
 	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
 	process_tty_out("abc\033]0;title\007xyz\r\n", -1);
 	process_tty_out("abc\033]1;title\007xyz\r\n", -1);
 	process_tty_out("123\033]2;title\007" "456\r\n", -1);
 
-	puts("drop console title escape seq; separate calls");
+	tstdesc("drop console title escape seq; separate calls");
 	process_tty_out("abc\033]0;ti", -1);
 	process_tty_out("tle\007xyz\r\n", -1);
 
-	puts("bracketed paste mode");
+	tstdesc("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
 
 	/* \r after paste mode off */
@@ -1338,7 +1340,7 @@ static void _Noreturn testmain(void)
 	process_tty_out("\033[?2004lhello\033[?2004h", -1);
 	process_tty_out(") after\r\n", -1);
 
-	puts("drop color and font");
+	tstdesc("drop color and font");
 	process_tty_out("before : ", -1);
 	process_tty_out("\033[1;35mafter\r\n", -1);
 
@@ -1351,10 +1353,10 @@ static void _Noreturn testmain(void)
 
 	process_tty_out("first ;; \033[1;31msecond\r\n", -1);
 
-	puts("\\r to move to start of line");
+	tstdesc("\\r to move to start of line");
 	process_tty_out("xyz123\rXYZ\r\n", -1);
 
-	puts("something makes the logs stop");
+	tstdesc("something makes the logs stop");
 	process_tty_out(
 		"\033[?2004h[0]~$ l\b"
 		"\033[Kseq 1 | less\r"
@@ -1369,44 +1371,44 @@ static void _Noreturn testmain(void)
 		, -1
 	);
 
-	puts("\\r then delete line");
+	tstdesc("\\r then delete line");
 	process_tty_out("abc\r\033[Kfoo\r\n", -1);
 
-	puts("arrow keys are translated to escape sequences");
+	tstdesc("arrow keys are translated to escape sequences");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 
-	puts("app cursor off: up,down,right,left=ESC [ A,B,C,D");
+	tstdesc("app cursor off: up,down,right,left=ESC [ A,B,C,D");
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");
 
-	puts("app cursor on: same codes as when off but O instead of [");
+	tstdesc("app cursor on: same codes as when off but O instead of [");
 	process_tty_out("\033[?1h", -1);
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");
 
-	puts("bad input tolerance: terminate OS cmd without char 7");
+	tstdesc("bad input tolerance: terminate OS cmd without char 7");
 	process_tty_out("\033]0;foobar\rdon't hide me\r\n", -1);
 
-	puts("backward to negative linepos, then dump line to log");
+	tstdesc("backward to negative linepos, then dump line to log");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("\r\010\010\010x\n", -1);
 
-	puts("escape before sending to attached clients");
+	tstdesc("escape before sending to attached clients");
 	testreset();
 	process_tty_out("abcd\r\n", -1);
 	process_tty_out("xyz\b\t\r\n", -1);
 	putrwout();
 
-	puts("pass OS escape to client");
+	tstdesc("pass OS escape to client");
 	testreset();
 	process_tty_out("\033]0;asdf\007xyz\r\n", -1);
 	putrwout();
 
-	puts("simplify alternate mode signal");
+	tstdesc("simplify alternate mode signal");
 	testreset();
 	process_tty_out("\033[?47h" "hello\r\n" "\033[?47l", -1);
 
@@ -1417,12 +1419,12 @@ static void _Noreturn testmain(void)
 	process_tty_out("\033[?1047h" "hello\r\n" "\033[?1047l", -1);
 	putrwout();
 
-	puts("regression");
+	tstdesc("regression");
 	testreset();
 	process_tty_out("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040", -1);
 	putrwout();
 
-	puts("passthrough escape \\033[1P from subproc to client");
+	tstdesc("passthrough escape \\033[1P from subproc to client");
 	testreset();
 	process_tty_out("\033[1P", -1);
 	putrwout();
@@ -1436,136 +1438,134 @@ static void _Noreturn testmain(void)
 	process_tty_out("\033[16P", -1);
 	putrwout();
 
-	puts("delete 5 characters ahead");
+	tstdesc("delete 5 characters ahead");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n", -1);
 
-	puts("delete 12 characters ahead");
+	tstdesc("delete 12 characters ahead");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n", -1);
 
-	puts("delete 16 characters ahead");
+	tstdesc("delete 16 characters ahead");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n", -1);
 
-	puts("save rawout from before OS escape");
+	tstdesc("save rawout from before OS escape");
 	testreset();
 	process_tty_out("abc\033]0;new-t", -1);
 	putrwout();
-	puts("<between calls>");
+	tstdesc("<between calls>");
 	process_tty_out("itle\007xyz\r\n", -1);
 	putrwout();
 
-	puts("1049h/l code for switching to/from alternate screen + other ops");
+	tstdesc("1049h/l code for switching to/from alternate screen + other ops");
 	testreset();
 	process_tty_out("abc \033[?1049h", -1);
 	process_tty_out("-in-\033[?1049lout", -1);
 	putrwout();
 
-	puts("dump of state");
+	tstdesc("dump of state");
 	testreset();
-	recount_state(1); full_write(1, "newline", "\n", -1);
+	recountstate4test();
 	process_tty_out("\033[?47h", -1); putrwout();
-	recount_state(1); full_write(1, "newline", "\n", -1);
-	recount_state(1); full_write(1, "newline", "\n", -1);
+	recountstate4test();
+	recountstate4test();
 	process_tty_out("\033[?47l", -1); putrwout();
-	recount_state(1); full_write(1, "newline", "\n", -1);
+	recountstate4test();
 	process_tty_out("\033[?1049h", -1); putrwout();
-	recount_state(1); full_write(1, "newline", "\n", -1);
+	recountstate4test();
 	process_tty_out("\033[?1049l", -1); putrwout();
-	recount_state(1); full_write(1, "newline", "\n", -1);
+	recountstate4test();
 
-	puts("do not save bell character in plain text log");
+	tstdesc("do not save bell character in plain text log");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("ready...\007 D I N G!\r\n", -1);
 
-	puts("editing a long line");
+	tstdesc("editing a long line");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	writetosp0term("\\w00300104");
 	process_tty_out(test_lineed_in, 0xf8);
 	process_tty_out("\n", -1);
 
-	puts("editing a long line in a narrower window");
+	tstdesc("editing a long line in a narrower window");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	writetosp0term("\\w00800061");
 	process_tty_out(test_lineednar_in, -1);
 	process_tty_out("\n", -1);
 
-	puts("go up more rows than exist in the linebuf");
+	tstdesc("go up more rows than exist in the linebuf");
 	testreset();
 	writetosp0term("\\w00800060");
 	process_tty_out("\033[Axyz\r\n", -1);
 
-	puts("set long then shorter title");
+	tstdesc("set long then shorter title");
 	testreset();
 	writetosp0term("\\tlongtitle\n");
 	putrwout();
 	writetosp0term("\\t1+1++1\n");
 	putrwout();
 
-	puts("title in recounted state");
+	tstdesc("title in recounted state");
 	testreset();
 	writetosp0term("\\tsometitle\n");
 	putrwout();
-	printf("  recount: ");
-	recount_state(1);
+	recountstate4test();
 	putrwout();
 
-	puts("... continued: unset title, respond with empty title");
+	tstdesc("... continued: unset title, respond with empty title");
 	writetosp0term("thisisnormalkeybinput\\t\n");
 	putrwout();
-	printf("  recount (should not include title here): ");
-	recount_state(1);
-	putrwout(); putchar('\n');
+	dprintf(1, "(should not include title here): ");
+	recountstate4test();
+	putrwout();
 
-	puts("title is too long");
-	wts.logfd = 1;
+	tstdesc("title is too long");
+	writelgon();
 	process_tty_out("this is plain terminal text", -1);
 	writetosp0term("\\t");
 	for (i = 0; i < sizeof(wts); i++) writetosp0term("abc");
 	writetosp0term("\n");
-	printf("rout buffer: ");
 	putrwout();
 	/* line buffer should not be clobbered by overflowing ttl buffer. */
-	printf("log: ");
 	process_tty_out("\r\n", -1);
-	printf("stored title length: %zu\n", strnlen(wts.ttl, sizeof wts.ttl));
+	dprintf(1, "stored title length: %zu\n",
+		strnlen(wts.ttl, sizeof wts.ttl));
 
-	puts("do not include altscreen content in scrollback log");
-	wts.logfd = 1;
+	tstdesc("do not include altscreen content in scrollback log");
+	writelgon();
 	process_tty_out("xyz\r\nabc\033[?1049h", -1);
 	process_tty_out("defg", -1);
 	process_tty_out("hijk\033[?1049lrest\r\n", -1);
 
-	puts("move to col");
+	tstdesc("move to col");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out(test_jumptocol_in, test_jumptocol_in_size);
 
-	puts("move to col 2");
+	tstdesc("move to col 2");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("asdf\033[2Gxyz\r\n", -1);
 
-	puts("shift rest of line then overwrite");
+	tstdesc("shift rest of line then overwrite");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("asdf 01234\r\033[4Pxyz\n", -1);
 
-	puts("shift remaining characters right");
+	tstdesc("shift remaining characters right");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	process_tty_out("asdf\r\033[10@xyz\n", -1);
 
-	puts("shift remaining characters right more");
+	tstdesc("shift remaining characters right more");
 	testreset();
-	wts.logfd = 1;
+	writelgon();
 	/* 10000 is too large; it should be ignored */
 	process_tty_out("asdf\r\033[10000@xyz\r\n", -1);
 	process_tty_out("asdf\r\033[15@xyz\r\n", -1);
@@ -1578,11 +1578,11 @@ static void _Noreturn testmain(void)
 	process_tty_out("\033[10@", -1);
 	process_tty_out("..more:)\r\n", -1);
 
-	puts("move more characters right than are in the line");
+	tstdesc("move more characters right than are in the line");
 	process_tty_out("abcd\r\033[1000@!!!!\r\n", -1);
 	process_tty_out("abcd\r\033[50@!!!!\r\n", -1); 
 
-	puts("make long line too big to fit into buffer");
+	tstdesc("make long line too big to fit into buffer");
 	for (i = 0; i < sizeof(wts.linebuf) - 1; i++) process_tty_out("*", -1);
 	process_tty_out("\r\033[32@!!!\r\n", -1);
 
@@ -1609,7 +1609,7 @@ int main(int argc, char **argv)
 	if (1 == argc && !strcmp("test", *argv)) testmain();
 	if (1 == argc && !strcmp("canontermlinks", *argv)) {
 		iterprofs(profpath(), &((struct iterprofspec){
-			.sigfd = 1,
+			.sigde = &((struct wrides){ 1 }),
 			.canonterm = 1,
 			.diaglog = 1,
 		}));

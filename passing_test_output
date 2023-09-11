@@ -1,207 +1,207 @@
-WRITE_TO_SUBPROC_CORE
-should ignore newline:
-kbd[hello how are you]
-empty string:
-no-op escape \N:
-change window size after \N:
+TEST: WRITE_TO_SUBPROC_CORE
+TEST: should ignore newline:
+pty[hello how are you]
+TEST: empty string:
+TEST: no-op escape \N:
+TEST: change window size after \N:
 sigwin r=99 c=11
-missing newline:
-kbd[asdf]
-sending sigwinch:
-kbd[about to resize......all done]
+TEST: missing newline:
+pty[asdf]
+TEST: sending sigwinch:
+pty[about to resize......all done]
 sigwin r=91 c=42
-escape seqs:
-kbd[line one\012line two\012line 3 \134 (reverse solidus)\012]
-escape seqs straddling:
-kbd[line one\012line two]
-kbd[\012line 3 ]
-kbd[\134 (reverse solidus)\012]
+TEST: escape seqs:
+pty[line one\012line two\012line 3 \\ (reverse solidus)\012]
+TEST: escape seqs straddling:
+pty[line one\012line two]
+pty[\012line 3 ]
+pty[\\ (reverse solidus)\012]
 sigwin r=120 c=140
-TEE_TTY_CONTENT
-pending line
-hello
-finished line
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[exceeded]
-abcxyz
-abcdef
-move back x2 and delete to eol
-abcd
-move back x1 and insert
-asdxy
-move back and forward
-asdf
-move back x2 and forward x1, then del to EOL
-asd
-as above, but in separate calls
-asd
-move left x3, move right x2, del EOL; 'right' seq in sep calls
-123 UI
-drop console title escape seq
-abcxyz
-abcxyz
-123456
-drop console title escape seq; separate calls
-abcxyz
-bracketed paste mode
-hello) after
-before (hello) after
-drop color and font
-before : after
-before : after
-before : After
-first ;; second
-\r to move to start of line
-XYZ123
-something makes the logs stop
-[0]~$ seq 1 | less
-[0]~$ # asdf
-\r then delete line
-foo
-arrow keys are translated to escape sequences
-app cursor off: up,down,right,left=ESC [ A,B,C,D
-kbd[left (\033[D \033[D)\015]
-kbd[up down up (\033[A \033[B \033[A)\015]
-kbd[right (\033[C)\015]
-app cursor on: same codes as when off but O instead of [
-kbd[left (\033OD \033OD)\015]
-kbd[up down up (\033OA \033OB \033OA)\015]
-kbd[right (\033OC)\015]
-bad input tolerance: terminate OS cmd without char 7
-don't hide me
-backward to negative linepos, then dump line to log
-x
-escape before sending to attached clients
-abcd\0d\0a
-xyz\08\09\0d\0a
-pass OS escape to client
-\1b]0;asdf\07xyz\0d\0a
-simplify alternate mode signal
-\1b[?47\s2hhello\0d\0a\1b[?47\s1l
-\1b[
-?47\s2hhello\0d\0a\1b
-[?47\s1l
-\1b[?1047\s2hhello\0d\0a\1b[?1047\s1l
-regression
-\1b[?2004h\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ \0d\1b[K\1b]0;matvore@penguin: ~\07\1b[01;32mmatvore@penguin\1b[00m:\1b[01;34m~\1b[00m$ 
-passthrough escape \033[1P from subproc to client
-\1b[1P
-\1b[4P
-\1b[5P
-\1b[16P
-delete 5 characters ahead
-$ sdfasdf # asdfasdfasdf
-delete 12 characters ahead
-$  # asdfasdfasdf
-delete 16 characters ahead
-$ sdfasdfasdf
-save rawout from before OS escape
-abc\1b]0;new-t
-<between calls>
-itle\07xyz\0d\0a
-1049h/l code for switching to/from alternate screen + other ops
-abc \1b[?1049\ss\s2\clh
--in-\1b[?1049\s1\rslout
-dump of state
-\s1
-\1b[?47\s2h
-\s2
-\s2
-\1b[?47\s1l
-\s1
-\1b[?1049\ss\s2\clh
-\s2
-\1b[?1049\s1\rsl
-\s1
-do not save bell character in plain text log
-ready... D I N G!
-editing a long line
+TEST: TEE_TTY_CONTENT
+TEST: pending line
+sblog[hello\012]
+TEST: finished line
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
+sblog[[exceeded]\012]
+sblog[abcxyz\012]
+sblog[abcdef\012]
+TEST: move back x2 and delete to eol
+sblog[abcd\012]
+TEST: move back x1 and insert
+sblog[asdxy\012]
+TEST: move back and forward
+sblog[asdf\012]
+TEST: move back x2 and forward x1, then del to EOL
+sblog[asd\012]
+TEST: as above, but in separate calls
+sblog[asd\012]
+TEST: move left x3, move right x2, del EOL; 'right' seq in sep calls
+sblog[123 UI\012]
+TEST: drop console title escape seq
+sblog[abcxyz\012]
+sblog[abcxyz\012]
+sblog[123456\012]
+TEST: drop console title escape seq; separate calls
+sblog[abcxyz\012]
+TEST: bracketed paste mode
+sblog[hello) after\012]
+sblog[before (hello) after\012]
+TEST: drop color and font
+sblog[before : after\012]
+sblog[before : after\012]
+sblog[before : After\012]
+sblog[first ;; second\012]
+TEST: \r to move to start of line
+sblog[XYZ123\012]
+TEST: something makes the logs stop
+sblog[[0]~$ seq 1 | less\012]
+sblog[[0]~$ # asdf\012]
+TEST: \r then delete line
+sblog[foo\012]
+TEST: arrow keys are translated to escape sequences
+TEST: app cursor off: up,down,right,left=ESC [ A,B,C,D
+pty[left (\033[D \033[D)\015]
+pty[up down up (\033[A \033[B \033[A)\015]
+pty[right (\033[C)\015]
+TEST: app cursor on: same codes as when off but O instead of [
+pty[left (\033OD \033OD)\015]
+pty[up down up (\033OA \033OB \033OA)\015]
+pty[right (\033OC)\015]
+TEST: bad input tolerance: terminate OS cmd without char 7
+sblog[don't hide me\012]
+TEST: backward to negative linepos, then dump line to log
+sblog[x\012]
+TEST: escape before sending to attached clients
+putrwout[abcd\\0d\\0a\012xyz\\08\\09\\0d\\0a\012]
+TEST: pass OS escape to client
+putrwout[\\1b]0;asdf\\07xyz\\0d\\0a\012]
+TEST: simplify alternate mode signal
+putrwout[\\1b[?47\\s2hhello\\0d\\0a\\1b[?47\\s1l\012\\1b[\012?47\\s2hhello\\0d\\0a\\1b\012[?47\\s1l\012\\1b[?1047\\s2hhello\\0d\\0a\\1b[?1047\\s1l\012]
+TEST: regression
+putrwout[\\1b[?2004h\\1b]0;matvore@penguin: ~\\07\\1b[01;32mmatvore@penguin\\1b[00m:\\1b[01;34m~\\1b[00m$ \\0d\\1b[K\\1b]0;matvore@penguin: ~\\07\\1b[01;32mmatvore@penguin\\1b[00m:\\1b[01;34m~\\1b[00m$ \012]
+TEST: passthrough escape \033[1P from subproc to client
+putrwout[\\1b[1P\012]
+putrwout[\\1b[4P\012]
+putrwout[\\1b[5P\012]
+putrwout[\\1b[16P\012]
+TEST: delete 5 characters ahead
+sblog[$ sdfasdf # asdfasdfasdf\012]
+TEST: delete 12 characters ahead
+sblog[$  # asdfasdfasdf\012]
+TEST: delete 16 characters ahead
+sblog[$ sdfasdfasdf\012]
+TEST: save rawout from before OS escape
+putrwout[abc\\1b]0;new-t\012]
+TEST: <between calls>
+putrwout[itle\\07xyz\\0d\\0a\012]
+TEST: 1049h/l code for switching to/from alternate screen + other ops
+putrwout[abc \\1b[?1049\\ss\\s2\\clh\012-in-\\1b[?1049\\s1\\rslout\012]
+TEST: dump of state
+recount_state[\\s1]
+putrwout[\\1b[?47\\s2h\012]
+recount_state[\\s2]
+recount_state[\\s2]
+putrwout[\\1b[?47\\s1l\012]
+recount_state[\\s1]
+putrwout[\\1b[?1049\\ss\\s2\\clh\012]
+recount_state[\\s2]
+putrwout[\\1b[?1049\\s1\\rsl\012]
+recount_state[\\s1]
+TEST: do not save bell character in plain text log
+sblog[ready... D I N G!\012]
+TEST: editing a long line
 sigwin r=30 c=104
-cd platform2
-[0]platform2$ git log --graph --format="%ct %h %s" |perl -pE'/^(.*[^0-9])?(\d{8,10})\b(.*)/ and $_=$1.`d\n//'|less 
-editing a long line in a narrower window
+sblog[cd platform2\012]
+sblog[[0]platform2$ git log --graph --format="%ct %h %s" |perl -pE'/^(.*[^0-9])?(\\d{8,10})\\b(.*)/ and $_=$1.`d\\n//'|less \012]
+TEST: editing a long line in a narrower window
 sigwin r=80 c=61
-matvore@penguin:~$ echo a --------------------------------------------------------------------------------
-go up more rows than exist in the linebuf
+sblog[matvore@penguin:~$ echo a --------------------------------------------------------------------------------\012]
+TEST: go up more rows than exist in the linebuf
 sigwin r=80 c=60
-set long then shorter title
-\@title:longtitle
-\@title:1+1++1
-title in recounted state
-\@title:sometitle
-  recount: \s1\@title:sometitle
-... continued: unset title, respond with empty title
-\@title:
-kbd[thisisnormalkeybinput]
-  recount (should not include title here): \s1
-title is too long
-\@title:abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab
-rout buffer: this is plain terminal text
-log: this is plain terminal text
+TEST: set long then shorter title
+cli[\\@title:longtitle\012]
+cli[\\@title:1+1++1\012]
+TEST: title in recounted state
+cli[\\@title:sometitle\012]
+recount_state[\\s1]
+recount_state[\\@title:sometitle\012]
+TEST: ... continued: unset title, respond with empty title
+cli[\\@title:\012]
+pty[thisisnormalkeybinput]
+(should not include title here): recount_state[\\s1]
+TEST: title is too long
+cli[\\@title:abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab]
+cli[cabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc]
+cli[abcabcab\012]
+putrwout[this is plain terminal text\012]
+sblog[this is plain terminal text\012]
 stored title length: 128
-do not include altscreen content in scrollback log
-xyz
-abcrest
-move to col
-] 
-cts-tf > run cts -m CtsInitTestCases -t keychords#init_inotify
-move to col 2
-axyz
-shift rest of line then overwrite
-xyz234
-shift remaining characters right
-xyz       asdf
-shift remaining characters right more
-xyz 
-xyz            asdf
-:)xyz  ..more
-:)xyzmore
-12345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345..more:)  6123456123456123456123456123456123456123456123456
-move more characters right than are in the line
-!!!!                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    abcd
-!!!!                                              abcd
-make long line too big to fit into buffer
-!!!                             *******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
-empty WERMPROFPATH
-non-existent and empty dirs in WERMPROFPATH
+TEST: do not include altscreen content in scrollback log
+sblog[xyz\012]
+sblog[abcrest\012]
+TEST: move to col
+sblog[] \012]
+sblog[cts-tf > run cts -m CtsInitTestCases -t keychords#init_inotify\012]
+TEST: move to col 2
+sblog[axyz\012]
+TEST: shift rest of line then overwrite
+sblog[xyz234\012]
+TEST: shift remaining characters right
+sblog[xyz       asdf\012]
+TEST: shift remaining characters right more
+sblog[xyz \012]
+sblog[xyz            asdf\012]
+sblog[:)xyz  ..more\012]
+sblog[:)xyzmore\012]
+sblog[12345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345..more:)  6123456123456123456123456123456123456123456123456\012]
+TEST: move more characters right than are in the line
+sblog[!!!!                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    abcd\012]
+sblog[!!!!                                              abcd\012]
+TEST: make long line too big to fit into buffer
+sblog[!!!                             *******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************\012]
+TEST: empty WERMPROFPATH
+TEST: non-existent and empty dirs in WERMPROFPATH
 reading profile dir at: test/profilesnoent
 opendir: No such file or directory
 reading profile dir at: test/profiles1
-match js and print
+TEST: match js and print
 reading profile dir at: test/profiles1
-\@auxjs:myjsjs,stuffmacrosjs
-name error but matches other line to print auxjs
+profsig[\\@auxjs:myjsjs,stuffmacrosjs\012]
+TEST: name error but matches other line to print auxjs
 reading profile dir at: test/profiles2
 illegal char '.' in profile name group=errgrp line=1
-\@auxjs:okjs
-name error no match
+profsig[\\@auxjs:okjs\012]
+TEST: name error no match
 reading profile dir at: test/profiles2
 illegal char '.' in profile name group=errgrp line=1
 profile with name 'xyz' not found
-name error but matches other line to print preamble
+TEST: name error but matches other line to print preamble
 reading profile dir at: test/profiles2
 illegal char '.' in profile name group=errgrp line=1
-better
-empty preamble for match 1
+profsig[better\012]
+TEST: empty preamble for match 1
 reading profile dir at: test/profiles1
-empty preamble for match 2
+TEST: empty preamble for match 2
 reading profile dir at: test/profiles1
-empty preamble for match 3
+TEST: empty preamble for match 3
 reading profile dir at: test/profiles1
-long preamble 1
+TEST: long preamble 1
 reading profile dir at: test/profiles1
-abcdefghijklmnopqrstuvwxyz1234abcdefghijklmnopqrstuvwxyz1234abcdefghijklmnopqrstuvwxyz1234
-long preamble 2
+profsig[abcdefghijklmnopqrstuvwxyz1234abcdefghijklmnopqrstuvwxyz1234abcd]
+profsig[efghijklmnopqrstuvwxyz1234\012]
+TEST: long preamble 2
 reading profile dir at: test/profiles1
-ABCDEFGHIJKLMNOPQRSTUVWXYZ1234ABCDEFGHIJKLMNOPQRSTUVWXYZ1234ABCDEFGHIJKLMNOPQRSTUVWXYZ1234
-empty js for match 1
+profsig[ABCDEFGHIJKLMNOPQRSTUVWXYZ1234ABCDEFGHIJKLMNOPQRSTUVWXYZ1234ABCD]
+profsig[EFGHIJKLMNOPQRSTUVWXYZ1234\012]
+TEST: empty js for match 1
 reading profile dir at: test/profiles1
-empty js for match 2
+TEST: empty js for match 2
 reading profile dir at: test/profiles1
-empty js for match 3
+TEST: empty js for match 3
 reading profile dir at: test/profiles1
-empty js for match 4
+TEST: empty js for match 4
 reading profile dir at: test/profiles1
-url-encoding-related chars not allowed in termid
+TEST: url-encoding-related chars not allowed in termid
 reading profile dir at: test/profiles3
 illegal char '&' in profile name group=badnames line=1
 illegal char '+' in profile name group=badnames line=2
@@ -212,7 +212,7 @@ illegal char '?' in profile name group=badnames line=6
 illegal char '\' in profile name group=badnames line=7
 illegal char '/' in profile name group=badnames line=7
 illegal char '"' in profile name group=badnames line=8
-bad names while outputting canonical terminal list
+TEST: bad names while outputting canonical terminal list
 reading profile dir at: test/profiles3
 illegal char '&' in profile name group=badnames line=1
 illegal char '+' in profile name group=badnames line=2
@@ -225,9 +225,12 @@ illegal char '\' in profile name group=badnames line=7
 illegal char '/' in profile name group=badnames line=7
 illegal char '"' in profile name group=badnames line=8
 profsig[term-link" href="/?termid=okname">okname</a></ul>\012]
-dump canonterm list
+TEST: dump canonterm list
 reading profile dir at: test/profilesname
-<ul id="ctl-thegrp" class="canonterm-list"><li><a class="canonterm-link" href="/?termid=item1">item1</a><li><a class="canonterm-link" href="/?termid=foo">foo</a><li><a class="canonterm-link" href="/?termid=item3">item3</a></ul>
+profsig[<ul id="ctl-thegrp" class="canonterm-list"><li><a class="canonte]
+profsig[rm-link" href="/?termid=item1">item1</a><li><a class="canonterm-]
+profsig[link" href="/?termid=foo">foo</a><li><a class="canonterm-link" h]
+profsig[ref="/?termid=item3">item3</a></ul>\012]
 access obj with bad ID
 [binary_name]: bad id: -2
 valid use of new obj, then access invalid fld

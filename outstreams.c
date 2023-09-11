@@ -13,10 +13,12 @@
  * limitations under the License. */
 
 #include <err.h>
+#include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-#include "shared.h"
+#include "outstreams.h"
 
 void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len)
 {
@@ -33,20 +35,21 @@ void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len)
 	}
 }
 
-static void flshannot(struct fdbuf *b)
+static void fullwriannot(struct wrides *de, const unsigned char *br, size_t sz)
 {
-	struct fdbuf eb = { .fd = b->fd };
-	int i, c;
+	struct wrides basde = {de->fd};
+	struct fdbuf eb = {&basde};
 	char esc[5];
 
-	FULL_WRITE(b->fd, b->escannot, -1);
+	fdb_apnd(&eb, de->escannot, -1);
 	fdb_apnd(&eb, "[", -1);
 
-	for (i = 0; i < b->len; i++) {
-		esc[0] = b->bf[i];
+	while (sz--) {
+		esc[0] = *br++;
 		esc[1] = 0;
 
-		if (*esc < ' ' || *esc == '\\') sprintf(esc, "\\%03o", *esc);
+		if (*esc == '\\') strcpy(esc, "\\\\");
+		else if (*esc < ' ') sprintf(esc, "\\%03o", *esc);
 
 		fdb_apnd(&eb, esc, -1);
 	}
@@ -57,12 +60,36 @@ static void flshannot(struct fdbuf *b)
 
 void fdb_flsh(struct fdbuf *b)
 {
-	unsigned bi;
-
-	if (!b->len) return;
-
-	if (!b->escannot) FULL_WRITE(b->fd, b->bf, b->len);
-	else flshannot(b);
+	if (b->len) full_write(b->de, b->bf, b->len);
 
 	b->len = 0;
+}
+
+void full_write(struct wrides *de, const void *buf_, ssize_t sz)
+{
+	ssize_t writn;
+	const unsigned char *buf = buf_;
+
+	if (sz == -1) sz = strlen(buf_);
+	if (sz < 0) abort();
+	if (!sz) return;
+
+	if (de->escannot) {
+		fullwriannot(de, buf_, sz);
+		return;
+	}
+
+	do {
+		writn = write(de->fd, buf, sz);
+		if (!writn) errx(1, "should be blocking");
+
+		if (writn > 0) {
+			sz -= writn;
+			buf += writn;
+		}
+		else {
+			perror("full_write");
+			if (errno != EINTR) return;
+		}
+	} while (sz);
 }

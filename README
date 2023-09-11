@@ -263,7 +263,7 @@ JS is loaded from directories listed in $WERMJSPATH, which is specified in the
 environment when running "$WERMDIR/run", and lists directories separated by
 colons, i.e. :
 
-If $WERMJSPATH is not defined, it defaults to $WERMDIR/js:$HOME/.local/werm/js
+If $WERMJSPATH is not defined, it defaults to $WERMDIR/js:$HOME/.config/werm/js
 
 For instance, if the JS field of a profile is "a,b,c", then Javascript will be
 loaded from any file named a.js, b.js, or c.js, in any directory in $WERMJSPATH.

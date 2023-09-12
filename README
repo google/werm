@@ -220,6 +220,15 @@ SCROLLBACK FEATURES
    with editor and UI screens, unlike 'laH M '. But everything else about its
    use is the same (Enter to copy text and close the tab).
 
+ * Scrollbacks are saved to disk in $WERMSRCDIR/var/YEAR/MONTH/DAY, excluding
+   any content printed to the alternate screen. You can turn off the scrollback
+   feature and thereby prevent the logs from being written to disk by setting
+   $WERMFLAGS to "?sblvl=" in the environment before running the server. The
+   default value of sblvl is "p" which means Plain scrollback logging is
+   enabled. Setting sblvl to "rp" (e.g. "export WERMFLAGS='?sblvl=rp'") would
+   also turn on Raw logging, which saves the exact subprocess stdout/stderr
+   streams in files named '*.raw'.
+
 PROFILES
 
 A profile is meant to label and setup a starting state for a shell session. It

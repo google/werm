@@ -55,7 +55,8 @@ static int xasprintf(char **strp, const char *format, ...)
 	return res;
 }
 
-static char *argv0, *termid, *logview;
+static char *argv0, *termid, *logview, *sblvl;
+static const char *qs;
 
 static size_t argv0sz;
 
@@ -427,104 +428,56 @@ static void recountttl(struct wrides *de)
 	fdb_flsh(&b);
 }
 
-static char *extract_query_arg(const char **qs, const char *pref)
+int extractqueryarg(const char *pref, char **dest)
 {
 	size_t preflen;
 	const char *end;
-	char *buf, *bufcur;
+	char *dscur;
 	int byte, bcnt;
 
 	preflen = strlen(pref);
-	if (memcmp(*qs, pref, preflen)) return NULL;
-	*qs += preflen;
+	if (strncmp(qs, pref, preflen)) return 0;
+	qs += preflen;
 
-	end = strchrnul(*qs, '&');
-	bufcur = buf = malloc(end - *qs + 1);
+	end = strchrnul(qs, '&');
 
-	while (*qs != end) {
-		byte = *(*qs)++;
+	free(*dest);
+	dscur = *dest = malloc(end - qs + 1);
+
+	while (qs != end) {
+		byte = *qs++;
 
 		if (byte == '%') {
 			bcnt = 0;
-			if (sscanf(*qs, "%2x%n", &byte, &bcnt) && bcnt == 2)
-				*qs += 2;
+			if (sscanf(qs, "%2x%n", &byte, &bcnt) && bcnt == 2)
+				qs += 2;
 		}
 
-		*bufcur++ = byte;
+		*dscur++ = byte;
 	}
-	*bufcur = 0;
+	*dscur = 0;
 
-	return buf;
+	return 1;
 }
 
-static void proccgienv(void)
+static void processquerystr(const char *fullqs)
 {
-	const char *qs;
-	char *val;
+	if (!fullqs) return;
+	qs = fullqs;
 
-	qs = getenv("QUERY_STRING");
-	if (!qs) return;
-
-	val = NULL;
 	while (1) {
-		if (val) {
-			free(val);
-			val = NULL;
-		}
 		if (*qs == '&') qs++;
 		if (!*qs) break;
 
-		val = extract_query_arg(&qs, "termid=");
-		if (val) {
-			free(termid);
-			termid = strdup(val);
-			continue;
-		}
+		if (extractqueryarg("termid=", &termid)) continue;
+		if (extractqueryarg("logview=", &logview)) continue;
+		if (extractqueryarg("sblvl=", &sblvl)) continue;
 
-		val = extract_query_arg(&qs, "logview=");
-		if (val) {
-			free(logview);
-			logview = strdup(val);
-			continue;
-		}
+		dprintf(2, "invalid query string arg at char pos %zu in '%s'\n",
+			qs - fullqs, fullqs);
 
-		/* Unrecognized query arg */
 		qs = strchrnul(qs, '&');
 	}
-
-	/* Set by websocketd and not wanted. CGI-related cruft: */
-	unsetenv("AUTH_TYPE");
-	unsetenv("CONTENT_LENGTH");
-	unsetenv("CONTENT_TYPE");
-	unsetenv("GATEWAY_INTERFACE");
-	unsetenv("HTTP_ACCEPT_ENCODING");
-	unsetenv("HTTP_ACCEPT_LANGUAGE");
-	unsetenv("HTTP_CACHE_CONTROL");
-	unsetenv("HTTP_CONNECTION");
-	unsetenv("HTTP_ORIGIN");
-	unsetenv("HTTP_PRAGMA");
-	unsetenv("HTTPS");
-	unsetenv("HTTP_SEC_WEBSOCKET_EXTENSIONS");
-	unsetenv("HTTP_SEC_WEBSOCKET_KEY");
-	unsetenv("HTTP_SEC_WEBSOCKET_VERSION");
-	unsetenv("HTTP_UPGRADE");
-	unsetenv("HTTP_USER_AGENT");
-	unsetenv("PATH_INFO");
-	unsetenv("PATH_TRANSLATED");
-	unsetenv("QUERY_STRING");
-	unsetenv("REMOTE_ADDR");
-	unsetenv("REMOTE_HOST");
-	unsetenv("REMOTE_IDENT");
-	unsetenv("REMOTE_PORT");
-	unsetenv("REMOTE_USER");
-	unsetenv("REQUEST_METHOD");
-	unsetenv("REQUEST_URI");
-	unsetenv("SCRIPT_NAME");
-	unsetenv("SERVER_NAME");
-	unsetenv("SERVER_PORT");
-	unsetenv("SERVER_PROTOCOL");
-	unsetenv("SERVER_SOFTWARE");
-	unsetenv("UNIQUE_ID");
 }
 
 static char **srvargv;
@@ -633,9 +586,18 @@ void maybe_open_logs(void)
 	now = time(NULL);
 	if (!localtime_r(&now, &tim)) err(1, "cannot get time");
 
-	wts.logde.fd = opnforlog(&tim, "");
-	wts.rawlogde.fd = opnforlog(&tim, ".raw");
-	wts.writelg = wts.writerawlg = 1;
+	/* sblvl configures scrollback logging. If the string has "p" then plain
+	 * logging is on, if "r" then raw logging is on. */
+	if (!sblvl) sblvl = strdup("p");
+
+	if (strchr(sblvl, 'p')) {
+		wts.writelg = 1;
+		wts.logde.fd = opnforlog(&tim, "");
+	}
+	if (strchr(sblvl, 'r')) {
+		wts.writerawlg = 1;
+		wts.rawlogde.fd = opnforlog(&tim, ".raw");
+	}
 }
 
 static void prepfordtach(void)
@@ -1056,8 +1018,9 @@ static void testreset(void)
 	free(wts.rwoutbuf);
 	memset(&wts, 0, sizeof(wts));
 
-	free(termid);
-	termid = NULL;
+	free(termid);	termid = 0;
+	free(logview);	logview = 0;
+	free(sblvl);	sblvl = 0;
 }
 
 static void writetosp0term(const char *s)
@@ -1075,6 +1038,24 @@ static void writetosp0term(const char *s)
 }
 
 static void tstdesc(const char *d) { dprintf(1, "TEST: %s\n", d); }
+
+static void testqrystring(void)
+{
+	tstdesc("parse termid arg");
+	testreset();
+	processquerystr("termid=hello");
+	dprintf(2, "%s\n", termid);
+
+	tstdesc("unrecognized query string arg");
+	testreset();
+	processquerystr("logview=test&huhtest=987");
+	dprintf(2, "logview=%s\n", logview);
+
+	tstdesc("empty arg, escapes, and omitted arg");
+	testreset();
+	processquerystr("sblvl=&termid=%21escapes%7eand%45");
+	dprintf(2, "%zu,%s,%d\n", strlen(sblvl), termid, !logview);
+}
 
 static void testiterprofs(void)
 {
@@ -1587,6 +1568,7 @@ static void _Noreturn testmain(void)
 	process_tty_out("\r\033[32@!!!\r\n", -1);
 
 	testiterprofs();
+	testqrystring();
 
 	exit(0);
 }
@@ -1615,6 +1597,8 @@ int main(int argc, char **argv)
 		}));
 		exit(0);
 	}
+
+	processquerystr(getenv("WERMFLAGS"));
 
 	if (argc >= 1 && !strcmp("serve", *argv)) {
 		iterprofs(profpath(), &((struct iterprofspec){ .diaglog = 1 }));
@@ -1651,7 +1635,42 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	proccgienv();
+	processquerystr(getenv("QUERY_STRING"));
+
+	/* Set by websocketd and not wanted. CGI-related cruft: */
+	unsetenv("AUTH_TYPE");
+	unsetenv("CONTENT_LENGTH");
+	unsetenv("CONTENT_TYPE");
+	unsetenv("GATEWAY_INTERFACE");
+	unsetenv("HTTP_ACCEPT_ENCODING");
+	unsetenv("HTTP_ACCEPT_LANGUAGE");
+	unsetenv("HTTP_CACHE_CONTROL");
+	unsetenv("HTTP_CONNECTION");
+	unsetenv("HTTP_ORIGIN");
+	unsetenv("HTTP_PRAGMA");
+	unsetenv("HTTPS");
+	unsetenv("HTTP_SEC_WEBSOCKET_EXTENSIONS");
+	unsetenv("HTTP_SEC_WEBSOCKET_KEY");
+	unsetenv("HTTP_SEC_WEBSOCKET_VERSION");
+	unsetenv("HTTP_UPGRADE");
+	unsetenv("HTTP_USER_AGENT");
+	unsetenv("PATH_INFO");
+	unsetenv("PATH_TRANSLATED");
+	unsetenv("QUERY_STRING");
+	unsetenv("REMOTE_ADDR");
+	unsetenv("REMOTE_HOST");
+	unsetenv("REMOTE_IDENT");
+	unsetenv("REMOTE_PORT");
+	unsetenv("REMOTE_USER");
+	unsetenv("REQUEST_METHOD");
+	unsetenv("REQUEST_URI");
+	unsetenv("SCRIPT_NAME");
+	unsetenv("SERVER_NAME");
+	unsetenv("SERVER_PORT");
+	unsetenv("SERVER_PROTOCOL");
+	unsetenv("SERVER_SOFTWARE");
+	unsetenv("UNIQUE_ID");
+
 	prepfordtach();
 	dtach_main();
 }

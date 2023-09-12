@@ -231,6 +231,13 @@ profsig[<ul id="ctl-thegrp" class="canonterm-list"><li><a class="canonte]
 profsig[rm-link" href="/?termid=item1">item1</a><li><a class="canonterm-]
 profsig[link" href="/?termid=foo">foo</a><li><a class="canonterm-link" h]
 profsig[ref="/?termid=item3">item3</a></ul>\012]
+TEST: parse termid arg
+hello
+TEST: unrecognized query string arg
+invalid query string arg at char pos 13 in 'logview=test&huhtest=987'
+logview=test
+TEST: empty arg, escapes, and omitted arg
+0,!escapes~andE,1
 access obj with bad ID
 [binary_name]: bad id: -2
 valid use of new obj, then access invalid fld

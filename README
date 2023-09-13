@@ -164,7 +164,8 @@ BASIC USE
 
  * Press Shift+Backspace to send Ctrl+W (delete word) to the shell.
 
- * To add or remove macros, look for macro_map in index.html.
+ * To add or remove macros, add it to the macro_map in index.html or a
+   profile's JS code (see PROFILES section).
 
    The left-hand side is the macro shortcut or mnemonic.
 
@@ -302,6 +303,29 @@ window.extended_macros.foo_macros = [
 window.extended_macros.bar_macros = [
 	...
 ];
+
+CAPSLOCK SIMULATION AND AUTO-OFF
+
+If you are using a Chromebook or have mapped your physical Caps Lock to
+something else, you can still get capslock functionality in Werm. This is done
+with the capsonwhile variable, which you set in a custom macro.
+
+capsonwhile should be set to a regex which is compared against each pressed
+key's 2-char mnemonic. The first key that does not match will turn capslock
+off. For example,
+
+window.extended_macros.caps_example = [
+	['raC ', function() { capsonwhile = /[A-Z0-9] /; }],
+];
+
+This means that 'raC ' will turn on a simulated capslock until a non-
+alphabetic and non-numeric key is pressed. If you want to be able to type
+underscores and keep capslock on, you can keeps capslock on when shift or
+the dash/underscore key is pressed. That would be the regex
+/[A-Z0-9] |ls|rs|- /.
+
+Alternatively, set capsonwhile to /../ to turn capslock on (matches all keys)
+and set capsonwhile to 0 to turn capslock off explicitly.
 
 SUGGESTED UTILITIES
 

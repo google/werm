@@ -240,7 +240,7 @@ function cookev(e)
 }
 
 var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
-	log_mn, log_print, log_macks, log_packin;
+	log_mn, log_print, log_macks, log_packin, capsonwhile;
 
 function term_init()
 {
@@ -570,6 +570,8 @@ function term_init()
 	{
 		var ch, pref;
 
+		if (capsonwhile && !e.mn.match(capsonwhile)) capsonwhile = 0;
+
 		if (e.altKey) return false;
 
 		pref = e.metaKey ? '\x1b' : '';
@@ -656,7 +658,10 @@ function term_init()
 			return true;
 		}
 
-		signal(sanit(pref + e.key));
+		ch = e.key;
+		if (capsonwhile) ch = ch.toUpperCase();
+
+		signal(sanit(pref + ch));
 		return true;
 	}
 

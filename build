@@ -72,9 +72,10 @@ $!s/$/\\012/
 if ! ctags=`which ctags-exuberant`; then
 	echo '`sudo apt install exuberant-ctags` to make tags file' 2>&1
 else
-	find . -path ./third_party/websocketd -prune -o -type f \( \
-		-name \*.h -o -name \*.c \
-	\) -print >/tmp/tag_files.$$
+	find .	-path ./third_party/websocketd -prune -o	\
+		-path ./var -prune -o				\
+		-type f \( -name \*.h -o -name \*.c \)		\
+		-print >/tmp/tag_files.$$
 
 	$ctags --format=1 `cat /tmp/tag_files.$$`
 fi

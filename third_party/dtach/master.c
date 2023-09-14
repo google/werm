@@ -214,16 +214,19 @@ update_socket_modes(int exec)
 		chmod(dtach_sock, newmode);
 }
 
-static void sendrout(void)
+static int sendrout(fd_set *writabl)
 {
 	struct client *p;
 	const unsigned char *routcurs;
 	size_t routrema;
 	ssize_t writn;
+	int nclients;
 
 	/* Send the data out to the clients. */
-	for (p = clients; p; p = p->next)
+	for (p = clients, nclients = 0; p; p = p->next)
 	{
+		if (!FD_ISSET(p->fd, writabl)) continue;
+
 		get_rout_for_attached(&routcurs, &routrema);
 		while (routrema)
 		{
@@ -238,11 +241,14 @@ static void sendrout(void)
 			else if (writn < 0 && errno == EINTR)
 				continue;
 			else if (writn < 0 && errno != EAGAIN)
-				break;
+				nclients = -1;
+			break;
 		}
+
+		if (nclients != -1 && !routrema) nclients++;
 	}
 
-	clear_rout();
+	return nclients;
 }
 
 /* Process activity on the pty - Input and terminal changes are sent out to
@@ -265,34 +271,36 @@ pty_activity(int s)
 
 	process_tty_out(preprocb, preproclen);
 
-//top:
-	/*
-	** Wait until at least one client is writable. Also wait on the control
-	** socket in case a new client tries to connect.
-	*/
-	FD_ZERO(&readfds);
-	FD_ZERO(&writefds);
-	FD_SET(s, &readfds);
-	highest_fd = s;
-	for (p = clients, nclients = 0; p; p = p->next)
-	{
-		if (!p->attached)
-			continue;
-		FD_SET(p->fd, &writefds);
-		if (p->fd > highest_fd)
-			highest_fd = p->fd;
-		nclients++;
-	}
-	if (nclients == 0)
-		return;
-	if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
-		return;
+	do {
+		/*
+		** Wait until at least one client is writable. Also wait on the
+		** control socket in case a new client tries to connect.
+		*/
+		FD_ZERO(&readfds);
+		FD_ZERO(&writefds);
+		FD_SET(s, &readfds);
+		highest_fd = s;
+		for (p = clients, nclients = 0; p; p = p->next)
+		{
+			if (!p->attached)
+				continue;
+			FD_SET(p->fd, &writefds);
+			if (p->fd > highest_fd)
+				highest_fd = p->fd;
+			nclients++;
+		}
+		if (nclients == 0)
+			break;
+		if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
+			break;
 
-//	werm: before, this is where data is sent to clients
+		nclients = sendrout(&writefds);
 
-//	/* Try again if nothing happened. */
-//	if (!FD_ISSET(s, &readfds) && nclients == 0)
-//		goto top;
+		/* Try again if nothing happened. */
+	} while (!FD_ISSET(s, &readfds) && nclients == 0);
+
+done:
+	clear_rout();
 }
 
 /* Process activity on the control socket */
@@ -470,8 +478,6 @@ masterprocess(int s, int statusfd)
 		/* pty activity? */
 		if (FD_ISSET(the_pty.fd, &readfds))
 			pty_activity(s);
-
-		sendrout();
 	}
 }
 

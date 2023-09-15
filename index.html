@@ -201,6 +201,30 @@ wermcfg.pass_ctrl_L = 0;
 var menu_key_inserts = '';
 // END menu_key_inserts
 
+// BEGIN remap_keys
+// Set to an array to tweak or redefine the keyboard remapping. Each item in
+// the array is an array of two elements. The first element is a regex that will
+// match the 2-char mnemonic for a key. The second element is a plain JS object
+// which maps characters to different strings to type when that character is
+// pressed.  For instance, you can remap 9 and 0 keys such that the parenthesis
+// are input without shift, and the numbers are input with shift, in which case
+// you would have a line in a profile's JS which looks like this:
+// remap_keys = [[/[09] /, {'9': '(', '0': ')', '(': '9', ')': '0'}]];
+// Note that the above mnemonic regex is selectively written such that the
+// numpad keys are not affected. To remap based on multiple regexes, you would
+// use something like this:
+//
+// remap_keys = [[/[0-9] /: {...}],
+//               [/#./: {...}]]
+//
+// in which case, the items in the first map would redefine the number row, and
+// the items in the second map would redefine the numpad keys. If you do not
+// need to distinguish keys that insert the same character, you can just use
+// single map with a regex of /../
+// Note that this can only remap keys that usually insert a character.
+var remap_keys = [];
+// END remap_keys
+
 function sanit(s)
 {
 	var e = [], c, ci;
@@ -571,6 +595,13 @@ function term_init()
 		var ch, pref;
 
 		if (capsonwhile && !e.mn.match(capsonwhile)) capsonwhile = 0;
+
+		remap_keys.forEach(function(rel)
+		{
+			var remch;
+			if (e.mn.match(rel[0])) remch = rel[1][e.key];
+			if (remch) e.key = remch;
+		});
 
 		if (e.altKey) return false;
 

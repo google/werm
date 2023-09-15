@@ -60,6 +60,9 @@ FEATURES
    * Look for "deadkey_map" or "menu_key_inserts" in index.html to customize the
      inserted characters.
 
+  * Keyboard layout remapping (search for "remap_keys" in index.html for an
+    explanation)
+
 QUICKSTART
 
  * chromeOS is the most thoroughly tested client OS at this time

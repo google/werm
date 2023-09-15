@@ -53,4 +53,6 @@ void fdb_flsh(struct fdbuf *b);
  * buf_ as a null-terminated string. */
 void full_write(struct wrides *de, const void *buf_, ssize_t len);
 
+void test_outstreams(void);
+
 #endif

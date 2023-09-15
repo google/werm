@@ -93,3 +93,8 @@ void full_write(struct wrides *de, const void *buf_, ssize_t sz)
 		}
 	} while (sz);
 }
+
+void test_outstreams(void)
+{
+	struct fdbuf b = {};
+}

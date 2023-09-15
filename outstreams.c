@@ -23,15 +23,36 @@
 void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len)
 {
 	const unsigned char *buf = buf_;
+	unsigned thissz;
+
+	if (!b->bf) {
+		if (!b->cap) b->cap = 64;
+		b->bf = malloc(b->cap);
+	}
 
 	if (len == -1) len = strlen(buf_);
 
-	if (b->len >= sizeof(b->bf))
-		errx(1, "buffer should be flushed already");
+	while (len) {
+		if (b->cap == b->len) {
+			if (b->de) {
+				full_write(b->de, b->bf, b->len);
+				b->len = 0;
+				continue;
+			}
 
-	while (len--) {
-		b->bf[b->len++] = *buf++;
-		if (b->len == sizeof(b->bf)) fdb_flsh(b);
+			if (b->cap > 20) b->cap >>= 1;
+			b->cap *= 3;
+
+			b->bf = realloc(b->bf, b->cap);
+		}
+
+		thissz = b->cap - b->len;
+		if (thissz > len) thissz = len;
+
+		memcpy(b->bf + b->len, buf, thissz);
+		b->len += thissz;
+		len -= thissz;
+		buf += thissz;
 	}
 }
 
@@ -55,14 +76,16 @@ static void fullwriannot(struct wrides *de, const unsigned char *br, size_t sz)
 	}
 
 	fdb_apnd(&eb, "]\n", -1);
-	fdb_flsh(&eb);
+	fdb_finsh(&eb);
 }
 
-void fdb_flsh(struct fdbuf *b)
+void fdb_finsh(struct fdbuf *b)
 {
-	if (b->len) full_write(b->de, b->bf, b->len);
+	if (b->len && b->de) full_write(b->de, b->bf, b->len);
 
-	b->len = 0;
+	free(b->bf);
+	b->bf = 0;
+	b->len = b->cap = 0;
 }
 
 void full_write(struct wrides *de, const void *buf_, ssize_t sz)
@@ -96,5 +119,36 @@ void full_write(struct wrides *de, const void *buf_, ssize_t sz)
 
 void test_outstreams(void)
 {
-	struct fdbuf b = {};
+	struct wrides de = {1};
+	struct fdbuf b = {&de, 32};
+	int i;
+
+	dprintf(1, "TEST OUTSTREAMS\n");
+	fdb_apnd(&b, "hello\n", -1);
+	fdb_apnd(&b, "goodbye\n do not print this part", 8);
+	fdb_finsh(&b);
+
+	de.escannot = "customcap";
+	b.cap = 7;
+	fdb_apnd(&b, "abcdefghijklmnopqrstuvwxyz....0123456789", -1);
+	dprintf(1, "about to flush: ");
+	fdb_finsh(&b);
+
+	/* no wrides */
+	b.cap = 1;
+	b.de = 0;
+	de.escannot = "grow unboundedly";
+	fdb_apnd(&b, "abcdefghijklmnopqrstuvwxyz....0123456789", -1);
+	dprintf(1, "grow unboundedly: %u,%u ", b.len, b.cap);
+	fdb_apnd(&b, "ABCDEFGHIJKLMNOPQRSTUVWXYZ....!@#$!@#$!?", -1);
+	dprintf(1, "%u,%u\n", b.len, b.cap);
+	full_write(&de, b.bf, b.len);
+	dprintf(1, "finishing capacity: %u\n", b.cap);
+	fdb_finsh(&b);
+
+	de.escannot = "customcap+multipleapnd";
+	b.de = &de;
+	b.cap = 16;
+	for (i = 0; i < 50; i++) fdb_apnd(&b, i & 1 ? "abc" : "123", i % 3);
+	fdb_finsh(&b);
 }

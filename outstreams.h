@@ -36,9 +36,12 @@ struct wrides {
 /* Comprises a file descriptor and a buffer which is pending a write to it.
  * This is useful for adhoc and simple buffering of content to an fd. */
 struct fdbuf {
+	/* If unset, bf will grow unboundedly as writes accumulate. */
 	struct wrides *de;
-	char bf[64];
-	int len;
+	unsigned cap, len;
+
+	/* Automatically allocated on any append operation if unset. */
+	unsigned char *bf;
 };
 
 /* Appends bytes to the end of the buffer and flushes it if it becomes full.
@@ -46,8 +49,9 @@ struct fdbuf {
  * null portion of it. */
 void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len);
 
-/* Flushes the buffer if it is not empty. */
-void fdb_flsh(struct fdbuf *b);
+/* Flushes the buffer if it is not empty and `de` is set. Then frees the
+ * buffer. */
+void fdb_finsh(struct fdbuf *b);
 
 /* Writes an entire buffer to the given file descriptor. If len is -1, prints
  * buf_ as a null-terminated string. */

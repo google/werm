@@ -214,12 +214,13 @@ update_socket_modes(int exec)
 		chmod(dtach_sock, newmode);
 }
 
+static struct fdbuf therout;
+
 static int sendrout(fd_set *writabl)
 {
 	struct client *p;
 	const unsigned char *routcurs;
-	size_t routrema;
-	ssize_t writn;
+	ssize_t writn, routrema;
 	int nclients;
 
 	/* Send the data out to the clients. */
@@ -227,7 +228,8 @@ static int sendrout(fd_set *writabl)
 	{
 		if (!FD_ISSET(p->fd, writabl)) continue;
 
-		get_rout_for_attached(&routcurs, &routrema);
+		routcurs = therout.bf;
+		routrema = therout.len;
 		while (routrema)
 		{
 			writn = write(p->fd, routcurs, routrema);
@@ -269,7 +271,8 @@ pty_activity(int s)
 	if (preproclen <= 0)
 		exit(1);
 
-	process_tty_out(preprocb, preproclen);
+	therout.len = 0;
+	process_tty_out(&therout, preprocb, preproclen);
 
 	do {
 		/*
@@ -298,9 +301,6 @@ pty_activity(int s)
 
 		/* Try again if nothing happened. */
 	} while (!FD_ISSET(s, &readfds) && nclients == 0);
-
-done:
-	clear_rout();
 }
 
 /* Process activity on the control socket */

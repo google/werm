@@ -29,19 +29,20 @@ void _Noreturn dtach_main(void);
 int dtach_master(void);
 void _Noreturn subproc_main(void);
 
-void clear_rout(void);
-
-/* Puts terminal state in fd to send to a client, such as whether using
- * alternate screen. */
+/* Outputs terminal state to send to a client, such as whether using alternate
+ * screen. */
 void recount_state(struct wrides *de);
-void process_tty_out(const void *buf, ssize_t len);
-void get_rout_for_attached(const unsigned char **buf, size_t *len);
+
+/* Processes output from the subprocess and writes the client output into rout.
+ * "client output" should be sent to each attach process. */
+void process_tty_out(struct fdbuf *rout, const void *buf, ssize_t len);
 
 void forward_stdin(int sock);
 
 /* ptyfd is the pseudo-terminal that controls the terminal-enabled process.
- * There is only one per master.
- * clioutfd is where output is sent to the attached client. */
+ * There is only one per master. vt100 keyboard input data is sent to this fd.
+ * clioutfd is where output is sent to the attached client. This is used for
+ * status updates (like the title) if needed. */
 void process_kbd(int ptyfd, int clioutfd, unsigned char *buf, size_t bufsz);
 
 void set_argv0(const char *role);

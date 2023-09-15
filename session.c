@@ -89,35 +89,10 @@ static struct {
 	unsigned writelg	: 1;
 	unsigned writerawlg	: 1;
 
-	/* rwout* contains bytes to send to each attach process. It grows
-	 * dynamically and is exposed to dtach code through
-	 * get_rout_for_attached and reset with clear_rout. session module
-	 * writes to it with putrout* methods.
-	 * This grows on demand because dtach logic treats it as a single
-	 * buffer in a loop somewhere. It would be risky to statically allocate
-	 * it without verifying the amount of bytes it can possibly grow to. */
-	unsigned char *rwoutbuf;
-	size_t rwoutsz, rwoutlen;
-
 	/* Logs (either text only, or raw subproc output) are written to these
 	 * fd's if writelg,writerawlg are 1. */
 	struct wrides logde, rawlogde;
 } wts;
-
-void clear_rout(void) { wts.rwoutlen = 0; }
-
-void get_rout_for_attached(const unsigned char **buf, size_t *len)
-{
-	*buf = wts.rwoutbuf;
-	*len = wts.rwoutlen;
-}
-
-static void putrwout(void)
-{
-	full_write(&((struct wrides){1, "putrwout"}),
-		   wts.rwoutbuf, wts.rwoutlen);
-	wts.rwoutlen = 0;
-}
 
 static void logescaped(FILE *f, const void *buf_, size_t sz)
 {
@@ -162,50 +137,25 @@ static void dump(void)
 	fclose(f);
 }
 
-static void verifyroutcap(size_t needed)
-{
-	size_t minsz = wts.rwoutlen + needed;
-
-	if (minsz <= wts.rwoutsz) return;
-
-	wts.rwoutsz = minsz * 2;
-	if (wts.rwoutsz < 16) wts.rwoutsz = 16;
-	wts.rwoutbuf = realloc(wts.rwoutbuf, wts.rwoutsz);
-	if (!wts.rwoutbuf) errx(1, "even realloc knows: out of mem");
-}
-
-static void putroutraw(const char *s, ssize_t len)
-{
-	unsigned char *bf;
-
-	if (len < 0) len = strlen(s);
-
-	verifyroutcap(len);
-	bf = wts.rwoutbuf;
-	while (len--) bf[wts.rwoutlen++] = *s++;
-}
-
 static int hexdig(int v)
 {
 	v &= 0x0f;
 	return v + (v < 10 ? '0' : 'W');
 }
 
-static void putrout(int b)
+static void routesca(struct fdbuf *rout, int b)
 {
-	unsigned char *bf;
-
-	verifyroutcap(3);
-	bf = wts.rwoutbuf;
-
-	b &= 0xff;
+	char ebf[3];
 
 	if (b == '\\' || b < ' ' || b > '~') {
-		bf[wts.rwoutlen++] = '\\';
-		bf[wts.rwoutlen++] = hexdig(b >> 4);
-		bf[wts.rwoutlen++] = hexdig(b);
+		b &= 0xff;
+
+		ebf[0] = '\\';
+		ebf[1] = hexdig(b >> 4);
+		ebf[2] = hexdig(b);
+		fdb_apnd(rout, ebf, 3);
 	}
-	else bf[wts.rwoutlen++] = b;
+	else fdb_apnd(rout, &b, 1);
 }
 
 static _Bool consumeesc(const char *pref, size_t preflen)
@@ -299,7 +249,7 @@ static void deletechrahead(void)
 
 /* Obviously this function is a mess. But I'm still planning how to clean it up.
  */
-void process_tty_out(const void *buf_, ssize_t len)
+void process_tty_out(struct fdbuf *rout, const void *buf_, ssize_t len)
 {
 	char lastescbyt;
 	const unsigned char *buf = buf_;
@@ -365,7 +315,7 @@ void process_tty_out(const void *buf_, ssize_t len)
 			if (CONSUMEESC("\033[?47")
 			    || CONSUMEESC("\033[?1047")) {
 				wts.altscren = *buf=='h';
-				putroutraw(*buf == 'h' ? "\\s2" : "\\s1", -1);
+				fdb_apnd(rout, *buf == 'h' ? "\\s2" : "\\s1", -1);
 				goto eol;
 			}
 			if (CONSUMEESC("\033[?1049")) {
@@ -375,9 +325,9 @@ void process_tty_out(const void *buf_, ssize_t len)
 				 * off: set primary screen, restore
 				 * cursor+state
 				 */
-				putroutraw(*buf == 'h' ? "\\ss\\s2\\cl"
-						       : "\\s1\\rs",
-					   -1);
+				fdb_apnd(rout, *buf == 'h' ? "\\ss\\s2\\cl"
+							   : "\\s1\\rs",
+					 -1);
 				goto eol;
 			}
 
@@ -411,11 +361,11 @@ void process_tty_out(const void *buf_, ssize_t len)
 	eol:
 		deletechrahead();
 
-		putrout(*buf++);
+		routesca(rout, *buf++);
 		len--;
 	}
 
-	putroutraw("\n", -1);
+	fdb_apnd(rout, "\n", 1);
 }
 
 static void recountttl(struct wrides *de)
@@ -425,7 +375,7 @@ static void recountttl(struct wrides *de)
 	fdb_apnd(&b, "\\@title:", -1);
 	fdb_apnd(&b, wts.ttl, ttllen());
 	fdb_apnd(&b, "\n", -1);
-	fdb_flsh(&b);
+	fdb_finsh(&b);
 }
 
 int extractqueryarg(const char *pref, char **dest)
@@ -761,7 +711,7 @@ static int proflines(
 
 	if (spc->canonterm) fdb_apnd(&sigbuf, "</ul>\n", -1);
 
-	fdb_flsh(&sigbuf);
+	fdb_finsh(&sigbuf);
 
 	return namematc;
 }
@@ -981,7 +931,7 @@ static void writetosubproccore(
 		}
 	}
 
-	fdb_flsh(&kbdb);
+	fdb_finsh(&kbdb);
 }
 
 void forward_stdin(int sock)
@@ -1013,10 +963,20 @@ void process_kbd(int ptyfd, int clioutfd, unsigned char *buf, size_t bufsz)
 	if (0 > ioctl(ptyfd, TIOCSWINSZ, &ws)) warn("setting window size");
 }
 
+static struct fdbuf tsrout = {};
+
+static void putrwout(void)
+{
+	struct wrides de = {1, "putrwout"};
+	full_write(&de, tsrout.bf, tsrout.len);
+	tsrout.len = 0;
+}
+
 static void testreset(void)
 {
-	free(wts.rwoutbuf);
 	memset(&wts, 0, sizeof(wts));
+
+	tsrout.len = 0;
 
 	free(termid);	termid = 0;
 	free(logview);	logview = 0;
@@ -1212,6 +1172,7 @@ static void writelgon(void)
 static void _Noreturn testmain(void)
 {
 	int i;
+	struct wrides routde = {1, "rout"};
 
 	tstdesc("WRITE_TO_SUBPROC_CORE");
 
@@ -1258,87 +1219,87 @@ static void _Noreturn testmain(void)
 
 	testreset();
 	writelgon();
-	process_tty_out("hello", -1);
+	process_tty_out(&tsrout, "hello", -1);
 	tstdesc("pending line");
-	process_tty_out("\r\n", -1);
+	process_tty_out(&tsrout, "\r\n", -1);
 	tstdesc("finished line");
 
 	do {
 		int i = 0;
-		while (i++ < sizeof(wts.linebuf)) process_tty_out("x", -1);
-		process_tty_out("[exceeded]", -1);
-		process_tty_out("\r\n", -1);
+		while (i++ < sizeof(wts.linebuf)) process_tty_out(&tsrout, "x", -1);
+		process_tty_out(&tsrout, "[exceeded]", -1);
+		process_tty_out(&tsrout, "\r\n", -1);
 	} while (0);
 
-	process_tty_out("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
-	process_tty_out("abcdef\b\r\n", -1);
+	process_tty_out(&tsrout, "abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
+	process_tty_out(&tsrout, "abcdef\b\r\n", -1);
 
 	tstdesc("move back x2 and delete to eol");
-	process_tty_out("abcdef\b\b\033[K\r\n", -1);
+	process_tty_out(&tsrout, "abcdef\b\b\033[K\r\n", -1);
 
 	tstdesc("move back x1 and insert");
-	process_tty_out("asdf\bxy\r\n", -1);
+	process_tty_out(&tsrout, "asdf\bxy\r\n", -1);
 
 	tstdesc("move back and forward");
-	process_tty_out("asdf\b\033[C\r\n", -1);
+	process_tty_out(&tsrout, "asdf\b\033[C\r\n", -1);
 
 	tstdesc("move back x2 and forward x1, then del to EOL");
-	process_tty_out("asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
+	process_tty_out(&tsrout, "asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
 
 	tstdesc("as above, but in separate calls");
-	process_tty_out("asdf\b\b", -1);
-	process_tty_out("\033[C", -1);
-	process_tty_out("\033[K", -1);
-	process_tty_out("\r\n", -1);
+	process_tty_out(&tsrout, "asdf\b\b", -1);
+	process_tty_out(&tsrout, "\033[C", -1);
+	process_tty_out(&tsrout, "\033[K", -1);
+	process_tty_out(&tsrout, "\r\n", -1);
 
 	tstdesc("move left x3, move right x2, del EOL; 'right' seq in sep calls");
-	process_tty_out("123 UIO\b\b\b" "\033[", -1);
-	process_tty_out("C" "\033", -1);
-	process_tty_out("[C", -1);
-	process_tty_out("\033[K", -1);
-	process_tty_out("\r\n", -1);
+	process_tty_out(&tsrout, "123 UIO\b\b\b" "\033[", -1);
+	process_tty_out(&tsrout, "C" "\033", -1);
+	process_tty_out(&tsrout, "[C", -1);
+	process_tty_out(&tsrout, "\033[K", -1);
+	process_tty_out(&tsrout, "\r\n", -1);
 
 	tstdesc("drop console title escape seq");
 	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
-	process_tty_out("abc\033]0;title\007xyz\r\n", -1);
-	process_tty_out("abc\033]1;title\007xyz\r\n", -1);
-	process_tty_out("123\033]2;title\007" "456\r\n", -1);
+	process_tty_out(&tsrout, "abc\033]0;title\007xyz\r\n", -1);
+	process_tty_out(&tsrout, "abc\033]1;title\007xyz\r\n", -1);
+	process_tty_out(&tsrout, "123\033]2;title\007" "456\r\n", -1);
 
 	tstdesc("drop console title escape seq; separate calls");
-	process_tty_out("abc\033]0;ti", -1);
-	process_tty_out("tle\007xyz\r\n", -1);
+	process_tty_out(&tsrout, "abc\033]0;ti", -1);
+	process_tty_out(&tsrout, "tle\007xyz\r\n", -1);
 
 	tstdesc("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
 
 	/* \r after paste mode off */
-	process_tty_out("before (", -1);
-	process_tty_out("\033[?2004l\rhello\033[?2004h", -1);
-	process_tty_out(") after\r\n", -1);
+	process_tty_out(&tsrout, "before (", -1);
+	process_tty_out(&tsrout, "\033[?2004l\rhello\033[?2004h", -1);
+	process_tty_out(&tsrout, ") after\r\n", -1);
 
 	/* no \r after paste mode off */
-	process_tty_out("before (", -1);
-	process_tty_out("\033[?2004lhello\033[?2004h", -1);
-	process_tty_out(") after\r\n", -1);
+	process_tty_out(&tsrout, "before (", -1);
+	process_tty_out(&tsrout, "\033[?2004lhello\033[?2004h", -1);
+	process_tty_out(&tsrout, ") after\r\n", -1);
 
 	tstdesc("drop color and font");
-	process_tty_out("before : ", -1);
-	process_tty_out("\033[1;35mafter\r\n", -1);
+	process_tty_out(&tsrout, "before : ", -1);
+	process_tty_out(&tsrout, "\033[1;35mafter\r\n", -1);
 
 	/* split between calls */
-	process_tty_out("before : ", -1);
-	process_tty_out("\033[1;", -1);
-	process_tty_out("35mafter\r\n", -1);
+	process_tty_out(&tsrout, "before : ", -1);
+	process_tty_out(&tsrout, "\033[1;", -1);
+	process_tty_out(&tsrout, "35mafter\r\n", -1);
 
-	process_tty_out("before : \033[36mAfter\r\n", -1);
+	process_tty_out(&tsrout, "before : \033[36mAfter\r\n", -1);
 
-	process_tty_out("first ;; \033[1;31msecond\r\n", -1);
+	process_tty_out(&tsrout, "first ;; \033[1;31msecond\r\n", -1);
 
 	tstdesc("\\r to move to start of line");
-	process_tty_out("xyz123\rXYZ\r\n", -1);
+	process_tty_out(&tsrout, "xyz123\rXYZ\r\n", -1);
 
 	tstdesc("something makes the logs stop");
-	process_tty_out(
+	process_tty_out(&tsrout, 
 		"\033[?2004h[0]~$ l\b"
 		"\033[Kseq 1 | less\r"
 		"\n\033[?2004l\r\033[?104"
@@ -1353,7 +1314,7 @@ static void _Noreturn testmain(void)
 	);
 
 	tstdesc("\\r then delete line");
-	process_tty_out("abc\r\033[Kfoo\r\n", -1);
+	process_tty_out(&tsrout, "abc\r\033[Kfoo\r\n", -1);
 
 	tstdesc("arrow keys are translated to escape sequences");
 	testreset();
@@ -1365,125 +1326,125 @@ static void _Noreturn testmain(void)
 	writetosp0term("right (\\>)\r");
 
 	tstdesc("app cursor on: same codes as when off but O instead of [");
-	process_tty_out("\033[?1h", -1);
+	process_tty_out(&tsrout, "\033[?1h", -1);
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");
 
 	tstdesc("bad input tolerance: terminate OS cmd without char 7");
-	process_tty_out("\033]0;foobar\rdon't hide me\r\n", -1);
+	process_tty_out(&tsrout, "\033]0;foobar\rdon't hide me\r\n", -1);
 
 	tstdesc("backward to negative linepos, then dump line to log");
 	testreset();
 	writelgon();
-	process_tty_out("\r\010\010\010x\n", -1);
+	process_tty_out(&tsrout, "\r\010\010\010x\n", -1);
 
 	tstdesc("escape before sending to attached clients");
 	testreset();
-	process_tty_out("abcd\r\n", -1);
-	process_tty_out("xyz\b\t\r\n", -1);
+	process_tty_out(&tsrout, "abcd\r\n", -1);
+	process_tty_out(&tsrout, "xyz\b\t\r\n", -1);
 	putrwout();
 
 	tstdesc("pass OS escape to client");
 	testreset();
-	process_tty_out("\033]0;asdf\007xyz\r\n", -1);
+	process_tty_out(&tsrout, "\033]0;asdf\007xyz\r\n", -1);
 	putrwout();
 
 	tstdesc("simplify alternate mode signal");
 	testreset();
-	process_tty_out("\033[?47h" "hello\r\n" "\033[?47l", -1);
+	process_tty_out(&tsrout, "\033[?47h" "hello\r\n" "\033[?47l", -1);
 
-	process_tty_out("\033[", -1);
-	process_tty_out("?47h" "hello\r\n" "\033", -1);
-	process_tty_out("[?47l", -1);
+	process_tty_out(&tsrout, "\033[", -1);
+	process_tty_out(&tsrout, "?47h" "hello\r\n" "\033", -1);
+	process_tty_out(&tsrout, "[?47l", -1);
 
-	process_tty_out("\033[?1047h" "hello\r\n" "\033[?1047l", -1);
+	process_tty_out(&tsrout, "\033[?1047h" "hello\r\n" "\033[?1047l", -1);
 	putrwout();
 
 	tstdesc("regression");
 	testreset();
-	process_tty_out("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040", -1);
+	process_tty_out(&tsrout, "\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040", -1);
 	putrwout();
 
 	tstdesc("passthrough escape \\033[1P from subproc to client");
 	testreset();
-	process_tty_out("\033[1P", -1);
+	process_tty_out(&tsrout, "\033[1P", -1);
 	putrwout();
 	testreset();
-	process_tty_out("\033[4P", -1);
+	process_tty_out(&tsrout, "\033[4P", -1);
 	putrwout();
 	testreset();
-	process_tty_out("\033[5P", -1);
+	process_tty_out(&tsrout, "\033[5P", -1);
 	putrwout();
 	testreset();
-	process_tty_out("\033[16P", -1);
+	process_tty_out(&tsrout, "\033[16P", -1);
 	putrwout();
 
 	tstdesc("delete 5 characters ahead");
 	testreset();
 	writelgon();
-	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n", -1);
+	process_tty_out(&tsrout, "$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n", -1);
 
 	tstdesc("delete 12 characters ahead");
 	testreset();
 	writelgon();
-	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n", -1);
+	process_tty_out(&tsrout, "$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n", -1);
 
 	tstdesc("delete 16 characters ahead");
 	testreset();
 	writelgon();
-	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n", -1);
+	process_tty_out(&tsrout, "$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n", -1);
 
 	tstdesc("save rawout from before OS escape");
 	testreset();
-	process_tty_out("abc\033]0;new-t", -1);
+	process_tty_out(&tsrout, "abc\033]0;new-t", -1);
 	putrwout();
 	tstdesc("<between calls>");
-	process_tty_out("itle\007xyz\r\n", -1);
+	process_tty_out(&tsrout, "itle\007xyz\r\n", -1);
 	putrwout();
 
 	tstdesc("1049h/l code for switching to/from alternate screen + other ops");
 	testreset();
-	process_tty_out("abc \033[?1049h", -1);
-	process_tty_out("-in-\033[?1049lout", -1);
+	process_tty_out(&tsrout, "abc \033[?1049h", -1);
+	process_tty_out(&tsrout, "-in-\033[?1049lout", -1);
 	putrwout();
 
 	tstdesc("dump of state");
 	testreset();
 	recountstate4test();
-	process_tty_out("\033[?47h", -1); putrwout();
+	process_tty_out(&tsrout, "\033[?47h", -1); putrwout();
 	recountstate4test();
 	recountstate4test();
-	process_tty_out("\033[?47l", -1); putrwout();
+	process_tty_out(&tsrout, "\033[?47l", -1); putrwout();
 	recountstate4test();
-	process_tty_out("\033[?1049h", -1); putrwout();
+	process_tty_out(&tsrout, "\033[?1049h", -1); putrwout();
 	recountstate4test();
-	process_tty_out("\033[?1049l", -1); putrwout();
+	process_tty_out(&tsrout, "\033[?1049l", -1); putrwout();
 	recountstate4test();
 
 	tstdesc("do not save bell character in plain text log");
 	testreset();
 	writelgon();
-	process_tty_out("ready...\007 D I N G!\r\n", -1);
+	process_tty_out(&tsrout, "ready...\007 D I N G!\r\n", -1);
 
 	tstdesc("editing a long line");
 	testreset();
 	writelgon();
 	writetosp0term("\\w00300104");
-	process_tty_out(test_lineed_in, 0xf8);
-	process_tty_out("\n", -1);
+	process_tty_out(&tsrout, test_lineed_in, 0xf8);
+	process_tty_out(&tsrout, "\n", -1);
 
 	tstdesc("editing a long line in a narrower window");
 	testreset();
 	writelgon();
 	writetosp0term("\\w00800061");
-	process_tty_out(test_lineednar_in, -1);
-	process_tty_out("\n", -1);
+	process_tty_out(&tsrout, test_lineednar_in, -1);
+	process_tty_out(&tsrout, "\n", -1);
 
 	tstdesc("go up more rows than exist in the linebuf");
 	testreset();
 	writetosp0term("\\w00800060");
-	process_tty_out("\033[Axyz\r\n", -1);
+	process_tty_out(&tsrout, "\033[Axyz\r\n", -1);
 
 	tstdesc("set long then shorter title");
 	testreset();
@@ -1508,67 +1469,69 @@ static void _Noreturn testmain(void)
 
 	tstdesc("title is too long");
 	writelgon();
-	process_tty_out("this is plain terminal text", -1);
+	process_tty_out(&tsrout, "this is plain terminal text", -1);
 	writetosp0term("\\t");
 	for (i = 0; i < sizeof(wts); i++) writetosp0term("abc");
 	writetosp0term("\n");
 	putrwout();
 	/* line buffer should not be clobbered by overflowing ttl buffer. */
-	process_tty_out("\r\n", -1);
+	process_tty_out(&tsrout, "\r\n", -1);
 	dprintf(1, "stored title length: %zu\n",
 		strnlen(wts.ttl, sizeof wts.ttl));
 
 	tstdesc("do not include altscreen content in scrollback log");
 	writelgon();
-	process_tty_out("xyz\r\nabc\033[?1049h", -1);
-	process_tty_out("defg", -1);
-	process_tty_out("hijk\033[?1049lrest\r\n", -1);
+	process_tty_out(&tsrout, "xyz\r\nabc\033[?1049h", -1);
+	process_tty_out(&tsrout, "defg", -1);
+	process_tty_out(&tsrout, "hijk\033[?1049lrest\r\n", -1);
 
 	tstdesc("move to col");
 	testreset();
 	writelgon();
-	process_tty_out(test_jumptocol_in, test_jumptocol_in_size);
+	process_tty_out(&tsrout, test_jumptocol_in, test_jumptocol_in_size);
 
 	tstdesc("move to col 2");
 	testreset();
 	writelgon();
-	process_tty_out("asdf\033[2Gxyz\r\n", -1);
+	process_tty_out(&tsrout, "asdf\033[2Gxyz\r\n", -1);
 
 	tstdesc("shift rest of line then overwrite");
 	testreset();
 	writelgon();
-	process_tty_out("asdf 01234\r\033[4Pxyz\n", -1);
+	process_tty_out(&tsrout, "asdf 01234\r\033[4Pxyz\n", -1);
 
 	tstdesc("shift remaining characters right");
 	testreset();
 	writelgon();
-	process_tty_out("asdf\r\033[10@xyz\n", -1);
+	process_tty_out(&tsrout, "asdf\r\033[10@xyz\n", -1);
 
 	tstdesc("shift remaining characters right more");
 	testreset();
 	writelgon();
 	/* 10000 is too large; it should be ignored */
-	process_tty_out("asdf\r\033[10000@xyz\r\n", -1);
-	process_tty_out("asdf\r\033[15@xyz\r\n", -1);
-	process_tty_out(":(..more\r:)\033[5@xyz\r\n", -1);
-	process_tty_out(":(..more\r:)\033[1@xyz\r\n", -1);
+	process_tty_out(&tsrout, "asdf\r\033[10000@xyz\r\n", -1);
+	process_tty_out(&tsrout, "asdf\r\033[15@xyz\r\n", -1);
+	process_tty_out(&tsrout, ":(..more\r:)\033[5@xyz\r\n", -1);
+	process_tty_out(&tsrout, ":(..more\r:)\033[1@xyz\r\n", -1);
 
 	/* Make sure we only copy the amount of characters needed. */
-	for (i = 0; i < 100; i++) process_tty_out("123456", -1);
-	process_tty_out("\r\033[552G", -1);
-	process_tty_out("\033[10@", -1);
-	process_tty_out("..more:)\r\n", -1);
+	for (i = 0; i < 100; i++) process_tty_out(&tsrout, "123456", -1);
+	process_tty_out(&tsrout, "\r\033[552G", -1);
+	process_tty_out(&tsrout, "\033[10@", -1);
+	process_tty_out(&tsrout, "..more:)\r\n", -1);
 
 	tstdesc("move more characters right than are in the line");
-	process_tty_out("abcd\r\033[1000@!!!!\r\n", -1);
-	process_tty_out("abcd\r\033[50@!!!!\r\n", -1); 
+	process_tty_out(&tsrout, "abcd\r\033[1000@!!!!\r\n", -1);
+	process_tty_out(&tsrout, "abcd\r\033[50@!!!!\r\n", -1); 
 
 	tstdesc("make long line too big to fit into buffer");
-	for (i = 0; i < sizeof(wts.linebuf) - 1; i++) process_tty_out("*", -1);
-	process_tty_out("\r\033[32@!!!\r\n", -1);
+	for (i = 0; i < sizeof(wts.linebuf) - 1; i++)
+		process_tty_out(&tsrout, "*", -1);
+	process_tty_out(&tsrout, "\r\033[32@!!!\r\n", -1);
 
 	testiterprofs();
 	testqrystring();
+	test_outstreams();
 
 	exit(0);
 }

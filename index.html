@@ -594,8 +594,6 @@ function term_init()
 	{
 		var ch, pref;
 
-		if (capsonwhile && !e.mn.match(capsonwhile)) capsonwhile = 0;
-
 		remap_keys.forEach(function(rel)
 		{
 			var remch;
@@ -1075,6 +1073,8 @@ function term_init()
 		if (log_keys) console.log('scrollport key:', e);
 
 		ce = cookev(e);
+
+		if (capsonwhile && !ce.mn.match(capsonwhile)) capsonwhile = 0;
 
 		// Let search+right alt (in that order) turn on capslock.
 		if (ce.mn == 'ra' && ce.metaKey) return;

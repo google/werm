@@ -811,7 +811,7 @@ void send_pream(int fd)
 	struct wrides de = { fd };
 
 	if (logview) {
-		full_write(&de, ". $WERMSRCDIR/logview ", -1);
+		full_write(&de, ". $WERMSRCDIR/util/logview ", -1);
 		full_write(&de, logview, -1);
 		full_write(&de, "\r", -1);
 		return;

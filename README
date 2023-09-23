@@ -206,10 +206,23 @@ From the attach page you can create or reconnect to persistent sessions.
 
 SCROLLBACK FEATURES
 
- * To access the scrollback buffer, press "laH L ". This opens a new tab with
-   $logfile shell variable set to the path of the scrollback file, (and for
-   debugging werm, $logfile.raw has the raw stdout+stderr of the shell). In the
-   scrollback tab, use "lel" as an alias for "less $logfile".
+ * To access the scrollback buffer, press "laH L ". This opens a new tab and
+   runs `less` viewing the scrollback buffer. From there, you can close the
+   scrollback viewer by simply closing the tab (it is an ephemeral session). If
+   you quit `less`, then you will return to a shell. In this shell, the
+   following commands and shell variables are available:
+
+   $logfile	the path of the scrollback file
+   lel		runs `less $logfile` (LEss Log)
+   rflt <args>	sends the lines in log in reverse order to `sed <args>`. For
+		example, `rflt '/$ grep/q; /\.h:/d'` would recall the output of
+		the just-run grep command but exclude matches found in C header
+		files (Reverse FiLTer)
+   rfmt <args>	same as `rflt`, but while `rflt` pipes output through `less`,
+		`rfmt` uses `more`
+   dl		runs `cat $logfile` (Dump Log)
+
+   These and other functions are defined in $WERMSRCDIR/util/logview
 
  * Open the scrollback in a new tab in an HTML <textarea> with macro "laH M " to
    get browser-native scrolling, searching, copying behavior. This does not use

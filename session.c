@@ -12,9 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. */
 
-#define _XOPEN_SOURCE 600
-#define _GNU_SOURCE
-
 #include "shared.h"
 #include "outstreams.h"
 #include "test/raw/data.h"
@@ -34,31 +31,12 @@
 #include <stdarg.h>
 #include <dirent.h>
 
-static int xasprintf(char **strp, const char *format, ...)
-{
-	int res;
-
-	va_list argp;
-
-	va_start(argp, format);
-	res = vsnprintf(NULL, 0, format, argp);
-	va_end(argp);
-	if (res < 0) errx(1, "vsnprintf: failed to calc str length");
-
-	*strp = malloc(res+1);
-
-	va_start(argp, format);
-	res = vsnprintf(*strp, res+1, format, argp);
-	va_end(argp);
-	if (res < 0) errx(1, "vsnprintf");
-
-	return res;
-}
-
-static char *argv0, *termid, *logview, *sblvl;
+static char *argv0, *termid, *logview, *sblvl, *dtachlog;
 static const char *qs;
 
 static size_t argv0sz;
+
+int is_ephem(void) { return !termid; }
 
 /* Name is based on Write To Subproc but this contains process_kbd state too.
  * We put this in a single struct so all logic state can be reset with a single
@@ -410,6 +388,8 @@ int extractqueryarg(const char *pref, char **dest)
 	return 1;
 }
 
+int dtach_logging(void) { return !!dtachlog; }
+
 static void processquerystr(const char *fullqs)
 {
 	if (!fullqs) return;
@@ -422,6 +402,7 @@ static void processquerystr(const char *fullqs)
 		if (extractqueryarg("termid=", &termid)) continue;
 		if (extractqueryarg("logview=", &logview)) continue;
 		if (extractqueryarg("sblvl=", &sblvl)) continue;
+		if (extractqueryarg("dtachlog=", &dtachlog)) continue;
 
 		dprintf(2, "invalid query string arg at char pos %zu in '%s'\n",
 			qs - fullqs, fullqs);
@@ -463,28 +444,12 @@ void _Noreturn subproc_main(void)
 	err(1, "execl $SHELL, which is: %s", shell ? shell : "<undef>");
 }
 
-static const char *rundir(void)
-{
-	static char *rd;
-	const char *wermdir;
-
-	if (rd) return rd;
-
-	wermdir = getenv("WERMSRCDIR");
-	if (!wermdir) errx(1, "$WERMSRCDIR is unset");
-
-	xasprintf(&rd, "%s/var", wermdir);
-	if (mkdir(rd, 0700) && errno != EEXIST) err(1, "cannot create %s", rd);
-
-	return rd;
-}
-
 static const char *socksdir(void)
 {
 	static char *sd;
 	if (sd) return sd;
 
-	xasprintf(&sd, "%s/socks", rundir());
+	xasprintf(&sd, "%s/socks", state_dir());
 	if (mkdir(sd, 0700) && errno != EEXIST) err(1, "cannot create %s", sd);
 
 	return sd;
@@ -505,7 +470,7 @@ static int opnforlog(const struct tm *tim, const char *suff)
 	int fd;
 	char *dir, *fn;
 
-	dir = strdup(rundir());
+	dir = strdup(state_dir());
 	appenddir(&dir, tim->tm_year+1900);
 	appenddir(&dir, tim->tm_mon+1);
 	appenddir(&dir, tim->tm_mday);
@@ -531,7 +496,7 @@ void maybe_open_logs(void)
 	 * used for grepping scrollback logs, so they can be very large
 	 * and included redundant data that will be confusing to see in
 	 * some recursive analysis of scrollbacks. */
-	if (dtach_ephem) return;
+	if (is_ephem()) return;
 
 	now = time(NULL);
 	if (!localtime_r(&now, &tim)) err(1, "cannot get time");
@@ -550,24 +515,53 @@ void maybe_open_logs(void)
 	}
 }
 
+/* This is needed for a predictable string to use in the socket name, or a
+ * human-identifiable placeholder. A percent is used in this string to spearate
+ * the profile name from the prefix since % is not allowed in profile names. */
+static const char *maybetermid(void)
+{
+	static char *pcpid;
+
+	if (pcpid) return pcpid;
+
+	if (termid)	xasprintf(&pcpid, "prs%%%s", termid);
+	else		xasprintf(&pcpid, "eph%%%lld", (long long) getpid());
+
+	return pcpid;
+}
+
 static void prepfordtach(void)
 {
-	dtach_ephem = !termid;
-
-	/* We need some termid for creating log file or setting argv0 later */
-	if (!termid) xasprintf(&termid, "ephem.%lld", (long long) getpid());
+	char *dtlogfn = 0;
+	int lgfd = -1, ok;
 
 	if (dtach_sock) errx(1, "dtach_sock already set: %s", dtach_sock);
-	xasprintf(&dtach_sock, "%s/%s.%s",
-		  socksdir(), dtach_ephem ? "ephemr" : "prsist", termid);
+	xasprintf(&dtach_sock, "%s/%s", socksdir(), maybetermid());
+
+	if (!dtachlog) return;
+
+	ok = 0;
+	xasprintf(&dtlogfn, "/tmp/dtachlog.%lld", (long long) getpid());
+	if (0 > (lgfd = open(dtlogfn, O_WRONLY | O_CREAT | O_APPEND, 0600)))
+		perror("open");
+	else if (0 > dup2(lgfd, 2))
+		perror("dup2");
+	else ok = 1;
+
+	fprintf(stderr, "opened %s for dtach logging? %d\n", dtlogfn, ok);
+	if (lgfd > 0) close(lgfd);
+	free(dtlogfn);
 }
 
 struct iterprofspec {
 	/* where to send any non-log, non-diagnostic output. */
 	struct wrides *sigde;
 
-	/* output canon term link for each profile to sigfd */
-	unsigned canonterm	: 1;
+	/* (internal) buffer used for writing to sigde. */
+	struct fdbuf *sigb;
+
+	/* output new sessionm link for each profile to sigfd */
+	unsigned newsessin	: 1;
 
 	unsigned sendauxjs	: 1;  /* send auxiliary js list to sigfd */
 	unsigned sendpream	: 1;  /* send preamble for termid to sigfd */
@@ -577,7 +571,7 @@ struct iterprofspec {
 	 */
 	unsigned diaglog	: 1;
 
-	/* whether to annotate and escape output send to sigfd, in order to make
+	/* whether to annotate and escape output sent to sigfd, in order to make
 	 * it more human-readable and separate from other output going to the
 	 * same stream. */
 	unsigned annotsig	: 1;
@@ -603,32 +597,59 @@ static void recallfiletofd(FILE *srcf, int recbyts, struct fdbuf *dstfd)
 	if (getc(srcf) == EOF) err(1, "ignoring last byte");
 }
 
-static int proflines(
-	const char *grpname, FILE *pff, const struct iterprofspec *spc)
+static void newsessinhtml(struct iterprofspec *spc, char k, const char *nmarg)
+{
+	const char *litext = nmarg, *litrid = nmarg;
+
+	if (!spc->newsessin) return;
+
+	switch (k) {
+	case 's':	/* start of profile group */
+		fdb_apnd(spc->sigb, "<ul id=\"ctl-", -1);
+		fdb_apnd(spc->sigb, nmarg, -1);
+		fdb_apnd(spc->sigb, "\" class=\"newsessin-list\">", -1);
+	break;
+	case 'b':	/* automatic basic item, which has empty terminal ID */
+		litext = "<em>basic</em>";
+		litrid = "";
+	case 'i':	/* profile item */
+		fdb_apnd(spc->sigb,
+			 "<li><a class=\"newsessin-link\" href=\"/?termid=",
+			 -1);
+		fdb_apnd(spc->sigb, litrid, -1);
+		fdb_apnd(spc->sigb, "\">", -1);
+		fdb_apnd(spc->sigb, litext, -1);
+		fdb_apnd(spc->sigb, "</a>", -1);
+	break;
+	case 'e':	/* end of profile group */
+		fdb_apnd(spc->sigb, "</ul>\n", -1);
+	break;
+	default: abort();
+	}
+}
+
+static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
 {
 	const char *cmpname;
-	int lineno = 0, namematc = 0, namelen;
+	int lineno = 0, namematc = 0, namerr = 0;
 
 	char fld, eofield, namemat, err = 0, startedjs;
 	char begunprenam, c;
+	struct fdbuf nmbuf = {0};
 
-	struct fdbuf sigbuf = {spc->sigde};
-
-	if (spc->canonterm) {
-		fdb_apnd(&sigbuf, "<ul id=\"ctl-", -1);
-		fdb_apnd(&sigbuf, grpname, -1);
-		fdb_apnd(&sigbuf, "\" class=\"canonterm-list\">", -1);
-	}
+	newsessinhtml(spc, 's', grpname);
 
 	c = '\n';
 	do {
 		if (c == '\n') {
-			cmpname = termid;
+			cmpname = is_ephem() ? "" : termid;
+
 			namemat = 0;
 			fld = 'n';
 			startedjs = 0;
 			begunprenam = 0;
-			namelen = 0;
+			nmbuf.len = 0;
+			namerr = 0;
 			lineno++;
 		}
 
@@ -649,13 +670,9 @@ static int proflines(
 				namematc += namemat;
 				fld = 'p';
 
-				if (spc->canonterm && namelen > 0) {
-					fdb_apnd(&sigbuf,
-						 "<li><a class=\"canonterm-link\" href=\"/?termid=", -1);
-					recallfiletofd(pff, namelen, &sigbuf);
-					fdb_apnd(&sigbuf, "\">", -1);
-					recallfiletofd(pff, namelen, &sigbuf);
-					fdb_apnd(&sigbuf, "</a>", -1);
+				if (spc->newsessin && !namerr && nmbuf.len) {
+					fdb_apnd(&nmbuf, "", 1);
+					newsessinhtml(spc, 'i', nmbuf.bf);
 				}
 				break;
 			}
@@ -665,21 +682,21 @@ static int proflines(
 				fprintf(stderr,
 					"illegal char '%c' in profile name", c);
 				err = 1;
+				namerr = 1;
 				cmpname = NULL;
-				namelen = INT_MIN;
 			}
 			if (cmpname && *cmpname++ != c) cmpname = NULL;
-			namelen++;
+			fdb_apnd(&nmbuf, &c, 1);
 
 			break;
 		case 'p':
 			if (eofield) {
 				fld = 'j';
-				if (begunprenam) fdb_apnd(&sigbuf, "\n", -1);
+				if (begunprenam) fdb_apnd(spc->sigb, "\n", -1);
 				break;
 			}
 			if (namemat && spc->sendpream) {
-				fdb_apnd(&sigbuf, &c, 1);
+				fdb_apnd(spc->sigb, &c, 1);
 				begunprenam = 1;
 			}
 
@@ -687,14 +704,14 @@ static int proflines(
 
 		case 'j':
 			if (eofield) {
-				if (startedjs) fdb_apnd(&sigbuf, "\n", -1);
+				if (startedjs) fdb_apnd(spc->sigb, "\n", -1);
 				break;
 			}
 			if (namemat && spc->sendauxjs) {
 				if (!startedjs)
-					fdb_apnd(&sigbuf, "\\@auxjs:", -1);
+					fdb_apnd(spc->sigb, "\\@auxjs:", -1);
 				startedjs = 1;
-				fdb_apnd(&sigbuf, &c, 1);
+				fdb_apnd(spc->sigb, &c, 1);
 			}
 
 			break;
@@ -709,20 +726,29 @@ static int proflines(
 		}
 	} while (c != EOF);
 
-	if (spc->canonterm) fdb_apnd(&sigbuf, "</ul>\n", -1);
+	newsessinhtml(spc, 'e', 0);
 
-	fdb_finsh(&sigbuf);
+	fdb_finsh(&nmbuf);
 
 	return namematc;
 }
 
-static void iterprofs(const char *ppaths_, const struct iterprofspec *spc)
+static void iterprofs(const char *ppaths_, struct iterprofspec *spc)
 {
 	DIR *pd;
 	char *ppaths = strdup(ppaths_), *tkn, *savepp, *ppitr, *ffn;
+
 	struct dirent *den;
 	FILE *pff;
 	int namematc = 0;
+	struct fdbuf sigbuf = {spc->sigde};
+	spc->sigb = &sigbuf;
+
+	/* "--" prefix to sort this category first. This hack can be removed
+	 * once the sorting logic is moved out of shell. */
+	newsessinhtml(spc, 's', "--basic");
+	newsessinhtml(spc, 'b', 0);
+	newsessinhtml(spc, 'e', 0);
 
 	for (ppitr = ppaths; ; ppitr = NULL) {
 		if (!(tkn = strtok_r(ppitr, ":", &savepp))) break;
@@ -773,13 +799,20 @@ doneproffile:
 
 	free(ppaths);
 
-	if (!namematc && (spc->sendauxjs || spc->sendpream))
+	fdb_finsh(&sigbuf);
+	spc->sigb = 0;
+
+	if (namematc || !termid || !*termid) return;
+
+	if (spc->sendauxjs || spc->sendpream)
 		fprintf(stderr, "profile with name '%s' not found\n", termid);
 }
 
+static const char *profpathsavd;
+
 static const char *profpath(void)
 {
-	static const char *p;
+	const char *p = profpathsavd;
 	char *def;
 
 	if (!p) p = getenv("WERMPROFPATH");
@@ -789,7 +822,7 @@ static const char *profpath(void)
 		p = def;
 	}
 
-	return p;
+	return profpathsavd=p;
 }
 
 void recount_state(struct wrides *de)
@@ -797,13 +830,11 @@ void recount_state(struct wrides *de)
 	full_write(de, wts.altscren ? "\\s2" : "\\s1", -1);
 	if (wts.ttl[0]) recountttl(de);
 
-	if (termid) {
-		iterprofs(profpath(), &((struct iterprofspec){
-			.sigde = de,
-			.sendauxjs = 1,
-			.diaglog = 1,
-		}));
-	}
+	iterprofs(profpath(), &((struct iterprofspec){
+		.sigde = de,
+		.sendauxjs = 1,
+		.diaglog = 1,
+	}));
 }
 
 void send_pream(int fd)
@@ -816,8 +847,6 @@ void send_pream(int fd)
 		full_write(&de, "\r", -1);
 		return;
 	}
-
-	if (!termid) return;
 
 	iterprofs(profpath(), &((struct iterprofspec){
 		.sigde = &de,
@@ -981,6 +1010,8 @@ static void testreset(void)
 	free(termid);	termid = 0;
 	free(logview);	logview = 0;
 	free(sblvl);	sblvl = 0;
+
+	profpathsavd = "";
 }
 
 static void writetosp0term(const char *s)
@@ -1142,18 +1173,42 @@ static void testiterprofs(void)
 		&sigde,
 	}));
 
-	tstdesc("bad names while outputting canonical terminal list");
+	tstdesc("bad names while outputting new session list");
 	testreset();
 	iterprofs("test/profiles3", &((struct iterprofspec) {
 		&sigde,
-		.canonterm = 1,
+		.newsessin = 1,
 	}));
 
-	tstdesc("dump canonterm list");
+	tstdesc("dump newsessin list");
 	testreset();
 	iterprofs("test/profilesname", &((struct iterprofspec) {
 		&sigde,
-		.canonterm = 1,
+		.newsessin = 1,
+	}));
+
+	tstdesc("empty profile name");
+	testreset();
+	iterprofs("test/emptyprof", &((struct iterprofspec) {
+		&sigde,
+		.newsessin = 1,
+	}));
+	termid = strdup("");
+	iterprofs("test/emptyprof", &((struct iterprofspec) {
+		&sigde,
+		.sendpream = 1,
+	}));
+	iterprofs("test/emptyprof", &((struct iterprofspec) {
+		&sigde,
+		.sendauxjs = 1,
+	}));
+
+	tstdesc("ephemeral session uses basic profile config");
+	testreset();
+	iterprofs("test/emptyprof", &((struct iterprofspec) {
+		&sigde,
+		.sendpream = 1,
+		.sendauxjs = 1,
 	}));
 }
 
@@ -1536,9 +1591,23 @@ static void _Noreturn testmain(void)
 	exit(0);
 }
 
-void set_argv0(const char *role)
+void set_argv0(char role)
 {
-	snprintf(argv0, argv0sz, "werm.%s.%s", termid, role);
+	snprintf(argv0, argv0sz, "Wer%c.%s", role, maybetermid());
+}
+
+static void appendunqid(void)
+{
+	char *newtrid, *sfix;
+
+	sfix = next_uniqid();
+	xasprintf(&newtrid, "%s.%s", termid, sfix);
+	free(termid);
+	termid = newtrid;
+
+	printf("\\@appendid:.%s\n", sfix);
+	fflush(stdout);
+	free(sfix);
 }
 
 int main(int argc, char **argv)
@@ -1552,10 +1621,10 @@ int main(int argc, char **argv)
 	argv++;
 
 	if (1 == argc && !strcmp("test", *argv)) testmain();
-	if (1 == argc && !strcmp("canontermlinks", *argv)) {
+	if (1 == argc && !strcmp("newsessinlinks", *argv)) {
 		iterprofs(profpath(), &((struct iterprofspec){
 			.sigde = &((struct wrides){ 1 }),
-			.canonterm = 1,
+			.newsessin = 1,
 			.diaglog = 1,
 		}));
 		exit(0);
@@ -1568,6 +1637,7 @@ int main(int argc, char **argv)
 
 		srvargv = argv+1;
 		termid = strdup("~spawner");
+		appendunqid();
 		prepfordtach();
 		fprintf(stderr,
 "--- WARNING ---\n"
@@ -1581,7 +1651,7 @@ int main(int argc, char **argv)
 "--- STARTING DAEMONIZED SPAWNER PROCESS ---\n"
 "Access http://<host>/attach to get started\n"
 "\n",
-			rundir());
+			state_dir());
 
 		cdhome();
 
@@ -1633,6 +1703,8 @@ int main(int argc, char **argv)
 	unsetenv("SERVER_PROTOCOL");
 	unsetenv("SERVER_SOFTWARE");
 	unsetenv("UNIQUE_ID");
+
+	if (termid && !strchr(termid, '.')) appendunqid();
 
 	prepfordtach();
 	dtach_main();

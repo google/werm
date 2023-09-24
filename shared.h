@@ -23,7 +23,10 @@ extern char *dtach_sock;
 extern int first_attach;
 
 /* If true, will terminate process when last client disconnects. */
-extern int dtach_ephem;
+int is_ephem(void);
+
+/* Whether the dtach component is logging. */
+int dtach_logging(void);
 
 void _Noreturn dtach_main(void);
 int dtach_master(void);
@@ -45,7 +48,9 @@ void forward_stdin(int sock);
  * status updates (like the title) if needed. */
 void process_kbd(int ptyfd, int clioutfd, unsigned char *buf, size_t bufsz);
 
-void set_argv0(const char *role);
+/* role is a single character that identifies the role (e.g. master or
+ * attacher). */
+void set_argv0(char role);
 
 /* Called if the process was attached to for the first time. */
 void send_pream(int fd);
@@ -54,3 +59,16 @@ void send_pream(int fd);
  * the attaching process, as the attaching process may have a later date on it
  * and thus create a new log file that doesn't get written to. */
 void maybe_open_logs(void);
+
+/* Allocates a new string of sufficient size and prints a formatted string to
+ * it. Returns the length of the new string. */
+int xasprintf(char **strp, const char *format, ...)
+	__attribute__((format (printf, 2, 3)));
+
+/* Returns a directory used to store state the persists across reboots and
+ * server instances. */
+const char *state_dir(void);
+
+/* Returns the next unique terminal ID suffix to use, not including the first
+ * dot, e.g. "abc" */
+char *next_uniqid(void);

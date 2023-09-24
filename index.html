@@ -425,6 +425,12 @@ function term_init()
 				loadauxjs(aftcolon(s));
 				break;
 			}
+			else if (s.startsWith('\\@appendid:')) {
+				termid += aftcolon(s);
+				history.replaceState(
+					{}, '', '/?termid=' + termid);
+				break;
+			}
 			else
 				pend_display.push(hex_val(1) * 16 + hex_val(2));
 
@@ -549,11 +555,8 @@ function term_init()
 
 	function open_child_term()
 	{
-		var rand_ltr, newid;
-
-		rand_ltr = String.fromCharCode(97 + 26*Math.random());
-		newid = (termid || '') + '.' + rand_ltr;
-		window.open('/?termid=' + encodeURIComponent(newid));
+		var nid = encodeURIComponent(termid.replace(/\..*$/, ''));
+		window.open('/?termid=' + nid);
 	}
 
 	function open_log_term()

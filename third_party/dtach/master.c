@@ -372,7 +372,7 @@ masterprocess(int s, int statusfd)
 
 	/* Okay, disassociate ourselves from the original terminal, as we
 	** don't care what happens to it. */
-	if (!dtach_ephem) setsid();
+	if (!is_ephem()) setsid();
 
 	/* Set a trap to unlink the socket when we die. */
 	atexit(unlink_socket);
@@ -395,7 +395,7 @@ masterprocess(int s, int statusfd)
 	/* Set up some signals. */
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGXFSZ, SIG_IGN);
-	signal(SIGHUP, dtach_ephem ? die : SIG_IGN);
+	signal(SIGHUP, is_ephem() ? die : SIG_IGN);
 	signal(SIGTTIN, SIG_IGN);
 	signal(SIGTTOU, SIG_IGN);
 	signal(SIGINT, die);
@@ -410,7 +410,8 @@ masterprocess(int s, int statusfd)
 	nullfd = open("/dev/null", O_RDWR);
 	dup2(nullfd, 0);
 	dup2(nullfd, 1);
-	dup2(nullfd, 2);
+	if (!dtach_logging()) dup2(nullfd, 2);
+
 	if (nullfd > 2)
 		close(nullfd);
 
@@ -474,7 +475,7 @@ masterprocess(int s, int statusfd)
 			if (FD_ISSET(p->fd, &readfds))
 				client_activity(p);
 		}
-		if (!clients && first_attach && dtach_ephem) exit(0);
+		if (!clients && first_attach && is_ephem()) exit(0);
 		/* pty activity? */
 		if (FD_ISSET(the_pty.fd, &readfds))
 			pty_activity(s);
@@ -547,7 +548,7 @@ dtach_master(void)
 	else if (pid == 0)
 	{
 		/* Child - this becomes the master */
-		set_argv0("master");
+		set_argv0('m');
 		if (fd[0] != -1)
 			close(fd[0]);
 		masterprocess(s, fd[1]);

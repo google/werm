@@ -195,14 +195,15 @@ replaces the current tab.
 
 From the attach page you can create or reconnect to persistent sessions.
 
- * the "scratch" persistent sessions are named with a single capital letter,
-   and are accessible with the 26 single-letter links at the top of /attach
+ * use a link in the "Existing" section to open an existing persisent session
 
- * use a link in the "Persistent sessions" section to open an existing persisent
-   session
+ * the list labeled "New" on the left side of /attach contains a line
+   for every defined "profile." Any of these links will start a new session.
+   using that profile. To add a profile to get a particular workflow started,
+   see PROFILES.
 
- * the "Common" list at the left of /attach contains a line for every defined
-   "profile." This list is empty until you add your first profile (see PROFILES)
+ * The "New" list always starts with a "basic" link, which starts a profile with
+   an empty name.
 
 SCROLLBACK FEATURES
 
@@ -239,12 +240,22 @@ SCROLLBACK FEATURES
 
  * Scrollbacks are saved to disk in $WERMSRCDIR/var/YEAR/MONTH/DAY, excluding
    any content printed to the alternate screen. You can turn off the scrollback
-   feature and thereby prevent the logs from being written to disk by setting
-   $WERMFLAGS to "sblvl=" in the environment before running the server. The
-   default value of sblvl is "p" which means Plain scrollback logging is
-   enabled. Setting sblvl to "rp" (e.g. "export WERMFLAGS='sblvl=rp'") would
-   also turn on Raw logging, which saves the exact subprocess stdout/stderr
-   streams in files named '*.raw'.
+   feature and thereby prevent the logs from being written to disk by adding the
+   "sblvl=" argument to $WERMFLAGS (see WERMFLAGS ENVVAR). The default value of
+   sblvl is "p" which means Plain scrollback logging is enabled. Setting sblvl
+   to "rp" (e.g. "export WERMFLAGS='sblvl=rp'") would also turn on Raw logging,
+   which saves the exact subprocess stdout/stderr streams in files named
+   '*.raw'.
+
+WERMFLAGS ENVVAR
+
+The environment variable WERMFLAGS is a URL query string without the leading
+question mark, e.g. "foo=1&bar=2" or "baz=3". This must be set when starting the
+server, and the following values are supported:
+
+dtachlog=	set to anything to enable detailed logging for the dtach
+		component to /tmp/dtachlog.<pid> files
+sblvl=		see SCROLLBACK FEATURES
 
 PROFILES
 
@@ -280,9 +291,16 @@ profile-foo<--TAB-->source ~/.foorc<--TAB-->foo-macros1,foo-macros2,common-macro
 bar-profile<--TAB-->source ~/.barrc<--TAB-->bar-macros,common-macros
 basic<--TAB-->source ~/.basicrc
 no-preamble<--TAB--><--TAB-->common-macros
+<--TAB--># basic<--TAB-->common
 
 The first two profiles have all fields defined. The third profile has no extra
 JS to load, and the fourth profile has no preamble.
+
+The fifth profile has no name. The empty-name profile is the _basic_ profile,
+which always appears at the top of the New list in /attach. This is also the
+profile used for ephemeral sessions.
+
+CUSTOM PROFILES: PREAMBLE
 
 The preamble is typed automatically for you into the terminal when a new process
 has been started. If the preamble is not empty, a \n is automatically typed
@@ -319,6 +337,20 @@ window.extended_macros.foo_macros = [
 window.extended_macros.bar_macros = [
 	...
 ];
+
+TERMINAL ID
+
+When the process of a non-ephemeral terminal starts, it claims an ID of the form
+"<profile_name>.<uniq_id>". The <profile_name> is empty for the basic profile.
+<uniq_id> is an ID which is designed be opaque but short and unique even among
+all profiles. This ID is used in log file names, browser tab names, and `ps`
+output for Werm-releated processes. The unique ID is a base 34 number matching
+the regex [a-z2-9]+ where the least significant digit is first, so typing
+".<two characters>" is enough to identify the name out of all recently spawned
+terminals.
+
+To reset the unique ID back to a single digit, delete the file that begins with
+`$WERMSRCDIR/var/nextterid.` at any time.
 
 CAPSLOCK SIMULATION AND AUTO-OFF
 

@@ -1,0 +1,4 @@
+ok1	echo foo
+	echo empty1
+		jsempty2
+ok2	echo bar

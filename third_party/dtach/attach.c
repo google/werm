@@ -74,7 +74,7 @@ attach_main(int noerror)
 	fd_set readfds;
 	int s;
 
-	set_argv0("attach");
+	set_argv0('a');
 
 	/* Attempt to open the socket. Don't display an error if noerror is 
 	** set. */

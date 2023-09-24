@@ -212,25 +212,43 @@ illegal char '?' in profile name group=badnames line=6
 illegal char '\' in profile name group=badnames line=7
 illegal char '/' in profile name group=badnames line=7
 illegal char '"' in profile name group=badnames line=8
-TEST: bad names while outputting canonical terminal list
+TEST: bad names while outputting new session list
+profsig[<ul id="ctl---basic" class="newsessin-list"><li><a class="newses]
 reading profile dir at: test/profiles3
+profsig[sin-link" href="/?termid="><em>basic</em></a></ul>\012<ul id="ctl-b]
 illegal char '&' in profile name group=badnames line=1
 illegal char '+' in profile name group=badnames line=2
 illegal char '=' in profile name group=badnames line=2
 illegal char ' ' in profile name group=badnames line=3
-profsig[<ul id="ctl-badnames" class="canonterm-list"><li><a class="canon]
+profsig[adnames" class="newsessin-list"><li><a class="newsessin-link" hr]
 illegal char '%' in profile name group=badnames line=5
 illegal char '?' in profile name group=badnames line=6
 illegal char '\' in profile name group=badnames line=7
 illegal char '/' in profile name group=badnames line=7
 illegal char '"' in profile name group=badnames line=8
-profsig[term-link" href="/?termid=okname">okname</a></ul>\012]
-TEST: dump canonterm list
+profsig[ef="/?termid=okname">okname</a></ul>\012]
+TEST: dump newsessin list
+profsig[<ul id="ctl---basic" class="newsessin-list"><li><a class="newses]
 reading profile dir at: test/profilesname
-profsig[<ul id="ctl-thegrp" class="canonterm-list"><li><a class="canonte]
-profsig[rm-link" href="/?termid=item1">item1</a><li><a class="canonterm-]
-profsig[link" href="/?termid=foo">foo</a><li><a class="canonterm-link" h]
-profsig[ref="/?termid=item3">item3</a></ul>\012]
+profsig[sin-link" href="/?termid="><em>basic</em></a></ul>\012<ul id="ctl-t]
+profsig[hegrp" class="newsessin-list"><li><a class="newsessin-link" href]
+profsig[="/?termid=item1">item1</a><li><a class="newsessin-link" href="/]
+profsig[?termid=foo">foo</a><li><a class="newsessin-link" href="/?termid]
+profsig[=item3">item3</a></ul>\012]
+TEST: empty profile name
+profsig[<ul id="ctl---basic" class="newsessin-list"><li><a class="newses]
+reading profile dir at: test/emptyprof
+profsig[sin-link" href="/?termid="><em>basic</em></a></ul>\012<ul id="ctl-g]
+profsig[rp" class="newsessin-list"><li><a class="newsessin-link" href="/]
+profsig[?termid=ok1">ok1</a><li><a class="newsessin-link" href="/?termid]
+profsig[=ok2">ok2</a></ul>\012]
+reading profile dir at: test/emptyprof
+profsig[echo empty1\012]
+reading profile dir at: test/emptyprof
+profsig[\\@auxjs:jsempty2\012]
+TEST: ephemeral session uses basic profile config
+reading profile dir at: test/emptyprof
+profsig[echo empty1\012\\@auxjs:jsempty2\012]
 TEST: parse termid arg
 hello
 TEST: unrecognized query string arg

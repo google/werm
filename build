@@ -55,7 +55,10 @@ $!s/$/\\012/
 	done
 )
 
-	cc -x c -std=c99 -I. -D_POSIX_C_SOURCE=200809L \
+	cc -x c -std=c99 -I. \
+	 -D_POSIX_C_SOURCE=200809L \
+	 -D_XOPEN_SOURCE=600 \
+	 -D_GNU_SOURCE \
 	 -Werror=format \
 	 -Werror=return-type \
 	 $WERMCCFLAGS \
@@ -63,6 +66,7 @@ $!s/$/\\012/
 	 session.c \
 	 outstreams.c \
 	 shared.c \
+	 uniqid.c \
 	 test/raw/*.c \
 	 third_party/dtach/*.c \
 	 tm.c \

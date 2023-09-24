@@ -46,7 +46,7 @@ h1 {
 	padding-right: 24pt;
 	border: 2px solid yellow;
 }
-.canonterm-list {
+.newsessin-list {
 	margin-top: 1em;
 	padding-left: 0;
 	list-style-type: none;
@@ -54,11 +54,6 @@ h1 {
 a {
 	color: white;
 	text-decoration: none;
-}
-a.scratch-link {
-	text-decoration: none;
-	margin-left: 7pt;
-	font-size:1.2em;
 }
 .feedback {
 	padding: 0.5em;
@@ -68,62 +63,27 @@ a.scratch-link {
 </head>
 <body style="font-family: monospace; font-size: 14px;  background-color: black; color: #8f8;">
 <table style="border: 2px solid yellow; border-collapse: collapse">
-<tr>
-<td class=column style="vertical-align: middle">
-<h1 style="border: 0px; padding: 0; margin: 0">scratch</h1>
-<td style="padding: 7pt">
-<div style="padding-bottom: 7pt">
-<a href=/?termid=A class=scratch-link>{A}</a>
-<a href=/?termid=B class=scratch-link>{B}</a>
-<a href=/?termid=C class=scratch-link>{C}</a>
-<a href=/?termid=D class=scratch-link>{D}</a>
-<a href=/?termid=E class=scratch-link>{E}</a>
-<a href=/?termid=F class=scratch-link>{F}</a>
-<a href=/?termid=G class=scratch-link>{G}</a>
-<a href=/?termid=H class=scratch-link>{H}</a>
-<a href=/?termid=I class=scratch-link>{I}</a>
-<a href=/?termid=J class=scratch-link>{J}</a>
-<a href=/?termid=K class=scratch-link>{K}</a>
-<a href=/?termid=L class=scratch-link>{L}</a>
-<a href=/?termid=M class=scratch-link>{M}</a>
-</div>
-<div>
-<a href=/?termid=N class=scratch-link>{N}</a>
-<a href=/?termid=O class=scratch-link>{O}</a>
-<a href=/?termid=P class=scratch-link>{P}</a>
-<a href=/?termid=Q class=scratch-link>{Q}</a>
-<a href=/?termid=R class=scratch-link>{R}</a>
-<a href=/?termid=S class=scratch-link>{S}</a>
-<a href=/?termid=T class=scratch-link>{T}</a>
-<a href=/?termid=U class=scratch-link>{U}</a>
-<a href=/?termid=V class=scratch-link>{V}</a>
-<a href=/?termid=W class=scratch-link>{W}</a>
-<a href=/?termid=X class=scratch-link>{X}</a>
-<a href=/?termid=Y class=scratch-link>{Y}</a>
-<a href=/?termid=Z class=scratch-link>{Z}</a>
-</div>
-</tr>
 
 <tr>
-<td class=column style="vertical-align:top">
-<h1>Common</h1>
+<td nowrap class=column style="vertical-align:top">
+<h1>New</h1>
 EOF
 
-$WERMSRCDIR/session canontermlinks | sort
+$WERMSRCDIR/session newsessinlinks | LC_ALL=C sort
 
 cat <<EOF
-<td class=column style="vertical-align: top">
-<h1>Active sessions</h1>
+<td nowrap class=column style="vertical-align: top">
+<h1>Existing</h1>
 <table>
 EOF
 
 # We redundantly verify a part of the path printed by lsof within awk because I
 # have seen lsof return totally different paths (also sockets) in the case of
 # files that are deleted but still open: Linux 6.3.11, lsof 4.95.0, Debian
-lsof -Fn $WERMSRCDIR/var/socks/prsist.* |
+lsof -Fn $WERMSRCDIR/var/socks/prs%* |
 awk '
-/^n.*\/var\/socks\/prsist\./ {
-	sub(/^n.*\/var\/socks\/prsist[.]/, "", $1);
+/^n.*\/var\/socks\/prs%/ {
+	sub(/^n.*\/var\/socks\/prs%/, "", $1);
 	count[$1] += 1;
 }
 END {
@@ -151,7 +111,7 @@ cat <<EOF
 </table>
 <div class=ephemeral-sessions>Ephemeral sessions:
 EOF
-find $WERMSRCDIR/var/socks/ephemr.* | wc -l
+find $WERMSRCDIR/var/socks/eph%* | wc -l
 cat <<EOF
 </div>
 </tr>

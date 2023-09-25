@@ -123,7 +123,7 @@ void test_outstreams(void)
 	struct fdbuf b = {&de, 32};
 	int i;
 
-	dprintf(1, "TEST OUTSTREAMS\n");
+	printf("TEST OUTSTREAMS\n");
 	fdb_apnd(&b, "hello\n", -1);
 	fdb_apnd(&b, "goodbye\n do not print this part", 8);
 	fdb_finsh(&b);
@@ -131,7 +131,7 @@ void test_outstreams(void)
 	de.escannot = "customcap";
 	b.cap = 7;
 	fdb_apnd(&b, "abcdefghijklmnopqrstuvwxyz....0123456789", -1);
-	dprintf(1, "about to flush: ");
+	printf("about to flush: ");
 	fdb_finsh(&b);
 
 	/* no wrides */
@@ -139,11 +139,11 @@ void test_outstreams(void)
 	b.de = 0;
 	de.escannot = "grow unboundedly";
 	fdb_apnd(&b, "abcdefghijklmnopqrstuvwxyz....0123456789", -1);
-	dprintf(1, "grow unboundedly: %u,%u ", b.len, b.cap);
+	printf("grow unboundedly: %u,%u ", b.len, b.cap);
 	fdb_apnd(&b, "ABCDEFGHIJKLMNOPQRSTUVWXYZ....!@#$!@#$!?", -1);
-	dprintf(1, "%u,%u\n", b.len, b.cap);
+	printf("%u,%u\n", b.len, b.cap);
 	full_write(&de, b.bf, b.len);
-	dprintf(1, "finishing capacity: %u\n", b.cap);
+	printf("finishing capacity: %u\n", b.cap);
 	fdb_finsh(&b);
 
 	de.escannot = "customcap+multipleapnd";

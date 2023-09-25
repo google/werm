@@ -75,8 +75,9 @@ static void pickcand(struct pckd *c)
 		if (strncmp(sdde->d_name, STATEPREF, PREFLEN)) continue;
 
 		if (c->oldpath) {
-			dprintf(2, "There is more than one file named %s/%s*!"
-				   " Delete the extra ones.\n",
+			fprintf(stderr,
+				"There is more than one file named %s/%s*!"
+				" Delete the extra ones.\n",
 				state_dir(), STATEPREF);
 			abort();
 		}
@@ -87,7 +88,8 @@ static void pickcand(struct pckd *c)
 	if (errno) { perror("readdir"); abort(); }
 
 	if (!c->oldpath) {
-		dprintf(2, "did not find curr ID file %s/%s*; will create\n",
+		fprintf(stderr,
+			"did not find curr ID file %s/%s*; will create\n",
 			state_dir(), STATEPREF);
 		c->next = strdup("a");
 	}

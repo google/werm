@@ -404,7 +404,8 @@ static void processquerystr(const char *fullqs)
 		if (extractqueryarg("sblvl=", &sblvl)) continue;
 		if (extractqueryarg("dtachlog=", &dtachlog)) continue;
 
-		dprintf(2, "invalid query string arg at char pos %zu in '%s'\n",
+		fprintf(stderr,
+			"invalid query string arg at char pos %zu in '%s'\n",
 			qs - fullqs, fullqs);
 
 		qs = strchrnul(qs, '&');
@@ -1025,27 +1026,27 @@ static void writetosp0term(const char *s)
 	writetosubproccore(&pty, &cli, (const unsigned char *)s, len);
 
 	if (wts.sendsigwin)
-		dprintf(1, "sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
+		printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
 }
 
-static void tstdesc(const char *d) { dprintf(1, "TEST: %s\n", d); }
+static void tstdesc(const char *d) { printf("TEST: %s\n", d); }
 
 static void testqrystring(void)
 {
 	tstdesc("parse termid arg");
 	testreset();
 	processquerystr("termid=hello");
-	dprintf(2, "%s\n", termid);
+	printf("%s\n", termid);
 
 	tstdesc("unrecognized query string arg");
 	testreset();
 	processquerystr("logview=test&huhtest=987");
-	dprintf(2, "logview=%s\n", logview);
+	printf("logview=%s\n", logview);
 
 	tstdesc("empty arg, escapes, and omitted arg");
 	testreset();
 	processquerystr("sblvl=&termid=%21escapes%7eand%45");
-	dprintf(2, "%zu,%s,%d\n", strlen(sblvl), termid, !logview);
+	printf("%zu,%s,%d\n", strlen(sblvl), termid, !logview);
 }
 
 static void testiterprofs(void)
@@ -1518,7 +1519,7 @@ static void _Noreturn testmain(void)
 	tstdesc("... continued: unset title, respond with empty title");
 	writetosp0term("thisisnormalkeybinput\\t\n");
 	putrwout();
-	dprintf(1, "(should not include title here): ");
+	printf("(should not include title here): ");
 	recountstate4test();
 	putrwout();
 
@@ -1531,8 +1532,7 @@ static void _Noreturn testmain(void)
 	putrwout();
 	/* line buffer should not be clobbered by overflowing ttl buffer. */
 	process_tty_out(&tsrout, "\r\n", -1);
-	dprintf(1, "stored title length: %zu\n",
-		strnlen(wts.ttl, sizeof wts.ttl));
+	printf("stored title length: %zu\n", strnlen(wts.ttl, sizeof wts.ttl));
 
 	tstdesc("do not include altscreen content in scrollback log");
 	writelgon();
@@ -1606,12 +1606,15 @@ static void appendunqid(void)
 	termid = newtrid;
 
 	printf("\\@appendid:.%s\n", sfix);
-	fflush(stdout);
 	free(sfix);
 }
 
 int main(int argc, char **argv)
 {
+	errno = 0;
+	if (setvbuf(stdout, 0, _IONBF, 0))
+		err(1, "could not turn off stdout buffering");
+
 	argv0 = argv[0];
 	argv0sz = strlen(argv0)+1;
 	memset(argv0, ' ', argv0sz-1);

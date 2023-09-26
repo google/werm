@@ -571,11 +571,6 @@ struct iterprofspec {
 	 * Always sent to stderr
 	 */
 	unsigned diaglog	: 1;
-
-	/* whether to annotate and escape output sent to sigfd, in order to make
-	 * it more human-readable and separate from other output going to the
-	 * same stream. */
-	unsigned annotsig	: 1;
 };
 
 /* Transfers the prior recbyts bytes from srcf, measured from one byte before

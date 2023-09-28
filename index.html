@@ -555,7 +555,9 @@ function term_init()
 
 	function open_child_term()
 	{
-		var nid = encodeURIComponent(termid.replace(/\..*$/, ''));
+		var nid = '';
+		if (termid)
+			nid = encodeURIComponent(termid.replace(/\..*$/, ''));
 		window.open('/?termid=' + nid);
 	}
 

@@ -53,7 +53,7 @@ func NewWebsocketdHandler(s *WebsocketdServer, req *http.Request, log *LogScope)
 	}
 	log.Associate("command", wsh.command)
 
-	wsh.Env = createEnv(wsh, req, log)
+	wsh.Env = createEnv(req)
 
 	return wsh, nil
 }

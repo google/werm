@@ -1604,6 +1604,21 @@ static void appendunqid(void)
 	free(sfix);
 }
 
+static void _Noreturn doshowenv(void)
+{
+	int syst;
+
+	/* Let perror and other errors show in the page. */
+	if (0 > dup2(1, 2)) printf("dup2 stderr to stdout error! %d\n", errno);
+
+	if (0 > (syst=system("env")))
+		perror("starting 'env'");
+	else if (syst)
+		printf("\n'env' exited with error: %d\n", WEXITSTATUS(syst));
+
+	exit(0);
+}
+
 int main(int argc, char **argv)
 {
 	errno = 0;
@@ -1627,6 +1642,7 @@ int main(int argc, char **argv)
 		}));
 		exit(0);
 	}
+	if (1 == argc && !strcmp("/showenv", *argv)) doshowenv();
 
 	processquerystr(getenv("WERMFLAGS"));
 
@@ -1667,40 +1683,7 @@ int main(int argc, char **argv)
 	}
 
 	processquerystr(getenv("QUERY_STRING"));
-
-	/* Set by websocketd and not wanted. CGI-related cruft: */
-	unsetenv("AUTH_TYPE");
-	unsetenv("CONTENT_LENGTH");
-	unsetenv("CONTENT_TYPE");
-	unsetenv("GATEWAY_INTERFACE");
-	unsetenv("HTTP_ACCEPT_ENCODING");
-	unsetenv("HTTP_ACCEPT_LANGUAGE");
-	unsetenv("HTTP_CACHE_CONTROL");
-	unsetenv("HTTP_CONNECTION");
-	unsetenv("HTTP_ORIGIN");
-	unsetenv("HTTP_PRAGMA");
-	unsetenv("HTTPS");
-	unsetenv("HTTP_SEC_WEBSOCKET_EXTENSIONS");
-	unsetenv("HTTP_SEC_WEBSOCKET_KEY");
-	unsetenv("HTTP_SEC_WEBSOCKET_VERSION");
-	unsetenv("HTTP_UPGRADE");
-	unsetenv("HTTP_USER_AGENT");
-	unsetenv("PATH_INFO");
-	unsetenv("PATH_TRANSLATED");
 	unsetenv("QUERY_STRING");
-	unsetenv("REMOTE_ADDR");
-	unsetenv("REMOTE_HOST");
-	unsetenv("REMOTE_IDENT");
-	unsetenv("REMOTE_PORT");
-	unsetenv("REMOTE_USER");
-	unsetenv("REQUEST_METHOD");
-	unsetenv("REQUEST_URI");
-	unsetenv("SCRIPT_NAME");
-	unsetenv("SERVER_NAME");
-	unsetenv("SERVER_PORT");
-	unsetenv("SERVER_PROTOCOL");
-	unsetenv("SERVER_SOFTWARE");
-	unsetenv("UNIQUE_ID");
 
 	if (termid && !strchr(termid, '.')) appendunqid();
 

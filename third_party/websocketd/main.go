@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -41,9 +40,6 @@ func main() {
 
 	log := libwebsocketd.RootLogScope(config.LogLevel, logfunc)
 
-	if runtime.GOOS != "windows" { // windows relies on env variables to find its libs... e.g. socket stuff
-		os.Clearenv() // it's ok to wipe it clean, we already read env variables from passenv into config
-	}
 	handler := libwebsocketd.NewWebsocketdServer(config.Config, log, config.MaxForks)
 	http.Handle("/", handler)
 

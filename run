@@ -16,18 +16,6 @@
 cd `dirname $0`
 export WERMSRCDIR=`pwd`
 
-passenv=/tmp/werm_passenv.$$
-
-cat >| $passenv << EOF
-WERMSRCDIR,DISPLAY,PATH,HOME,SHELL,DBUS_SESSION_BUS_ADDRESS,XDG_RUNTIME_DIR,LANG
-LANGUAGE,USER,WERMPROFPATH,WERMJSPATH
-EOF
-
-env | sed '
-	/^\(LC_[A-Z]*\)=.*/!d
-	s//\1/
-' >> $passenv
-
 set -x
 # We run the `session` binary with the fully-qualified path so that the argv[0]
 # string can be overwritten with long strings.
@@ -35,7 +23,6 @@ set -x
 # right before exec'ing it, so that spawned shells will start at home for free.
 exec "$PWD/session" serve \
 	"$PWD/third_party/websocketd/websocketd" \
-	--passenv `tr '\n' , <$passenv` \
 	--cgidir="$PWD/cgi" \
 	--staticdir="$PWD" \
 	"$@" \

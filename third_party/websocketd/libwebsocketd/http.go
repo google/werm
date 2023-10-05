@@ -8,12 +8,14 @@ package libwebsocketd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/cgi"
 	"net/textproto"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -103,7 +105,7 @@ func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		upgradeRe := regexp.MustCompile(`(?i)(^|[,\s])Upgrade($|[,\s])`)
 		// WebSocket, limited to size of h.forks
 		if strings.ToLower(hdrs.Get("Upgrade")) == "websocket" && upgradeRe.MatchString(hdrs.Get("Connection")) {
-			if h.noteForkCreated() == nil {
+			if h.noteForkCreated(w, log) {
 				defer h.noteForkCompled()
 
 				// start figuring out if we even need to upgrade
@@ -145,9 +147,6 @@ func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				handler.accept(conn, log)
 				return
 
-			} else {
-				log.Error("http", "Max of possible forks already active, upgrade rejected")
-				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
 			}
 			return
 		}
@@ -155,31 +154,54 @@ func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	pushHeaders(w.Header(), h.Config.HeadersHTTP)
 
+	if req.URL.Path == "/showenv" {
+		upth := req.URL.Path
+
+		if ! h.noteForkCreated(w, log) { return }
+		defer h.noteForkCompled()
+
+		log.Access("http", upth);
+
+		sess := &exec.Cmd{
+			Path:	h.Config.CommandName,
+			Args:	[]string{ h.Config.CommandName, upth },
+		}
+
+		soutr, err := sess.StdoutPipe()
+		if err != nil {
+			log.Access(upth, "cannot make pipe: %s", err)
+			return
+		}
+		defer soutr.Close()
+
+		if err = sess.Start(); err != nil {
+			log.Access(upth, "err starting handler: %s", err)
+			return
+		}
+		defer sess.Wait()
+
+		if _, err := io.Copy(w, soutr); err != nil {
+			log.Access(upth, "err sending handler output: %s", err)
+		}
+
+		return
+	}
+
 	// CGI scripts, limited to size of h.forks
 	if h.Config.CgiDir != "" {
 		filePath := path.Join(h.Config.CgiDir, fmt.Sprintf(".%s", filepath.FromSlash(req.URL.Path)))
 		if fi, err := os.Stat(filePath); err == nil && !fi.IsDir() {
 
 			log.Associate("cgiscript", filePath)
-			if h.noteForkCreated() == nil {
+			if h.noteForkCreated(w, log) {
 				defer h.noteForkCompled()
 
-				// Make variables to supplement cgi... Environ it uses will show empty list.
-				envlen := len(h.Config.ParentEnv)
-				cgienv := make([]string, envlen+1)
-				if envlen > 0 {
-					copy(cgienv, h.Config.ParentEnv)
-				}
-				cgienv[envlen] = "SERVER_SOFTWARE=" + h.Config.ServerSoftware
 				cgiHandler := &cgi.Handler{
 					Path: filePath,
-					Env: cgienv,
+					Env: os.Environ(),
 				}
 				log.Access("http", "CGI")
 				cgiHandler.ServeHTTP(w, req)
-			} else {
-				log.Error("http", "Fork not allowed since maxforks amount has been reached. CGI was not run.")
-				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
 			}
 			return
 		}
@@ -223,18 +245,20 @@ func (h *WebsocketdServer) TellURL(scheme, host, path string) string {
 	return scheme + "://" + host + path
 }
 
-func (h *WebsocketdServer) noteForkCreated() error {
+func (h *WebsocketdServer) noteForkCreated(w http.ResponseWriter, log *LogScope) bool {
 	// note that forks can be nil since the construct could've been created by
 	// someone who is not using NewWebsocketdServer
 	if h.forks != nil {
 		select {
 		case h.forks <- 1:
-			return nil
+			return true
 		default:
-			return ForkNotAllowedError
+			log.Error("http", "Max of possible forks already active, upgrade rejected")
+			http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+			return false
 		}
 	} else {
-		return nil
+		return true
 	}
 }
 

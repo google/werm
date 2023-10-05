@@ -31,8 +31,4 @@ type Config struct {
 	Headers        []string
 	HeadersWs      []string
 	HeadersHTTP    []string
-
-	// created environment
-	Env       []string // Additional environment variables to pass to process ("key=value").
-	ParentEnv []string // Variables kept from os.Environ() before sanitizing it for subprocess.
 }

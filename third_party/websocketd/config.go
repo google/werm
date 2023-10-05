@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -38,18 +37,6 @@ func (al *Arglist) String() string {
 func (al *Arglist) Set(value string) error {
 	*al = append(*al, value)
 	return nil
-}
-
-// Borrowed from net/http/cgi
-var defaultPassEnv = map[string]string{
-	"darwin":  "PATH,DYLD_LIBRARY_PATH",
-	"freebsd": "PATH,LD_LIBRARY_PATH",
-	"hpux":    "PATH,LD_LIBRARY_PATH,SHLIB_PATH",
-	"irix":    "PATH,LD_LIBRARY_PATH,LD_LIBRARYN32_PATH,LD_LIBRARY64_PATH",
-	"linux":   "PATH,LD_LIBRARY_PATH",
-	"openbsd": "PATH,LD_LIBRARY_PATH",
-	"solaris": "PATH,LD_LIBRARY_PATH,LD_LIBRARY_PATH_32,LD_LIBRARY_PATH_64",
-	"windows": "PATH,SystemRoot,COMSPEC,PATHEXT,WINDIR",
 }
 
 func parseCommandLine() *Config {
@@ -81,7 +68,6 @@ func parseCommandLine() *Config {
 	scriptDirFlag := flag.String("dir", "", "Base directory for WebSocket scripts")
 	staticDirFlag := flag.String("staticdir", "", "Serve static content from this directory over HTTP")
 	cgiDirFlag := flag.String("cgidir", "", "Serve CGI scripts from this directory over HTTP")
-	passEnvFlag := flag.String("passenv", defaultPassEnv[runtime.GOOS], "List of envvars to pass to subprocesses (others will be cleaned out)")
 	sameOriginFlag := flag.Bool("sameorigin", false, "Restrict upgrades if origin and host headers differ")
 	allowOriginsFlag := flag.String("origin", "", "Restrict upgrades if origin does not match the list")
 
@@ -157,22 +143,6 @@ func parseCommandLine() *Config {
 
 	mainConfig.CertFile = *sslCert
 	mainConfig.KeyFile = *sslKey
-
-	// Building config.ParentEnv to avoid calling Environ all the time in the scripts
-	// (caller is responsible for wiping environment if desired)
-	config.ParentEnv = make([]string, 0)
-	newlineCleaner := strings.NewReplacer("\n", " ", "\r", " ")
-	for _, key := range strings.Split(*passEnvFlag, ",") {
-		if key != "HTTPS" {
-			if v := os.Getenv(key); v != "" {
-				// inevitably adding flavor of libwebsocketd appendEnv func.
-				// it's slightly nicer than in net/http/cgi implementation
-				if clean := strings.TrimSpace(newlineCleaner.Replace(v)); clean != "" {
-					config.ParentEnv = append(config.ParentEnv, fmt.Sprintf("%s=%s", key, clean))
-				}
-			}
-		}
-	}
 
 	if *allowOriginsFlag != "" {
 		config.AllowOrigins = strings.Split(*allowOriginsFlag, ",")

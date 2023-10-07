@@ -66,12 +66,6 @@ type Upgrader struct {
 	// A CheckOrigin function should carefully validate the request origin to
 	// prevent cross-site request forgery.
 	CheckOrigin func(r *http.Request) bool
-
-	// EnableCompression specify if the server should attempt to negotiate per
-	// message compression (RFC 7692). Setting this value to true does not
-	// guarantee that compression will be supported. Currently only "no context
-	// takeover" modes are supported.
-	EnableCompression bool
 }
 
 func (u *Upgrader) returnError(w http.ResponseWriter, r *http.Request, status int, reason string) (*Conn, error) {
@@ -160,18 +154,6 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 
 	subprotocol := u.selectSubprotocol(r, responseHeader)
 
-	// Negotiate PMCE
-	var compress bool
-	if u.EnableCompression {
-		for _, ext := range parseExtensions(r.Header) {
-			if ext[""] != "permessage-deflate" {
-				continue
-			}
-			compress = true
-			break
-		}
-	}
-
 	h, ok := w.(http.Hijacker)
 	if !ok {
 		return u.returnError(w, r, http.StatusInternalServerError, "websocket: response does not implement http.Hijacker")
@@ -204,11 +186,6 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 	c := newConn(netConn, true, u.ReadBufferSize, u.WriteBufferSize, u.WriteBufferPool, br, writeBuf)
 	c.subprotocol = subprotocol
 
-	if compress {
-		c.newCompressionWriter = compressNoContextTakeover
-		c.newDecompressionReader = decompressNoContextTakeover
-	}
-
 	// Use larger of hijacked buffer and connection write buffer for header.
 	p := buf
 	if len(c.writeBuf) > len(p) {
@@ -223,9 +200,6 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 		p = append(p, "Sec-WebSocket-Protocol: "...)
 		p = append(p, c.subprotocol...)
 		p = append(p, "\r\n"...)
-	}
-	if compress {
-		p = append(p, "Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover\r\n"...)
 	}
 	for k, vs := range responseHeader {
 		if k == "Sec-Websocket-Protocol" {

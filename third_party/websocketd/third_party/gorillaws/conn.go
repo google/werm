@@ -314,8 +314,6 @@ func newConn(conn net.Conn, isServer bool, readBufferSize, writeBufferSize int, 
 		writeBuf:               writeBuf,
 		writePool:              writeBufferPool,
 		writeBufSize:           writeBufferSize,
-		enableWriteCompression: true,
-		compressionLevel:       defaultCompressionLevel,
 	}
 	c.SetCloseHandler(nil)
 	c.SetPingHandler(nil)
@@ -729,28 +727,6 @@ func (w *messageWriter) Close() error {
 		return w.err
 	}
 	return w.flushFrame(true, nil)
-}
-
-// WritePreparedMessage writes prepared message into connection.
-func (c *Conn) WritePreparedMessage(pm *PreparedMessage) error {
-	frameType, frameData, err := pm.frame(prepareKey{
-		isServer:         c.isServer,
-		compress:         c.newCompressionWriter != nil && c.enableWriteCompression && isData(pm.messageType),
-		compressionLevel: c.compressionLevel,
-	})
-	if err != nil {
-		return err
-	}
-	if c.isWriting {
-		panic("concurrent write to websocket connection")
-	}
-	c.isWriting = true
-	err = c.write(frameType, c.writeDeadline, frameData, nil)
-	if !c.isWriting {
-		panic("concurrent write to websocket connection")
-	}
-	c.isWriting = false
-	return err
 }
 
 // WriteMessage is a helper method for getting a writer using NextWriter,
@@ -1201,25 +1177,6 @@ func (c *Conn) NetConn() net.Conn {
 // Deprecated: Use the NetConn method.
 func (c *Conn) UnderlyingConn() net.Conn {
 	return c.conn
-}
-
-// EnableWriteCompression enables and disables write compression of
-// subsequent text and binary messages. This function is a noop if
-// compression was not negotiated with the peer.
-func (c *Conn) EnableWriteCompression(enable bool) {
-	c.enableWriteCompression = enable
-}
-
-// SetCompressionLevel sets the flate compression level for subsequent text and
-// binary messages. This function is a noop if compression was not negotiated
-// with the peer. See the compress/flate package for a description of
-// compression levels.
-func (c *Conn) SetCompressionLevel(level int) error {
-	if !isValidCompressionLevel(level) {
-		return errors.New("websocket: invalid compression level")
-	}
-	c.compressionLevel = level
-	return nil
 }
 
 // FormatCloseMessage formats closeCode and text as a WebSocket close message.

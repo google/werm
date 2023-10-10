@@ -524,7 +524,7 @@ function term_init()
 		sock.onmessage = function(e) {
 			if (log_packin)
 				console.log(`packet in ${e.data.length} chr(s)`,
-					    e.data);
+					    [e.data]);
 			display(e.data);
 		};
 	}

@@ -97,11 +97,7 @@ func (pe *ProcessEndpoint) Send(msg []byte) bool {
 
 func (pe *ProcessEndpoint) StartReading() {
 	go pe.log_stderr()
-	if pe.bin {
-		go pe.process_binout()
-	} else {
-		go pe.process_txtout()
-	}
+	go pe.process_txtout()
 }
 
 func (pe *ProcessEndpoint) process_txtout() {
@@ -117,23 +113,6 @@ func (pe *ProcessEndpoint) process_txtout() {
 			break
 		}
 		pe.output <- trimEOL(buf)
-	}
-	close(pe.output)
-}
-
-func (pe *ProcessEndpoint) process_binout() {
-	buf := make([]byte, 10*1024*1024)
-	for {
-		n, err := pe.process.stdout.Read(buf)
-		if err != nil {
-			if err != io.EOF {
-				pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
-			} else {
-				pe.log.Debug("process", "Process STDOUT closed")
-			}
-			break
-		}
-		pe.output <- append(make([]byte, 0, n), buf[:n]...) // cloned buffer
 	}
 	close(pe.output)
 }

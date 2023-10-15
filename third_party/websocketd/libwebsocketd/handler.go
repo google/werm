@@ -78,7 +78,23 @@ func (wsh *WebsocketdHandler) accept(ws *gorillaws.Conn, log *LogScope) {
 	}
 	wsEndpoint := NewWebSocketEndpoint(ws, log)
 
-	PipeEndpoints(process, wsEndpoint)
+	wsEndpoint.StartReading()
+	process.StartReading()
+
+	defer wsEndpoint.Terminate()
+	defer process.Terminate()
+	for {
+		select {
+		case msgOne, ok := <-wsEndpoint.Output():
+			if !ok || !process.Send(msgOne) {
+				return
+			}
+		case msgTwo, ok := <-process.Output():
+			if !ok || !wsEndpoint.Send(msgTwo) {
+				return
+			}
+		}
+	}
 }
 
 // RemoteInfo holds information about remote http client

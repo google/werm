@@ -277,9 +277,6 @@ type Conn struct {
 	handleClose   func(int, string) error
 	readErrCount  int
 	messageReader *messageReader // the current low-level reader
-
-	readDecompress         bool // whether last read frame had RSV1 set
-	newDecompressionReader func(io.Reader) io.ReadCloser
 }
 
 func newConn(conn net.Conn, isServer bool, readBufferSize, writeBufferSize int, writeBufferPool BufferPool, br *bufio.Reader, writeBuf []byte) *Conn {
@@ -729,33 +726,6 @@ func (w *messageWriter) Close() error {
 	return w.flushFrame(true, nil)
 }
 
-// WriteMessage is a helper method for getting a writer using NextWriter,
-// writing the message and closing the writer.
-func (c *Conn) WriteMessage(messageType int, data []byte) error {
-
-	if c.isServer && (c.newCompressionWriter == nil || !c.enableWriteCompression) {
-		// Fast path with no allocations and single frame.
-
-		var mw messageWriter
-		if err := c.beginMessage(&mw, messageType); err != nil {
-			return err
-		}
-		n := copy(c.writeBuf[mw.pos:], data)
-		mw.pos += n
-		data = data[n:]
-		return mw.flushFrame(true, data)
-	}
-
-	w, err := c.NextWriter(messageType)
-	if err != nil {
-		return err
-	}
-	if _, err = w.Write(data); err != nil {
-		return err
-	}
-	return w.Close()
-}
-
 // SetWriteDeadline sets the write deadline on the underlying network
 // connection. After a write has timed out, the websocket state is corrupt and
 // all future writes will return an error. A zero value for t means writes will
@@ -795,13 +765,8 @@ func (c *Conn) advanceFrame() (int, error) {
 	mask := p[1]&maskBit != 0
 	c.setReadRemaining(int64(p[1] & 0x7f))
 
-	c.readDecompress = false
 	if rsv1 {
-		if c.newDecompressionReader != nil {
-			c.readDecompress = true
-		} else {
-			errors = append(errors, "RSV1 set")
-		}
+		errors = append(errors, "RSV1 set")
 	}
 
 	if rsv2 {
@@ -991,9 +956,6 @@ func (c *Conn) NextReader() (messageType int, r io.Reader, err error) {
 		if frameType == TextMessage || frameType == BinaryMessage {
 			c.messageReader = &messageReader{c}
 			c.reader = c.messageReader
-			if c.readDecompress {
-				c.reader = c.newDecompressionReader(c.reader)
-			}
 			return frameType, c.reader, nil
 		}
 	}
@@ -1062,18 +1024,6 @@ func (r *messageReader) Close() error {
 	return nil
 }
 
-// ReadMessage is a helper method for getting a reader using NextReader and
-// reading from that reader to a buffer.
-func (c *Conn) ReadMessage() (messageType int, p []byte, err error) {
-	var r io.Reader
-	messageType, r, err = c.NextReader()
-	if err != nil {
-		return messageType, nil, err
-	}
-	p, err = ioutil.ReadAll(r)
-	return messageType, p, err
-}
-
 // SetReadDeadline sets the read deadline on the underlying network connection.
 // After a read has timed out, the websocket connection state is corrupt and
 // all future reads will return an error. A zero value for t means reads will
@@ -1099,7 +1049,7 @@ func (c *Conn) CloseHandler() func(code int, text string) error {
 // if the close message is empty. The default close handler sends a close
 // message back to the peer.
 //
-// The handler function is called from the NextReader, ReadMessage and message
+// The handler function is called from the NextReader and message
 // reader Read methods. The application must read the connection to process
 // close messages as described in the section on Control Messages above.
 //
@@ -1128,7 +1078,7 @@ func (c *Conn) PingHandler() func(appData string) error {
 // The appData argument to h is the PING message application data. The default
 // ping handler sends a pong to the peer.
 //
-// The handler function is called from the NextReader, ReadMessage and message
+// The handler function is called from the NextReader and message
 // reader Read methods. The application must read the connection to process
 // ping messages as described in the section on Control Messages above.
 func (c *Conn) SetPingHandler(h func(appData string) error) {
@@ -1155,7 +1105,7 @@ func (c *Conn) PongHandler() func(appData string) error {
 // The appData argument to h is the PONG message application data. The default
 // pong handler does nothing.
 //
-// The handler function is called from the NextReader, ReadMessage and message
+// The handler function is called from the NextReader and message
 // reader Read methods. The application must read the connection to process
 // pong messages as described in the section on Control Messages above.
 func (c *Conn) SetPongHandler(h func(appData string) error) {

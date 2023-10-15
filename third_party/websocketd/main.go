@@ -12,11 +12,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"libwebsocketd"
 )
 
-func logfunc(l *libwebsocketd.LogScope, level libwebsocketd.LogLevel, levelName string, category string, msg string, args ...interface{}) {
+func logfunc(l *LogScope, level LogLevel, levelName string, category string, msg string, args ...interface{}) {
 	if level < l.MinLevel {
 		return
 	}
@@ -31,16 +29,16 @@ func logfunc(l *libwebsocketd.LogScope, level libwebsocketd.LogLevel, levelName 
 	}
 
 	l.Mutex.Lock()
-	fmt.Printf("%s | %-6s | %-10s | %s | %s\n", libwebsocketd.Timestamp(), levelName, category, assocDump, fullMsg)
+	fmt.Printf("%s | %-6s | %-10s | %s | %s\n", Timestamp(), levelName, category, assocDump, fullMsg)
 	l.Mutex.Unlock()
 }
 
 func main() {
 	config := parseCommandLine()
 
-	log := libwebsocketd.RootLogScope(config.LogLevel, logfunc)
+	log := RootLogScope(config.LogLevel, logfunc)
 
-	handler := libwebsocketd.NewWebsocketdServer(config.Config, log, config.MaxForks)
+	handler := NewWebsocketdServer(config, log, config.MaxForks)
 	http.Handle("/", handler)
 
 	if config.UsingScriptDir {

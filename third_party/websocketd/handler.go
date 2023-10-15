@@ -1,4 +1,5 @@
-package libwebsocketd
+
+package main
 
 import (
 	"errors"

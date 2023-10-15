@@ -14,18 +14,39 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"libwebsocketd"
 )
 
 type Config struct {
 	Addr              []string // TCP addresses to listen on. e.g. ":1234", "1.2.3.4:1234" or "[::1]:1234"
 	Uds               string   // Unix Domain Socket to listen on
 	MaxForks          int      // Number of allowable concurrent forks
-	LogLevel          libwebsocketd.LogLevel
+	LogLevel          LogLevel
 	RedirPort         int
 	CertFile, KeyFile string
-	*libwebsocketd.Config
+
+	// base initiaization fields
+	StartupTime    time.Time // Server startup time (used for dev console caching).
+	CommandName    string    // Command to execute.
+	CommandArgs    []string  // Additional args to pass to command.
+	ServerSoftware string    // Value to pass to SERVER_SOFTWARE environment variable (e.g. websocketd/1.2.3).
+	CloseMs        uint      // Milliseconds to start sending signals
+
+	HandshakeTimeout time.Duration // time to finish handshake (default 1500ms)
+
+	// settings
+	ReverseLookup  bool     // Perform reverse DNS lookups on hostnames (useful, but slower).
+	Ssl            bool     // websocketd works with --ssl which means TLS is in use
+	ScriptDir      string   // Base directory for websocket scripts.
+	UsingScriptDir bool     // Are we running with a script dir.
+	StaticDir      string   // If set, static files will be served from this dir over HTTP.
+	CgiDir         string   // If set, CGI scripts will be served from this dir over HTTP.
+	AllowOrigins   []string // List of allowed origin addresses for websocket upgrade.
+	SameOrigin     bool     // If set, requires websocket upgrades to be performed from same origin only.
+	Headers        []string
+	HeadersWs      []string
+	HeadersHTTP    []string
+
+	// created environment
 }
 
 type Arglist []string
@@ -40,8 +61,7 @@ func (al *Arglist) Set(value string) error {
 }
 
 func parseCommandLine() *Config {
-	var mainConfig Config
-	var config libwebsocketd.Config
+	var config Config
 
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	flag.CommandLine.Usage = func() {}
@@ -95,18 +115,18 @@ func parseCommandLine() *Config {
 	}
 
 	if ipSocknum != 0 {
-		mainConfig.Addr = make([]string, ipSocknum)
+		config.Addr = make([]string, ipSocknum)
 		for i, addrSingle := range addrlist {
-			mainConfig.Addr[i] = fmt.Sprintf("%s:%d", addrSingle, port)
+			config.Addr[i] = fmt.Sprintf("%s:%d", addrSingle, port)
 		}
 	} else if !udsOnly {
-		mainConfig.Addr = []string{fmt.Sprintf("localhost:%d", port)}
+		config.Addr = []string{fmt.Sprintf("localhost:%d", port)}
 	}
-	mainConfig.Uds = *udsFlag
-	mainConfig.MaxForks = *maxForksFlag
-	mainConfig.RedirPort = *redirPortFlag
-	mainConfig.LogLevel = libwebsocketd.LevelFromString(*logLevelFlag)
-	if mainConfig.LogLevel == libwebsocketd.LogUnknown {
+	config.Uds = *udsFlag
+	config.MaxForks = *maxForksFlag
+	config.RedirPort = *redirPortFlag
+	config.LogLevel = LevelFromString(*logLevelFlag)
+	if config.LogLevel == LogUnknown {
 		log.Fatal("Incorrect loglevel flag '%s'", *logLevelFlag)
 	}
 
@@ -141,8 +161,8 @@ func parseCommandLine() *Config {
 		}
 	}
 
-	mainConfig.CertFile = *sslCert
-	mainConfig.KeyFile = *sslKey
+	config.CertFile = *sslCert
+	config.KeyFile = *sslKey
 
 	if *allowOriginsFlag != "" {
 		config.AllowOrigins = strings.Split(*allowOriginsFlag, ",")
@@ -196,7 +216,5 @@ func parseCommandLine() *Config {
 		}
 	}
 
-	mainConfig.Config = &config
-
-	return &mainConfig
+	return &config
 }

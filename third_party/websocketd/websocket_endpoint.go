@@ -63,13 +63,10 @@ func (we *WebSocketEndpoint) StartReading() {
 
 func (we *WebSocketEndpoint) read_frames() {
 	for {
-		mtype, rd, err := we.ws.NextReader()
+		_, rd, err := we.ws.NextReader()
 		if err != nil {
 			we.log.Debug("websocket", "Cannot receive: %s", err)
 			break
-		}
-		if mtype != we.mtype {
-			we.log.Debug("websocket", "Received message of type that we did not expect... Ignoring...")
 		}
 
 		p, err := ioutil.ReadAll(rd)
@@ -77,14 +74,8 @@ func (we *WebSocketEndpoint) read_frames() {
 			we.log.Debug("websocket", "Cannot read received message: %s", err)
 			break
 		}
-		switch mtype {
-		case gorillaws.TextMessage:
-			we.output <- append(p, '\n')
-		case gorillaws.BinaryMessage:
-			we.output <- p
-		default:
-			we.log.Debug("websocket", "Received message of unknown type: %d", mtype)
-		}
+
+		we.output <- append(p, '\n')
 	}
 	close(we.output)
 }

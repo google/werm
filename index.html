@@ -257,7 +257,7 @@ function cookev(e)
 }
 
 var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
-	log_mn, log_print, log_macks, log_packin, capsonwhile;
+	log_mn, log_print, log_macks, log_packin, capsonwhile, display;
 
 function term_init()
 {
@@ -350,11 +350,10 @@ function term_init()
 		}]);
 	}
 
-	function aftcolon(s) { return s.replace(/^[^:]*:/, ''); }
-
-	function display(s)
+	display = function(s)
 	{
-		var next_esc, pend_i, c, pend_remain;
+		var next_esc, pend_i, c, pend_remain, nli, escpylo, coldex,
+			esclen;
 
 		function pend(di) { return pend_display[pend_i + di]; }
 		function is_utf_trail(di) {
@@ -386,17 +385,27 @@ function term_init()
 			next_esc = s.indexOf('\\');
 			if (next_esc === -1) next_esc = s.length;
 			if (next_esc > 0) {
-				pend_display.push(s.substr(0, next_esc));
+				pend_display.push(
+					s.substr(0, next_esc)
+						.replaceAll('\n', ''));
 				s = s.substr(next_esc);
 			}
 
 			if (!s) break;
 
-			if (s.length < 3) {
-				// Escape is incomplete, so send it later.
+			nli = s.indexOf('\n');
+			if (nli == -1) {
+				// Escape may be incomplete, since we haven't
+				// received a full line from the server.
 				pend_escape = s;
 				break;
 			}
+
+			if (s.startsWith('\\@')) {
+				coldex = s.indexOf(':');
+				escpylo = s.substring(coldex+1, nli);
+				esclen = nli + 1;
+			} else esclen = 3;
 
 			if (s.startsWith('\\s1'))
 				t.setAlternateMode(false);
@@ -409,25 +418,22 @@ function term_init()
 			else if (s.startsWith('\\rs'))
 				t.restoreScrCursAndState();
 			else if (s.startsWith('\\@title:')) {
-				row_ttl = aftcolon(s);
+				row_ttl = escpylo;
 				locked_ttl = !!row_ttl;
 				set_title();
-				break;
 			}
 			else if (s.startsWith('\\@auxjs:')) {
-				loadauxjs(aftcolon(s));
-				break;
+				loadauxjs(escpylo);
 			}
 			else if (s.startsWith('\\@appendid:')) {
-				termid += aftcolon(s);
+				termid += escpylo;
 				history.replaceState(
 					{}, '', '/?termid=' + termid);
-				break;
 			}
 			else
 				pend_display.push(hex_val(1) * 16 + hex_val(2));
 
-			s = s.substr(3);
+			s = s.substr(esclen);
 		}
 
 		if (!term_ready) return;

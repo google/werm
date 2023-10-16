@@ -102,9 +102,9 @@ func (pe *ProcessEndpoint) StartReading() {
 }
 
 func (pe *ProcessEndpoint) process_txtout() {
-	bufin := bufio.NewReader(pe.process.stdout)
 	for {
-		buf, err := bufin.ReadBytes('\n')
+		buf := make([]uint8, 125);
+		len, err := pe.process.stdout.Read(buf);
 		if err != nil {
 			if err != io.EOF {
 				pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
@@ -113,7 +113,7 @@ func (pe *ProcessEndpoint) process_txtout() {
 			}
 			break
 		}
-		pe.output <- trimEOL(buf)
+		pe.output <- buf[:len];
 	}
 	close(pe.output)
 }

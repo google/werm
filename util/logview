@@ -29,12 +29,17 @@ dl () {
 # that mention tests:
 # rflt '/$ grep/q; /[tT]est/d'
 rflt () {
-	tac $logfile | sed "$@" | less
+	tac $logfile | sed "$@" | $PAGER
 }
 
-# Same as rflt but uses `more` instead of `less`.
+# Same as rflt but uses `more` instead of $PAGER.
 rfmt () {
 	tac $logfile | sed "$@" | more
+}
+
+# Similar to rfmt and rflt but uses no pager at all
+rft () {
+	tac $logfile | sed "$@"
 }
 
 dltf () {

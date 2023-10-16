@@ -232,13 +232,14 @@ is an ephemeral session). If you quit `less`, then you will return to a
 shell. In this shell, the following commands and shell variables are
 available:
 
-| syntax                | description                              |
-| --------------------- | ---------------------------------------- |
-| `$logfile`            | the path of the scrollback file          |
-| `lel`                 | runs `less $logfile` (LEss Log)          |
+| syntax                | description                                   |
+| --------------------- | --------------------------------------------- |
+| `$logfile`            | the path of the scrollback file               |
+| `lel`                 | runs `less $logfile` (LEss Log)               |
 | `rflt`&nbsp;`<args>`  | sends the lines in log in reverse order to `sed <args>`. For	example, `rflt '/$ grep/q; /\.h:/d'` would recall the output of	the just-run `grep` command but exclude matches found in C header files (Reverse FiLTer) |
-| `rfmt`&nbsp;`<args>`  | same as `rflt`, but while `rflt` pipes output through `less`, `rfmt` uses `more` |
-| `dl`                  | runs `cat $logfile` (Dump Log)           |
+| `rfmt`&nbsp;`<args>`  | same as `rflt`, but while `rflt` pipes output through `$PAGER`, `rfmt` uses `more` |
+| `rft`&nbsp;`<args>`   | same as `rflt` but does not send to any pager |
+| `dl`                  | runs `cat $logfile` (Dump Log)                |
 
 These and other functions are defined in `$WERMSRCDIR/util/logview`
 

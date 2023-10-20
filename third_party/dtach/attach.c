@@ -18,6 +18,12 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ NOV 2023
+
+ - attach_main is void instead of int and does not return at all on error
+
+ - call a Werm API to output formatted termination messages
+
  OCT 2023
 
  - do not clear screen on attach
@@ -34,6 +40,8 @@
  - rename sockname and allow werm code to modify it */
 
 #include "third_party/dtach/dtach.h"
+#include "outstreams.h"
+#include "inbound.h"
 
 /* Connects to a unix domain socket */
 static int
@@ -79,14 +87,12 @@ die(int sig)
 {
 	/* Print a nice pretty message for some things. */
 	if (sig == SIGHUP || sig == SIGINT)
-		printf(EOS "\r\n[detached]\r\n");
+		exit_msg("", "detached with signal: ", sig);
 	else
-		printf(EOS "\r\n[got signal %d - dying]\r\n", sig);
-	exit(1);
+		exit_msg("e", "unexpected signal: ", sig);
 }
 
-int
-attach_main(int noerror)
+void attach_main(int noerror)
 {
 	unsigned char buf[BUFSIZE];
 	fd_set readfds;
@@ -119,12 +125,9 @@ attach_main(int noerror)
 			}
 		}
 	}
-	if (s < 0)
-	{
-		if (!noerror)
-			printf("dtach connect_socket: %s: %s\n",
-			       dtach_sock, strerror(errno));
-		return 1;
+	if (s < 0) {
+		if (noerror) return;
+		exit_msg("es", "dtach connect_socket errno: ", errno);
 	}
 
 	/* Set some signals. */
@@ -148,10 +151,7 @@ attach_main(int noerror)
 		FD_SET(s, &readfds);
 		n = select(s + 1, &readfds, NULL, NULL, NULL);
 		if (n < 0 && errno != EINTR && errno != EAGAIN)
-		{
-			printf(EOS "\r\n[select failed]\r\n");
-			exit(1);
-		}
+			exit_msg("e", "select syscall failed: ", errno);
 
 		/* Pty activity */
 		if (n > 0 && FD_ISSET(s, &readfds))
@@ -159,26 +159,19 @@ attach_main(int noerror)
 			ssize_t len = read(s, buf, sizeof(buf));
 
 			if (len == 0)
-			{
-				printf(EOS "\r\n[EOF - dtach terminating]"
-					"\r\n");
-				exit(0);
-			}
-			else if (len < 0)
-			{
-				printf(EOS "\r\n[read returned an error]\r\n");
-				exit(1);
-			}
+				exit_msg("", "EOF - dtach terminating", -1);
+			if (len < 0)
+				exit_msg("e", "read syscall failed: ", errno);
+
 			/* Send the data to the terminal. */
-			write(1, buf, len);
+			write_wbsoc_frame(buf, len);
 			n--;
 		}
 		/* stdin activity */
 		if (n > 0 && FD_ISSET(0, &readfds))
 		{
-			forward_stdin(s);
+			fwrd_inbound_frames(s);
 			n--;
 		}
 	}
-	return 0;
 }

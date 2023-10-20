@@ -18,6 +18,10 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ NOV 2023
+
+ - attach_main is void instead of int and does not return at all on error
+
  OCT 2023
 
  - remove logic needed for interactive use
@@ -43,7 +47,7 @@ dtach_main(void)
 	if (!dtach_sock) errx(1, "dtach_sock must be set");
 
 	/* Try to attach first. If that doesn't work, create a new socket. */
-	if (!attach_main(1)) exit(0);
+	attach_main(1);
 
 	if (errno == ECONNREFUSED || errno == ENOENT)
 	{
@@ -52,5 +56,7 @@ dtach_main(void)
 		if (dtach_master() != 0)
 			exit(1);
 	}
-	exit(attach_main(0));
+
+	attach_main(0);
+	exit(0);
 }

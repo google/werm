@@ -32,8 +32,6 @@ void recount_state(struct wrides *de);
  * "client output" should be sent to each attach process. */
 void process_tty_out(struct fdbuf *rout, const void *buf, ssize_t len);
 
-void forward_stdin(int sock);
-
 /* ptyfd is the pseudo-terminal that controls the terminal-enabled process.
  * There is only one per master. vt100 keyboard input data is sent to this fd.
  * clioutfd is where output is sent to the attached client. This is used for

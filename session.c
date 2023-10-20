@@ -8,6 +8,7 @@
 #include "outstreams.h"
 #include "test/raw/data.h"
 
+#include <stdint.h>
 #include <limits.h>
 #include <time.h>
 #include <errno.h>
@@ -105,27 +106,6 @@ static void dump(void)
 	logescaped(f, wts.ttl, ttllen());
 
 	fclose(f);
-}
-
-static int hexdig(int v)
-{
-	v &= 0x0f;
-	return v + (v < 10 ? '0' : 'W');
-}
-
-static void routesca(struct fdbuf *rout, int b)
-{
-	char ebf[3];
-
-	if (b == '\\' || b < ' ' || b > '~') {
-		b &= 0xff;
-
-		ebf[0] = '\\';
-		ebf[1] = hexdig(b >> 4);
-		ebf[2] = hexdig(b);
-		fdb_apnd(rout, ebf, 3);
-	}
-	else fdb_apnd(rout, &b, 1);
 }
 
 static _Bool consumeesc(const char *pref, size_t preflen)
@@ -331,11 +311,11 @@ void process_tty_out(struct fdbuf *rout, const void *buf_, ssize_t len)
 	eol:
 		deletechrahead();
 
-		routesca(rout, *buf++);
+		fdb_routc(rout, *buf++);
 		len--;
 	}
 
-	fdb_apnd(rout, "\n", 1);
+	fdb_apnc(rout, '\n');
 }
 
 static void recountttl(struct wrides *de)
@@ -344,7 +324,7 @@ static void recountttl(struct wrides *de)
 
 	fdb_apnd(&b, "\\@title:", -1);
 	fdb_apnd(&b, wts.ttl, ttllen());
-	fdb_apnd(&b, "\n", -1);
+	fdb_apnc(&b, '\n');
 	fdb_finsh(&b);
 }
 
@@ -579,7 +559,7 @@ static void recallfiletofd(FILE *srcf, int recbyts, struct fdbuf *dstfd)
 	while (recbyts--) {
 		c = getc(srcf);
 		if (ferror(srcf)) err(1, "transferring byte");
-		fdb_apnd(dstfd, &c, 1);
+		fdb_apnc(dstfd, c);
 	}
 
 	if (getc(srcf) == EOF) err(1, "ignoring last byte");
@@ -659,7 +639,7 @@ static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
 				fld = 'p';
 
 				if (spc->newsessin && !namerr && nmbuf.len) {
-					fdb_apnd(&nmbuf, "", 1);
+					fdb_apnc(&nmbuf, 0);
 					newsessinhtml(spc, 'i', nmbuf.bf);
 				}
 				break;
@@ -674,17 +654,17 @@ static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
 				cmpname = NULL;
 			}
 			if (cmpname && *cmpname++ != c) cmpname = NULL;
-			fdb_apnd(&nmbuf, &c, 1);
+			fdb_apnc(&nmbuf, c);
 
 			break;
 		case 'p':
 			if (eofield) {
 				fld = 'j';
-				if (begunprenam) fdb_apnd(spc->sigb, "\n", -1);
+				if (begunprenam) fdb_apnc(spc->sigb, '\n');
 				break;
 			}
 			if (namemat && spc->sendpream) {
-				fdb_apnd(spc->sigb, &c, 1);
+				fdb_apnc(spc->sigb, c);
 				begunprenam = 1;
 			}
 
@@ -692,14 +672,14 @@ static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
 
 		case 'j':
 			if (eofield) {
-				if (startedjs) fdb_apnd(spc->sigb, "\n", -1);
+				if (startedjs) fdb_apnc(spc->sigb, '\n');
 				break;
 			}
 			if (namemat && spc->sendauxjs) {
 				if (!startedjs)
 					fdb_apnd(spc->sigb, "\\@auxjs:", -1);
 				startedjs = 1;
-				fdb_apnd(spc->sigb, &c, 1);
+				fdb_apnc(spc->sigb, c);
 			}
 
 			break;
@@ -871,7 +851,7 @@ static void writetosubproccore(
 			if (byte == '\\')
 				wts.escp = '1';
 			else
-				fdb_apnd(&kbdb, &byte, 1);
+				fdb_apnc(&kbdb, byte);
 			break;
 
 		case '1':
@@ -880,11 +860,11 @@ static void writetosubproccore(
 
 			switch (byte) {
 			case 'n':
-				fdb_apnd(&kbdb, "\n", -1);
+				fdb_apnc(&kbdb, '\n');
 				break;
 
 			case '\\':
-				fdb_apnd(&kbdb, "\\", -1);
+				fdb_apnc(&kbdb, '\\');
 				break;
 
 			case 'w':
@@ -914,10 +894,10 @@ static void writetosubproccore(
 			}
 
 			if (!cursmvbyte) break;
-			fdb_apnd(&kbdb, "\033", 1);
+			fdb_apnc(&kbdb, 033);
 			/* application cursor mode does O rather than [ */
-			fdb_apnd(&kbdb, wts.appcursor ? "O" : "[", -1);
-			fdb_apnd(&kbdb, &cursmvbyte, 1);
+			fdb_apnc(&kbdb, wts.appcursor ? 'O' : '[');
+			fdb_apnc(&kbdb, cursmvbyte);
 			break;
 
 		case 'w':
@@ -949,20 +929,6 @@ static void writetosubproccore(
 	}
 
 	fdb_finsh(&kbdb);
-}
-
-void forward_stdin(int sock)
-{
-	struct wrides de = { sock };
-
-	ssize_t red;
-	unsigned char buf[512];
-
-	red = read(0, buf, sizeof(buf));
-	if (!red) errx(1, "nothing on stdin");
-	if (red == -1) err(1, "read from stdin");
-
-	full_write(&de, buf, red);
 }
 
 void process_kbd(int ptyfd, int clioutfd, unsigned char *buf, size_t bufsz)
@@ -1585,14 +1551,24 @@ void set_argv0(char role)
 
 static void appendunqid(void)
 {
-	char *newtrid, *sfix;
+	char *sfix;
+	struct fdbuf buf = {0};
 
 	sfix = next_uniqid();
-	xasprintf(&newtrid, "%s.%s", termid, sfix);
-	free(termid);
-	termid = newtrid;
+	fdb_apnd(&buf, "\\@appendid:.", -1);
+	fdb_apnd(&buf, sfix, -1);
+	fdb_apnc(&buf, '\n');
+	write_wbsoc_frame(buf.bf, buf.len);
 
-	printf("\\@appendid:.%s\n", sfix);
+	buf.len = 0;
+	fdb_apnd(&buf, termid, -1);
+	fdb_apnc(&buf, '.');
+	fdb_apnd(&buf, sfix, 1 + strlen(sfix));
+
+	/* Free old termid and take ownership of buffer. */
+	free(termid);
+	termid = (char *)buf.bf;
+
 	free(sfix);
 }
 

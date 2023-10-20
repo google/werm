@@ -56,6 +56,7 @@ $!s/$/\\012/
 	 $WERMCCFLAGS \
 	 -o session \
 	 session.c \
+	 inbound.c \
 	 outstreams.c \
 	 shared.c \
 	 uniqid.c \

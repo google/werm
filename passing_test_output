@@ -259,6 +259,11 @@ TEST: empty arg, escapes, and omitted arg
 TEST OUTSTREAMS
 hello
 goodbye
+-19 -10 -1 0 1234 9
+56789
+100000
+-2147483648
+2147483647
 customcap[abcdefg]
 customcap[hijklmn]
 customcap[opqrstu]

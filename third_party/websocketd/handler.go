@@ -4,6 +4,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -60,42 +61,55 @@ func NewWebsocketdHandler(s *WebsocketdServer, req *http.Request, log *LogScope)
 }
 
 func (wsh *WebsocketdHandler) accept(ws *gorillaws.Conn, log *LogScope) {
-	defer ws.Close()
-
 	log.Access("session", "CONNECT")
 	defer log.Access("session", "DISCONNECT")
 
 	launched, err := launchCmd(wsh.command, wsh.server.Config.CommandArgs, wsh.Env)
 	if err != nil {
 		log.Error("process", "Could not launch process %s %s (%s)", wsh.command, strings.Join(wsh.server.Config.CommandArgs, " "), err)
+		ws.Close()
 		return
 	}
 
 	log.Associate("pid", strconv.Itoa(launched.cmd.Process.Pid))
 
-	process := NewProcessEndpoint(launched, false, log)
+	process := NewProcessEndpoint(launched, log)
 	if cms := wsh.server.Config.CloseMs; cms != 0 {
 		process.closetime += time.Duration(cms) * time.Millisecond
 	}
-	wsEndpoint := NewWebSocketEndpoint(ws, log)
 
-	wsEndpoint.StartReading()
-	process.StartReading()
+	status := make(chan error)
 
-	defer wsEndpoint.Terminate()
-	defer process.Terminate()
+	go func() {
+		_, err := io.Copy(ws.Connection(), launched.stdout)
+		if err != nil {
+			err = fmt.Errorf("error copying outbound frames: %w", err)
+		}
+		// Make opposite Copy call reach its EOF
+		ws.Close()
+		status <- err
+	}()
+	go func() {
+		_, err := io.Copy(launched.stdin, ws.Connection())
+		if err != nil {
+			err = fmt.Errorf("error copying inbound frames: %w", err)
+		}
+		process.Terminate()
+		status <- err
+	}()
+
+	got := 0
 	for {
 		select {
-		case msgOne, ok := <-wsEndpoint.Output():
-			if !ok || !process.Send(msgOne) {
-				return
-			}
-		case msgTwo, ok := <-process.Output():
-			if !ok || !wsEndpoint.Send(msgTwo) {
-				return
+		case err := <-status:
+			if err != nil {
+				log.Error("accept", "error: %s", err)
 			}
 		}
+		got += 1
+		if got == 2 { break }
 	}
+
 }
 
 // RemoteInfo holds information about remote http client

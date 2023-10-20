@@ -4,13 +4,18 @@
  * license that can be found in the LICENSE file or at
  * https://developers.google.com/open-source/licenses/bsd */
 
+#include <limits.h>
 #include <err.h>
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <sys/uio.h>
+#include <arpa/inet.h>
 
 #include "outstreams.h"
+#include "shared.h"
 
 void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len)
 {
@@ -48,6 +53,13 @@ void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len)
 	}
 }
 
+void fdb_apnc(struct fdbuf *b, int c_)
+{
+	char c = c_;
+
+	fdb_apnd(b, &c, 1);
+}
+
 static void fullwriannot(struct wrides *de, const unsigned char *br, size_t sz)
 {
 	struct wrides basde = {de->fd};
@@ -80,6 +92,60 @@ void fdb_finsh(struct fdbuf *b)
 	b->len = b->cap = 0;
 }
 
+static int hexdig(int v)
+{
+	v &= 0x0f;
+	return v + (v < 10 ? '0' : 'W');
+}
+
+void fdb_routc(struct fdbuf *b, int c)
+{
+	char ebf[3];
+
+	c &= 0xff;
+	if (c == '\\' || c < ' ' || c > '~') {
+		ebf[0] = '\\';
+		ebf[1] = hexdig(c >> 4);
+		ebf[2] = hexdig(c);
+		fdb_apnd(b, ebf, 3);
+	}
+	else {
+		fdb_apnc(b, c);
+	}
+}
+
+void fdb_routs(struct fdbuf *b, const char *s, ssize_t len)
+{
+	if (len < 0) len = strlen(s);
+
+	while (len--) fdb_routc(b, *s++);
+}
+
+void fdb_itoa(struct fdbuf *b, int i)
+{
+	char bf[sizeof(int) * 4], *bc = bf;
+
+	if (i == INT_MIN) {
+		fdb_itoa(b, INT_MIN/10);
+		fdb_itoa(b, INT_MAX%10 + 1);
+		return;
+	}
+	if (i < 0) {
+		fdb_apnc(b, '-');
+		fdb_itoa(b, -i);
+		return;
+	}
+
+	do {
+		*bc++ = (i % 10) + '0';
+		i /= 10;
+	}
+	while (i);
+
+	do fdb_apnc(b, *--bc);
+	while (bc != bf);
+}
+
 void full_write(struct wrides *de, const void *buf_, ssize_t sz)
 {
 	ssize_t writn;
@@ -109,6 +175,94 @@ void full_write(struct wrides *de, const void *buf_, ssize_t sz)
 	} while (sz);
 }
 
+void write_wbsoc_frame(const void *buf, ssize_t len)
+{
+	unsigned char headr[14];
+	struct iovec v[2], *vc;
+	uint16_t len2;
+	uint32_t len4;
+	ssize_t writn;
+
+	if (len < 0) len = strlen(buf);
+
+	/* Perhaps send a ping if len is 0? */
+	if (!len) return;
+
+	/* Send as a single text data frame. */
+	headr[0] = 0x81;
+
+	v[0].iov_base = headr;
+	if (len <= 125) {
+		headr[1] = len;
+		v[0].iov_len = 2;
+	}
+	else if (len <= 0xffff) {
+		headr[1] = 126;
+		len2 = htons(len);
+		memcpy(headr + 2, &len2, 2);
+		v[0].iov_len = 4;
+	}
+	else {
+		headr[2] = 127;
+		len4 = htonl(len >> 32);
+		memcpy(headr + 2, &len4, 4);
+		len4 = htonl(len);
+		memcpy(headr + 6, &len4, 4);
+		v[0].iov_len = 10;
+	}
+
+	v[1].iov_base = (void *) buf;
+	v[1].iov_len = len;
+
+	vc = v;
+
+	writn = 0;
+	for (;;) {
+		vc->iov_len -= writn;
+
+		writn = writev(1, vc, v+2 - vc);
+		if (writn < 0) {
+			if (writn == EINTR) continue;
+			perror("writev websocket frame");
+			abort();
+		}
+		if (!writn) abort();
+
+		while (writn >= vc->iov_len) {
+			writn -= vc->iov_len;
+			if (++vc == v + 2) return;
+		}
+	}
+}
+
+void _Noreturn exit_msg(const char *flags, const char *msg, int code)
+{
+	struct fdbuf b = {0};
+	char iserr = !!strchr(flags, 'e');
+
+	/* Show white text on red (error) or black text on cyan (notice). */
+	fdb_routs(&b, "\033[", -1);
+	if (iserr)	fdb_routs(&b, "97;48;2;200;0;0", -1);
+	else		fdb_routs(&b, "30;48;2;0;255;255", -1);
+	fdb_routs(&b, "m ", -1);
+
+	fdb_routs(&b, msg, -1);
+	if (code != -1) fdb_itoa(&b, code);
+
+	if (strchr(flags, 's')) {
+		fdb_routs(&b, " socket: ", -1);
+		fdb_routs(&b, dtach_sock, -1);
+	}
+
+	/* Reset colors in case a new master process is started in the same
+	 * browser window. */
+	fdb_routs(&b, " \033[0m\r\n", -1);
+	fdb_apnc(&b, '\n');
+
+	write_wbsoc_frame(b.bf, b.len);
+	exit(iserr);
+}
+
 void test_outstreams(void)
 {
 	struct wrides de = {1};
@@ -118,6 +272,29 @@ void test_outstreams(void)
 	printf("TEST OUTSTREAMS\n");
 	fdb_apnd(&b, "hello\n", -1);
 	fdb_apnd(&b, "goodbye\n do not print this part", 8);
+	fdb_finsh(&b);
+
+	fdb_itoa(&b, -19);
+	fdb_apnc(&b, ' ');
+	fdb_itoa(&b, -10);
+	fdb_apnc(&b, ' ');
+	fdb_itoa(&b, -1);
+	fdb_apnc(&b, ' ');
+	fdb_itoa(&b, 0);
+	fdb_apnc(&b, ' ');
+	fdb_itoa(&b, 1234);
+	fdb_apnc(&b, ' ');
+	fdb_itoa(&b, 9);
+	fdb_apnc(&b, '\n');
+	fdb_itoa(&b, 56789);
+	fdb_apnc(&b, '\n');
+	fdb_itoa(&b, 100000);
+	fdb_apnc(&b, '\n');
+	/* Implementation is agnostic to INT_* limits but the test is not. */
+	fdb_itoa(&b, INT_MIN);
+	fdb_apnc(&b, '\n');
+	fdb_itoa(&b, INT_MAX);
+	fdb_apnc(&b, '\n');
 	fdb_finsh(&b);
 
 	de.escannot = "customcap";

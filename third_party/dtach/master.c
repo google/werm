@@ -18,6 +18,14 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ NOV 2023
+
+ - drop statusfd mechanism. Use perror and stderr rather than stdout to show
+   error details for init_pty and fork(2). This will show up in websocketd log.
+   We can't use exit_msg from Werm here since we don't know if we were invoked
+   directly from session.c and with a tty, or invoked from an attach process,
+   where stdout is connected to a websocket. stderr is safe in both cases.
+
  OCT 2023
 
  - call a function defined by werm rather than exec an argv array to start the
@@ -125,7 +133,7 @@ setnonblocking(int fd)
 
 /* Initialize the pty structure. */
 static int
-init_pty(int statusfd)
+init_pty(void)
 {
 	/* Use the original terminal's settings. We don't have to set the
 	** window size here, because the attacher will send it in a packet. */
@@ -390,7 +398,7 @@ client_activity(struct client *p)
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
 static _Noreturn void
-masterprocess(int s, int statusfd)
+masterprocess(int s)
 {
 	struct client *p, *next;
 	fd_set readfds;
@@ -407,14 +415,9 @@ masterprocess(int s, int statusfd)
 
 	/* Create a pty in which the process is running. */
 	signal(SIGCHLD, die);
-	if (init_pty(statusfd) < 0)
+	if (init_pty() < 0)
 	{
-		if (statusfd != -1)
-			dup2(statusfd, 1);
-		if (errno == ENOENT)
-			puts("dtach: Could not find a pty.");
-		else
-			printf("dtach: init_pty: %s\n", strerror(errno));
+		perror("dtach: init_pty");
 		exit(1);
 	}
 
@@ -428,10 +431,6 @@ masterprocess(int s, int statusfd)
 	signal(SIGTTOU, SIG_IGN);
 	signal(SIGINT, die);
 	signal(SIGTERM, die);
-
-	/* Close statusfd, since we don't need it anymore. */
-	if (statusfd != -1)
-		close(statusfd);
 
 	/* Make sure stdin/stdout/stderr point to /dev/null. We are now a
 	** daemon. */
@@ -513,7 +512,6 @@ masterprocess(int s, int statusfd)
 int
 dtach_master(void)
 {
-	int fd[2] = {-1, -1};
 	int s;
 	pid_t pid;
 
@@ -543,33 +541,16 @@ dtach_master(void)
 	}
 	if (s < 0)
 	{
-		printf("dtach create_socket: %s: %s\n",
-		       dtach_sock, strerror(errno));
+		perror("dtach create_socket");
+		fprintf(stderr, "Socket path: %s\n", dtach_sock);
 		return 1;
 	}
-
-#if defined(F_SETFD) && defined(FD_CLOEXEC)
-	fcntl(s, F_SETFD, FD_CLOEXEC);
-
-	/* If FD_CLOEXEC works, create a pipe and use it to report any errors
-	** that occur while trying to execute the program. */
-	if (pipe(fd) >= 0)
-	{
-		if (fcntl(fd[0], F_SETFD, FD_CLOEXEC) < 0 ||
-		    fcntl(fd[1], F_SETFD, FD_CLOEXEC) < 0)
-		{
-			close(fd[0]);
-			close(fd[1]);
-			fd[0] = fd[1] = -1;
-		}
-	}
-#endif
 
 	/* Fork off so we can daemonize and such */
 	pid = fork();
 	if (pid < 0)
 	{
-		printf("dtach: fork: %s\n", strerror(errno));
+		perror("dtach: fork");
 		unlink_socket();
 		return 1;
 	}
@@ -577,30 +558,10 @@ dtach_master(void)
 	{
 		/* Child - this becomes the master */
 		set_argv0('m');
-		if (fd[0] != -1)
-			close(fd[0]);
-		masterprocess(s, fd[1]);
+		masterprocess(s);
 	}
 	/* Parent - just return. */
 
-#if defined(F_SETFD) && defined(FD_CLOEXEC)
-	/* Check if an error occurred while trying to execute the program. */
-	if (fd[0] != -1)
-	{
-		char buf[1024];
-		ssize_t len;
-
-		close(fd[1]);
-		len = read(fd[0], buf, sizeof(buf));
-		if (len > 0)
-		{
-			write(2, buf, len);
-			kill(pid, SIGTERM);
-			return 1;
-		}
-		close(fd[0]);
-	}
-#endif
 	close(s);
 	return 0;
 }

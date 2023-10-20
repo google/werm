@@ -16,18 +16,16 @@ import (
 type ProcessEndpoint struct {
 	process   *LaunchedProcess
 	closetime time.Duration
-	output    chan []byte
 	log       *LogScope
-	bin       bool
 }
 
-func NewProcessEndpoint(process *LaunchedProcess, bin bool, log *LogScope) *ProcessEndpoint {
-	return &ProcessEndpoint{
+func NewProcessEndpoint(process *LaunchedProcess, log *LogScope) *ProcessEndpoint {
+	pe := &ProcessEndpoint{
 		process: process,
-		output:  make(chan []byte),
 		log:     log,
-		bin:     bin,
 	}
+	go pe.log_stderr()
+	return pe
 }
 
 func (pe *ProcessEndpoint) Terminate() {
@@ -85,37 +83,6 @@ func (pe *ProcessEndpoint) Terminate() {
 	}
 
 	pe.log.Error("process", "SIGKILL did not terminate %v!", pe.process.cmd.Process.Pid)
-}
-
-func (pe *ProcessEndpoint) Output() chan []byte {
-	return pe.output
-}
-
-func (pe *ProcessEndpoint) Send(msg []byte) bool {
-	pe.process.stdin.Write(msg)
-	return true
-}
-
-func (pe *ProcessEndpoint) StartReading() {
-	go pe.log_stderr()
-	go pe.process_txtout()
-}
-
-func (pe *ProcessEndpoint) process_txtout() {
-	for {
-		buf := make([]uint8, 125);
-		len, err := pe.process.stdout.Read(buf);
-		if err != nil {
-			if err != io.EOF {
-				pe.log.Error("process", "Unexpected error while reading STDOUT from process: %s", err)
-			} else {
-				pe.log.Debug("process", "Process STDOUT closed")
-			}
-			break
-		}
-		pe.output <- buf[:len];
-	}
-	close(pe.output)
 }
 
 func (pe *ProcessEndpoint) log_stderr() {

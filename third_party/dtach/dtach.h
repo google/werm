@@ -18,6 +18,12 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ NOV 2023
+
+ - deleted EOS define
+
+ - attach_main is void instead of int and does not return at all on error
+
  OCT 2023
 
  - remove package struct and related declarations
@@ -104,10 +110,7 @@
 */
 #define BUFSIZE 4096
 
-/* This hopefully moves to the bottom of the screen */
-#define EOS "\033[999H"
-
-int attach_main(int noerror);
+void attach_main(int noerror);
 
 #ifdef sun
 #define BROKEN_MASTER

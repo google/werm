@@ -1,3 +1,5 @@
+Werm modification: removed documentation particular to interactive invocation.
+
 dtach is a program written in C that emulates the detach feature of
 screen, which allows a program to be executed in an environment that is
 protected from the controlling terminal. For instance, the program under

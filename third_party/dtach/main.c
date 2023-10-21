@@ -15,6 +15,17 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/* WERM-SPECIFIC MODIFICATIONS
+
+ OCT 2023
+
+ - remove logic needed for interactive use
+
+ - reformats prompted by large amount of removed logic
+
+ - add error for dtach_sock not being set */
+
 #include "third_party/dtach/dtach.h"
 
 /*
@@ -25,11 +36,6 @@
 
 /* Make sure the binary has a copyright. */
 const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004-2016 Ned T. Crigler";
-
-/* The character used for detaching. Defaults to '^\' */
-int detach_char = '\\' - 64;
-/* 1 if we should not interpret the suspend character. */
-int no_suspend;
 
 void _Noreturn
 dtach_main(void)

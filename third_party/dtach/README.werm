@@ -5,3 +5,19 @@ License: GNU General Public License 2.0
 Notes:
 Werm has local modifications. Non-trivial new functionality and Werm-aware
 features are kept outside of the third_party directory whenever feasible.
+
+The following files in dtach were deleted as they were not applicable to code
+and functionality kept by Werm:
+
+FILE		DATE
+dtach.1		2023-10
+pkt.h		2023-10
+.gitignore	2023-10
+Makefile.in	2023-10
+configure	2023-10
+configure.ac	2023-10
+
+These files were added by Werm:
+
+config.h	2023-10
+README.werm	2023-10

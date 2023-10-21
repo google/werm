@@ -15,6 +15,24 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/* WERM-SPECIFIC MODIFICATIONS
+
+ OCT 2023
+
+ - do not clear screen on attach
+
+ - remove logic to create and manage a pty, as this is not needed on attach
+   side
+
+ - remove logic to detect and report winsize changes, as this is the
+   responsibility of werm and is no longer pty-based, so requires a complete
+   rewrite
+
+ - remove keyboard->packet forwarding logic (push_main)
+
+ - rename sockname and allow werm code to modify it */
+
 #include "third_party/dtach/dtach.h"
 
 /* Connects to a unix domain socket */

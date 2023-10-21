@@ -15,6 +15,34 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/* WERM-SPECIFIC MODIFICATIONS
+
+ OCT 2023
+
+ - call a function defined by werm rather than exec an argv array to start the
+   program
+
+ - rename sockname to dtach_sock
+
+ - remove forkpty and openpty re-implementations of standard functions. These
+   seem to already be available by now in any OS werm may conceivably want to
+   support in the future.
+
+ - remove dontfork and act as if it's always false
+
+ - allow logging of error messages based on werm configuration to a logfile,
+   by simply sending errors to stderr
+
+ - remove progname (argv[0] of dtach interactive invocations) and hard-code with
+   "dtach" in status messages
+
+ - remove packetized communication over the dtach socket and rewrite it in werm,
+   calling process_kbd from this file
+
+ - refactor logic to send output to clients, put it in sendrout function in this
+   file */
+
 #include "third_party/dtach/dtach.h"
 
 /* The pty struct - The pty information is stored here. */

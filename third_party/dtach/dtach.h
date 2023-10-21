@@ -15,6 +15,19 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/* WERM-SPECIFIC MODIFICATIONS
+
+ OCT 2023
+
+ - remove package struct and related declarations
+
+ - remove push_main and master_main prototypes
+
+ - remove various variable declarations
+
+*/
+
 #ifndef dtach_h
 #define dtach_h
 
@@ -81,8 +94,6 @@
 #ifndef S_ISSOCK
 #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 #endif
-
-extern int detach_char, no_suspend;
 
 /*
 ** The master sends a simple stream of text to the attaching clients, without

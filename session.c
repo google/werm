@@ -203,7 +203,7 @@ static void deletechrahead(void)
 		TMlineresize(wts.linesz - cnt);
 		break;
 	case 'G':
-		wts.linepos = cnt - 1;
+		TMlinepos(cnt - 1);
 		break;
 	case '@':
 		TMlineresize(wts.linesz + cnt);

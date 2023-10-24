@@ -560,11 +560,6 @@ function term_init()
 		window.open('/?termid=' + nid);
 	}
 
-	function open_log_term()
-	{
-		window.open('/?logview=' + encodeURIComponent(termid));
-	}
-
 	t.onTerminalReady = function()
 	{
 		var io = t.io.push();
@@ -926,6 +921,14 @@ function term_init()
 		console.log(exp, mn);
 	}
 
+	function open_for_term(prefix)
+	{
+		if (!termid)
+			display('Not available in ephemeral session.');
+		else
+			window.open(prefix + encodeURIComponent(termid));
+	}
+
 	var macro_map = [
 		['raW ; ', 'std::'],
 		['laI F ', 'git status -s -uno\r'],
@@ -962,6 +965,11 @@ function term_init()
 		['rarsA T ', function() { window.open('/attach', '_top'); }],
 		['rarsS T ', function() { window.open('/attach', '_blank'); }],
 
+		/* These cannot be added conditionally to macro_map, since
+		 * termid may be set later by \@appendid */
+		['laH L ', open_for_term.bind(0, '/?logview=')],
+		['laH M ', open_for_term.bind(0, '/scrollback?termid=')],
+
 		[['ra', set_repeat_key, set_repeat_cnt], repeat_keystroke],
 		[['la',
 		 set_barrier_dig.bind(0),
@@ -969,13 +977,6 @@ function term_init()
 		 set_barrier_dig.bind(2)], show_barrier],
 	];
 
-	if (termid) {
-		macro_map.push(['laH L ', open_log_term]);
-		macro_map.push(['laH M ', function()
-		{
-			window.open('/scrollback?termid=' + encodeURIComponent(termid));
-		}]);
-	}
 	macro_map.push(['laH N ', function()
 	{
 		var sbwin, rows, rsi, rstxt = [];

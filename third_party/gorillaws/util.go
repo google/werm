@@ -5,12 +5,9 @@
 package gorillaws
 
 import (
-	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
-	"io"
 	"net/http"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -21,14 +18,6 @@ func computeAcceptKey(challengeKey string) string {
 	h.Write([]byte(challengeKey))
 	h.Write(keyGUID)
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
-}
-
-func generateChallengeKey() (string, error) {
-	p := make([]byte, 16)
-	if _, err := io.ReadFull(rand.Reader, p); err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(p), nil
 }
 
 // Token octets per RFC 2616.
@@ -136,43 +125,6 @@ func nextToken(s string) (token, rest string) {
 	return s[:i], s[i:]
 }
 
-// nextTokenOrQuoted returns the leading token or quoted string per RFC 2616
-// and the string following the token or quoted string.
-func nextTokenOrQuoted(s string) (value string, rest string) {
-	if !strings.HasPrefix(s, "\"") {
-		return nextToken(s)
-	}
-	s = s[1:]
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '"':
-			return s[:i], s[i+1:]
-		case '\\':
-			p := make([]byte, len(s)-1)
-			j := copy(p, s[:i])
-			escape := true
-			for i = i + 1; i < len(s); i++ {
-				b := s[i]
-				switch {
-				case escape:
-					escape = false
-					p[j] = b
-					j++
-				case b == '\\':
-					escape = true
-				case b == '"':
-					return string(p[:j]), s[i+1:]
-				default:
-					p[j] = b
-					j++
-				}
-			}
-			return "", ""
-		}
-	}
-	return "", ""
-}
-
 // equalASCIIFold returns true if s is equal to t with ASCII case folding as
 // defined in RFC 4790.
 func equalASCIIFold(s, t string) bool {
@@ -222,64 +174,6 @@ headers:
 		}
 	}
 	return false
-}
-
-// parseExtensions parses WebSocket extensions from a header.
-func parseExtensions(header http.Header) []map[string]string {
-	// From RFC 6455:
-	//
-	//  Sec-WebSocket-Extensions = extension-list
-	//  extension-list = 1#extension
-	//  extension = extension-token *( ";" extension-param )
-	//  extension-token = registered-token
-	//  registered-token = token
-	//  extension-param = token [ "=" (token | quoted-string) ]
-	//     ;When using the quoted-string syntax variant, the value
-	//     ;after quoted-string unescaping MUST conform to the
-	//     ;'token' ABNF.
-
-	var result []map[string]string
-headers:
-	for _, s := range header["Sec-Websocket-Extensions"] {
-		for {
-			var t string
-			t, s = nextToken(skipSpace(s))
-			if t == "" {
-				continue headers
-			}
-			ext := map[string]string{"": t}
-			for {
-				s = skipSpace(s)
-				if !strings.HasPrefix(s, ";") {
-					break
-				}
-				var k string
-				k, s = nextToken(skipSpace(s[1:]))
-				if k == "" {
-					continue headers
-				}
-				s = skipSpace(s)
-				var v string
-				if strings.HasPrefix(s, "=") {
-					v, s = nextTokenOrQuoted(skipSpace(s[1:]))
-					s = skipSpace(s)
-				}
-				if s != "" && s[0] != ',' && s[0] != ';' {
-					continue headers
-				}
-				ext[k] = v
-			}
-			if s != "" && s[0] != ',' {
-				continue headers
-			}
-			result = append(result, ext)
-			if s == "" {
-				continue headers
-			}
-			s = s[1:]
-		}
-	}
-	return result
 }
 
 // isValidChallengeKey checks if the argument meets RFC6455 specification.

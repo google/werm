@@ -7,6 +7,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"sync"
 	"time"
 )
@@ -25,69 +27,55 @@ const (
 	LogUnknown = 127
 )
 
-type LogFunc func(logScope *LogScope, level LogLevel, levelName string, category string, msg string, args ...interface{})
+func logfunc(l *LogScope, level LogLevel, levelName string, msg string, args ...interface{}) {
+	if level < l.MinLevel {
+		return
+	}
+	fullMsg := fmt.Sprintf(msg, args...)
+
+	l.Mutex.Lock()
+	fmt.Fprintln(os.Stderr, Timestamp(), levelName, fullMsg)
+	l.Mutex.Unlock()
+}
 
 type LogScope struct {
-	Parent     *LogScope   // Parent scope
 	MinLevel   LogLevel    // Minimum log level to write out.
 	Mutex      *sync.Mutex // Should be shared across all LogScopes that write to the same destination.
-	Associated []AssocPair // Additional data associated with scope
-	LogFunc    LogFunc
 }
 
-type AssocPair struct {
-	Key   string
-	Value string
+func (l *LogScope) Debug(msg string, args ...interface{}) {
+	logfunc(l, LogDebug, "D", msg, args...)
 }
 
-func (l *LogScope) Associate(key string, value string) {
-	l.Associated = append(l.Associated, AssocPair{key, value})
+func (l *LogScope) Trace(msg string, args ...interface{}) {
+	logfunc(l, LogTrace, "T", msg, args...)
 }
 
-func (l *LogScope) Debug(category string, msg string, args ...interface{}) {
-	l.LogFunc(l, LogDebug, "DEBUG", category, msg, args...)
+func (l *LogScope) Access(msg string, args ...interface{}) {
+	logfunc(l, LogAccess, "A", msg, args...)
 }
 
-func (l *LogScope) Trace(category string, msg string, args ...interface{}) {
-	l.LogFunc(l, LogTrace, "TRACE", category, msg, args...)
+func (l *LogScope) Info(msg string, args ...interface{}) {
+	logfunc(l, LogInfo, "I", msg, args...)
 }
 
-func (l *LogScope) Access(category string, msg string, args ...interface{}) {
-	l.LogFunc(l, LogAccess, "ACCESS", category, msg, args...)
+func (l *LogScope) Error(msg string, args ...interface{}) {
+	logfunc(l, LogError, "E", msg, args...)
 }
 
-func (l *LogScope) Info(category string, msg string, args ...interface{}) {
-	l.LogFunc(l, LogInfo, "INFO", category, msg, args...)
+func (l *LogScope) Fatal(msg string, args ...interface{}) {
+	logfunc(l, LogFatal, "F", msg, args...)
 }
 
-func (l *LogScope) Error(category string, msg string, args ...interface{}) {
-	l.LogFunc(l, LogError, "ERROR", category, msg, args...)
-}
-
-func (l *LogScope) Fatal(category string, msg string, args ...interface{}) {
-	l.LogFunc(l, LogFatal, "FATAL", category, msg, args...)
-}
-
-func (parent *LogScope) NewLevel(logFunc LogFunc) *LogScope {
+func RootLogScope(minLevel LogLevel) *LogScope {
 	return &LogScope{
-		Parent:     parent,
-		MinLevel:   parent.MinLevel,
-		Mutex:      parent.Mutex,
-		Associated: make([]AssocPair, 0),
-		LogFunc:    logFunc}
-}
-
-func RootLogScope(minLevel LogLevel, logFunc LogFunc) *LogScope {
-	return &LogScope{
-		Parent:     nil,
 		MinLevel:   minLevel,
 		Mutex:      &sync.Mutex{},
-		Associated: make([]AssocPair, 0),
-		LogFunc:    logFunc}
+	}
 }
 
 func Timestamp() string {
-	return time.Now().Format(time.RFC1123Z)
+	return time.Now().Format(time.RFC3339)
 }
 
 func LevelFromString(s string) LogLevel {

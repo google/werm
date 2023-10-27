@@ -13,12 +13,7 @@ import (
 	"strings"
 )
 
-const (
-	gatewayInterface = "websocketd-CGI/0.1"
-)
-
 var headerNewlineToSpace = strings.NewReplacer("\n", " ", "\r", " ")
-var headerDashToUnderscore = strings.NewReplacer("-", "_")
 
 func createEnv(req *http.Request) []string {
 	// Standard CGI env, as defined in http://tools.ietf.org/html/rfc3875

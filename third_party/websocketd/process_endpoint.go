@@ -38,7 +38,7 @@ func (pe *ProcessEndpoint) Terminate() {
 	// a bit verbose to create good debugging trail
 	select {
 	case <-terminated:
-		pe.log.Debug("process", "Process %v terminated after stdin was closed", pe.process.cmd.Process.Pid)
+		pe.log.Debug("Process %v terminated after stdin was closed", pe.process.cmd.Process.Pid)
 		return // means process finished
 	case <-time.After(100*time.Millisecond + pe.closetime):
 	}
@@ -46,12 +46,12 @@ func (pe *ProcessEndpoint) Terminate() {
 	err := pe.process.cmd.Process.Signal(syscall.SIGINT)
 	if err != nil {
 		// process is done without this, great!
-		pe.log.Error("process", "SIGINT unsuccessful to %v: %s", pe.process.cmd.Process.Pid, err)
+		pe.log.Error("SIGINT unsuccessful to %v: %s", pe.process.cmd.Process.Pid, err)
 	}
 
 	select {
 	case <-terminated:
-		pe.log.Debug("process", "Process %v terminated after SIGINT", pe.process.cmd.Process.Pid)
+		pe.log.Debug("Process %v terminated after SIGINT", pe.process.cmd.Process.Pid)
 		return // means process finished
 	case <-time.After(250*time.Millisecond + pe.closetime):
 	}
@@ -59,30 +59,30 @@ func (pe *ProcessEndpoint) Terminate() {
 	err = pe.process.cmd.Process.Signal(syscall.SIGTERM)
 	if err != nil {
 		// process is done without this, great!
-		pe.log.Error("process", "SIGTERM unsuccessful to %v: %s", pe.process.cmd.Process.Pid, err)
+		pe.log.Error("SIGTERM unsuccessful to %v: %s", pe.process.cmd.Process.Pid, err)
 	}
 
 	select {
 	case <-terminated:
-		pe.log.Debug("process", "Process %v terminated after SIGTERM", pe.process.cmd.Process.Pid)
+		pe.log.Debug("Process %v terminated after SIGTERM", pe.process.cmd.Process.Pid)
 		return // means process finished
 	case <-time.After(500*time.Millisecond + pe.closetime):
 	}
 
 	err = pe.process.cmd.Process.Kill()
 	if err != nil {
-		pe.log.Error("process", "SIGKILL unsuccessful to %v: %s", pe.process.cmd.Process.Pid, err)
+		pe.log.Error("SIGKILL unsuccessful to %v: %s", pe.process.cmd.Process.Pid, err)
 		return
 	}
 
 	select {
 	case <-terminated:
-		pe.log.Debug("process", "Process %v terminated after SIGKILL", pe.process.cmd.Process.Pid)
+		pe.log.Debug("Process %v terminated after SIGKILL", pe.process.cmd.Process.Pid)
 		return // means process finished
 	case <-time.After(1000 * time.Millisecond):
 	}
 
-	pe.log.Error("process", "SIGKILL did not terminate %v!", pe.process.cmd.Process.Pid)
+	pe.log.Error("SIGKILL did not terminate %v!", pe.process.cmd.Process.Pid)
 }
 
 func (pe *ProcessEndpoint) log_stderr() {
@@ -91,13 +91,13 @@ func (pe *ProcessEndpoint) log_stderr() {
 		buf, err := bufstderr.ReadSlice('\n')
 		if err != nil {
 			if err != io.EOF {
-				pe.log.Error("process", "Unexpected error while reading STDERR from process: %s", err)
+				pe.log.Error("Unexpected error while reading STDERR from process: %s", err)
 			} else {
-				pe.log.Debug("process", "Process STDERR closed")
+				pe.log.Debug("Process STDERR closed")
 			}
 			break
 		}
-		pe.log.Error("stderr", "%s", string(trimEOL(buf)))
+		pe.log.Error("%s", string(trimEOL(buf)))
 	}
 }
 

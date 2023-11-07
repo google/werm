@@ -26,6 +26,8 @@
    directly from session.c and with a tty, or invoked from an attach process,
    where stdout is connected to a websocket. stderr is safe in both cases.
 
+ - close the control socket in the subproc (e.g. /bin/bash or the spawner)
+
  OCT 2023
 
  - call a function defined by werm rather than exec an argv array to start the
@@ -141,23 +143,19 @@ init_pty(void)
 
 	/* Create the pty process */
 	the_pty.pid = forkpty(&the_pty.fd, NULL, NULL, NULL);
-	if (the_pty.pid < 0)
-		return -1;
-	else if (the_pty.pid == 0)
-		/* Child.. Execute the program. Will not return. */
-		subproc_main();
-
-	/* Parent.. Finish up and return */
-
+	if (the_pty.pid < 0) {
+		perror("forkpty");
+		abort();
+	}
+	if (the_pty.pid != 0) {
 #ifdef BROKEN_MASTER
-	{
 		char *buf;
 
 		buf = ptsname(the_pty.fd);
 		the_pty.slave = open(buf, O_RDWR|O_NOCTTY);
-	}
 #endif
-	return 0;
+	}
+	return the_pty.pid;
 }
 
 /* Send a signal to the slave side of a pseudo-terminal. */
@@ -415,10 +413,16 @@ masterprocess(int s)
 
 	/* Create a pty in which the process is running. */
 	signal(SIGCHLD, die);
-	if (init_pty() < 0)
-	{
-		perror("dtach: init_pty");
-		exit(1);
+	if (!init_pty()) {
+		/* Child of master. Becomes the subproc, such as the shell. We
+		 * need to close the control socket so lsof can give an accurate
+		 * picture of whether the sockets are in use. This keeps /attach
+		 * session use state accurate. Note that the spawner also
+		 * creates more dtach processes, so for the spawner process,
+		 * this event prevents ~spawner.<ID> from staying open by each
+		 * master proc. */
+		close(s);
+		subproc_main();
 	}
 
 	maybe_open_logs();

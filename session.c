@@ -596,7 +596,8 @@ static void newsessinhtml(struct iterprofspec *spc, char k, const char *nmarg)
 	}
 }
 
-static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
+static int proflines(
+	const char *grpname, const char *prffn, struct iterprofspec *spc)
 {
 	const char *cmpname;
 	int lineno = 0, namematc = 0, namerr = 0;
@@ -604,6 +605,13 @@ static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
 	char fld, eofield, namemat, err = 0, startedjs;
 	char begunprenam, c;
 	struct fdbuf nmbuf = {0};
+	FILE *pff = fopen(prffn, "r");
+
+	if (!pff) {
+		perror("fopen for profile");
+		fprintf(stderr, "prpath=%s group=%s\n", prffn, grpname);
+		return 0;
+	}
 
 	newsessinhtml(spc, 's', grpname);
 
@@ -697,6 +705,7 @@ static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
 	newsessinhtml(spc, 'e', 0);
 
 	fdb_finsh(&nmbuf);
+	fclose(pff);
 
 	return namematc;
 }
@@ -704,10 +713,9 @@ static int proflines(const char *grpname, FILE *pff, struct iterprofspec *spc)
 static void iterprofs(const char *ppaths_, struct iterprofspec *spc)
 {
 	DIR *pd;
-	char *ppaths = strdup(ppaths_), *tkn, *savepp, *ppitr, *ffn;
+	char *ppaths = strdup(ppaths_), *tkn, *savepp, *ppitr, *ffn = 0;
 
 	struct dirent *den;
-	FILE *pff;
 	int namematc = 0;
 	struct fdbuf sigbuf = {spc->sigde};
 	spc->sigb = &sigbuf;
@@ -736,6 +744,7 @@ static void iterprofs(const char *ppaths_, struct iterprofspec *spc)
 				break;
 			}
 
+			free(ffn);
 			xasprintf(&ffn, "%s/%s", tkn, den->d_name);
 
 			if (den->d_name[0] == '.') {
@@ -743,29 +752,20 @@ static void iterprofs(const char *ppaths_, struct iterprofspec *spc)
 					fprintf(stderr,
 						"  skipped file '%s'\n",
 						den->d_name);
-				goto doneproffile;
+				continue;
 			}
 
 			if (spc->diaglog)
 				fprintf(stderr, "  group %s\n", den->d_name);
 
-			pff = fopen(ffn, "r");
-			if (!pff) {
-				perror("fopen");
-				goto doneproffile;
-			}
-
-			namematc += proflines(den->d_name, pff, spc);
-
-doneproffile:
-			free(ffn);
-			ffn = NULL;
+			namematc += proflines(den->d_name, ffn, spc);
 		}
 
 		closedir(pd);
 	}
 
 	free(ppaths);
+	free(ffn);
 
 	fdb_finsh(&sigbuf);
 	spc->sigb = 0;

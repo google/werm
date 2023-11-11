@@ -169,6 +169,7 @@ shortcuts:
  * `la` and `ra` are the alt keys, `ls` and `rs` are shift, and `lc` and
    `rc` are control.
  * `sp` is the spacebar
+ * `vs` is backslash (vertical pipe) key (reVerse Solidus)
 
 `native_to_mn` in `index.html` defines the complete mapping between
 mnemonics and the long-form name used by the JS Event API.

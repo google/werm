@@ -18,6 +18,22 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ DEC 2023
+
+ - delete unused killpty function
+
+ - do not change executable bit on active sockets
+
+ - allow clients to not receive all terminal output by not setting the
+   wantsoutput flag
+
+ - utility for getting attached client info: print_atch_clis
+
+ - refactor blocking-client detection logic into new cliwrite function for
+   readability
+
+ - print errno message if reading from pty failed
+
  NOV 2023
 
  - drop statusfd mechanism. Use perror and stderr rather than stdout to show
@@ -54,6 +70,7 @@
    file */
 
 #include "third_party/dtach/dtach.h"
+#include "outstreams.h"
 
 /* The pty struct - The pty information is stored here. */
 struct pty
@@ -79,8 +96,8 @@ struct client
 	struct client **pprev;
 	/* File descriptor of the client. */
 	int fd;
-	/* Whether or not the client is attached. */
-	int attached;
+
+	struct clistate cls;
 };
 
 /* The list of connected clients. */
@@ -158,35 +175,6 @@ init_pty(void)
 	return the_pty.pid;
 }
 
-/* Send a signal to the slave side of a pseudo-terminal. */
-static void
-killpty(struct pty *pty, int sig)
-{
-	pid_t pgrp = -1;
-
-#ifdef TIOCSIGNAL
-	if (ioctl(pty->fd, TIOCSIGNAL, sig) >= 0)
-		return;
-#endif
-#ifdef TIOCSIG
-	if (ioctl(pty->fd, TIOCSIG, sig) >= 0)
-		return;
-#endif
-#ifdef TIOCGPGRP
-#ifdef BROKEN_MASTER
-	if (ioctl(pty->slave, TIOCGPGRP, &pgrp) >= 0 && pgrp != -1 &&
-		kill(-pgrp, sig) >= 0)
-		return;
-#endif
-	if (ioctl(pty->fd, TIOCGPGRP, &pgrp) >= 0 && pgrp != -1 &&
-		kill(-pgrp, sig) >= 0)
-		return;
-#endif
-
-	/* Fallback using the child's pid. */
-	kill(-pty->pid, sig);
-}
-
 /* Creates a new unix domain socket. */
 static int
 create_socket(char *name)
@@ -229,59 +217,51 @@ create_socket(char *name)
 	return s;
 }
 
-/* Update the modes on the socket. */
-static void
-update_socket_modes(int exec)
-{
-	struct stat st;
-	mode_t newmode;
-
-	if (stat(dtach_sock, &st) < 0)
-		return;
-
-	if (exec)
-		newmode = st.st_mode | S_IXUSR;
-	else
-		newmode = st.st_mode & ~S_IXUSR;
-
-	if (st.st_mode != newmode)
-		chmod(dtach_sock, newmode);
-}
-
 static struct fdbuf therout;
+
+/* Returns:
+   'b' if writing would block
+   'e' if unexpected error
+   'o' if all written OK */
+static int cliwrite(int fd, const unsigned char *b, size_t sz)
+{
+	ssize_t writn;
+
+	while (sz) {
+		writn = write(fd, b, sz);
+
+		if (writn > 0) {
+			sz -= writn;
+			b += writn;
+		}
+		else if (errno == EAGAIN || errno == EWOULDBLOCK)
+			return 'b';
+		else {
+			perror("writing to client");
+			fprintf(stderr, "  fd: %d\n", fd);
+			fprintf(stderr, "  size: %zu\n", sz);
+			return 'e';
+		}
+	}
+
+	return 'o';
+}
 
 static int sendrout(fd_set *writabl)
 {
 	struct client *p;
-	const unsigned char *routcurs;
-	ssize_t writn, routrema;
 	int nclients;
 
 	/* Send the data out to the clients. */
-	for (p = clients, nclients = 0; p; p = p->next)
-	{
+	for (p = clients, nclients = 0; p; p = p->next) {
 		if (!FD_ISSET(p->fd, writabl)) continue;
 
-		routcurs = therout.bf;
-		routrema = therout.len;
-		while (routrema)
-		{
-			writn = write(p->fd, routcurs, routrema);
-
-			if (writn > 0)
-			{
-				routrema -= writn;
-				routcurs += writn;
-				continue;
-			}
-			else if (writn < 0 && errno == EINTR)
-				continue;
-			else if (writn < 0 && errno != EAGAIN)
-				nclients = -1;
-			break;
+		switch (cliwrite(p->fd, therout.bf, therout.len)) {
+		default: abort();
+		case 'b': break;
+		case 'e': nclients = -1;
+		case 'o': if (nclients != -1) nclients++;
 		}
-
-		if (nclients != -1 && !routrema) nclients++;
 	}
 
 	return nclients;
@@ -294,16 +274,17 @@ pty_activity(int s)
 {
 	unsigned char preprocb[BUFSIZE];
 	struct client *p;
-	ssize_t preproclen, writn;
 	fd_set readfds, writefds;
-	int highest_fd, nclients;
+	int highest_fd, nclients, preproclen;
 
 	/* Read the pty activity */
 	preproclen = read(the_pty.fd, preprocb, sizeof(preprocb));
 
 	/* Error -> die */
-	if (preproclen <= 0)
-		exit(1);
+	if (preproclen <= 0) {
+		perror("read pty");
+		abort();
+	}
 
 	therout.len = 0;
 	process_tty_out(&therout, preprocb, preproclen);
@@ -319,7 +300,7 @@ pty_activity(int s)
 		highest_fd = s;
 		for (p = clients, nclients = 0; p; p = p->next)
 		{
-			if (!p->attached)
+			if (!p->cls.wantsoutput)
 				continue;
 			FD_SET(p->fd, &writefds);
 			if (p->fd > highest_fd)
@@ -355,14 +336,29 @@ control_activity(int s)
 	}
 
 	/* Link it in. */
-	p = malloc(sizeof(struct client));
+	p = calloc(1, sizeof(struct client));
 	p->fd = fd;
-	p->attached = 0;
 	p->pprev = &clients;
 	p->next = *(p->pprev);
 	if (p->next)
 		p->next->pprev = &p->next;
 	*(p->pprev) = p;
+}
+
+void print_atch_clis(struct fdbuf *b)
+{
+	struct client *q;
+	const char *pref = "";
+
+	fdb_apnc(b, '[');
+	for (q = clients; q; q = q->next) {
+		if (!q->cls.wantsoutput) continue;
+
+		fdb_apnd(b, pref, -1);
+		pref = ",";
+		fdb_json(b, q->cls.endpnt, sizeof q->cls.endpnt);
+	}
+	fdb_apnc(b, ']');
 }
 
 /* Process activity from a client. */
@@ -387,10 +383,7 @@ client_activity(struct client *p)
 		free(p);
 		return;
 	}
-	if (!p->attached) recount_state(&((struct wrides) {p->fd}));
-	p->attached = 1;
-
-	process_kbd(the_pty.fd, p->fd, buf, len);
+	process_kbd(the_pty.fd, p->fd, &p->cls, buf, len);
 }
 
 /* The master process - It watches over the pty process and the attached */
@@ -401,8 +394,6 @@ masterprocess(int s)
 	struct client *p, *next;
 	fd_set readfds;
 	int highest_fd, nullfd;
-
-	int has_attached_client = 0;
 
 	/* Okay, disassociate ourselves from the original terminal, as we
 	** don't care what happens to it. */
@@ -449,8 +440,6 @@ masterprocess(int s)
 	/* Loop forever. */
 	while (1)
 	{
-		int new_has_attached_client = 0;
-
 		/* Re-initialize the file descriptor set for select. */
 		FD_ZERO(&readfds);
 		FD_SET(s, &readfds);
@@ -460,7 +449,7 @@ masterprocess(int s)
 		** When first_attach is unset, wait until the client attaches
 		** before trying to read from the pty.
 		*/
-		if (!first_attach && clients && clients->attached) {
+		if (!first_attach && clients && clients->cls.wantsoutput) {
 			first_attach = 1;
 			send_pream(the_pty.fd);
 		}
@@ -476,16 +465,6 @@ masterprocess(int s)
 			FD_SET(p->fd, &readfds);
 			if (p->fd > highest_fd)
 				highest_fd = p->fd;
-
-			if (p->attached)
-				new_has_attached_client = 1;
-		}
-
-		/* chmod the socket if necessary. */
-		if (has_attached_client != new_has_attached_client)
-		{
-			update_socket_modes(new_has_attached_client);
-			has_attached_client = new_has_attached_client;
 		}
 
 		/* Wait for something to happen. */

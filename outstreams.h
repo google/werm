@@ -57,6 +57,12 @@ void fdb_routc(struct fdbuf *b, int c);
  * Will escape as needed like fdb_routc does. */
 void fdb_routs(struct fdbuf *b, const char *s, ssize_t len);
 
+/* Appends the given string as a JSON string. The string in |s| is a utf8
+   string, and non-ASCII codepoints are not modified, so the output is also
+   utf8. Where escapes are needed, \u is used rather than \x so that the results
+   can be parsed as JSON. */
+void fdb_json(struct fdbuf *b, const char *s, ssize_t len);
+
 /* Converts an int to a string and appends it to b. Escaping is not necessary if
  * this is used for terminal output to the client. */
 void fdb_itoa(struct fdbuf *b, int i);

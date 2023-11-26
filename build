@@ -53,6 +53,9 @@ $!s/$/\\012/
 	 -D_GNU_SOURCE \
 	 -Werror=format \
 	 -Werror=return-type \
+	 -Werror=unused-variable \
+	 -Werror=missing-declarations \
+	 -Werror=unused-function \
 	 $WERMCCFLAGS \
 	 -o session \
 	 session.c \

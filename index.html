@@ -32,6 +32,7 @@ body {
     <script>window['extended_macros'] = {}</script>
 
     <script src="hterm"></script>
+    <script src="endptid.js"></script>
     <script>
 
 var signal, set_locked_title, wfns;
@@ -310,7 +311,6 @@ function term_init()
 		compons.push(host);
 
 		document.title = compons.join(' | ');
-		if (row_ttl) localStorage['title-' + termid] = row_ttl;
 	}
 
 	function print(str)
@@ -515,8 +515,10 @@ function term_init()
 		// signalsize implicitly sends pending sends that have
 		// accumulated while disconnected.
 		sock.onopen = function() {
-			pend_send.push(dimensignal(t.screenSize.width,
-						   t.screenSize.height));
+			pend_send.push(
+				dimensignal(t.screenSize.width,
+					    t.screenSize.height),
+				'\\i', endptid());
 			send_pending();
 		};
 

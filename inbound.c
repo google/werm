@@ -57,7 +57,6 @@ void fwrd_inbound_frames(int sock)
 	uint16_t datalen16;
 	int unmaski, datpart, unmaskof;
 	unsigned char *bfc;
-	unsigned fragsz;
 
 	if (bfi != bfsz) abort();
 

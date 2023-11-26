@@ -3,8 +3,14 @@ TEST: should ignore newline:
 pty[hello how are you]
 TEST: empty string:
 TEST: no-op escape \N:
+wantsoutput=0
+cli[\\s1]
+wantsoutput=1
 TEST: change window size after \N:
+wantsoutput=0
+cli[\\s1]
 sigwin r=99 c=11
+wantsoutput=1
 TEST: missing newline:
 pty[asdf]
 TEST: sending sigwinch:
@@ -97,16 +103,16 @@ putrwout[itle\\07xyz\\0d\\0a\012]
 TEST: 1049h/l code for switching to/from alternate screen + other ops
 putrwout[abc \\1b[?1049\\ss\\s2\\clh\012-in-\\1b[?1049\\s1\\rslout\012]
 TEST: dump of state
-recount_state[\\s1]
+cli[\\s1]
 putrwout[\\1b[?47\\s2h\012]
-recount_state[\\s2]
-recount_state[\\s2]
+cli[\\s2]
+cli[\\s2]
 putrwout[\\1b[?47\\s1l\012]
-recount_state[\\s1]
+cli[\\s1]
 putrwout[\\1b[?1049\\ss\\s2\\clh\012]
-recount_state[\\s2]
+cli[\\s2]
 putrwout[\\1b[?1049\\s1\\rsl\012]
-recount_state[\\s1]
+cli[\\s1]
 TEST: do not save bell character in plain text log
 sblog[ready... D I N G!\012]
 TEST: editing a long line
@@ -123,12 +129,12 @@ cli[\\@title:longtitle\012]
 cli[\\@title:1+1++1\012]
 TEST: title in recounted state
 cli[\\@title:sometitle\012]
-recount_state[\\s1]
-recount_state[\\@title:sometitle\012]
+cli[\\s1]
+cli[\\@title:sometitle\012]
 TEST: ... continued: unset title, respond with empty title
 cli[\\@title:\012]
 pty[thisisnormalkeybinput]
-(should not include title here): recount_state[\\s1]
+(should not include title here): cli[\\s1]
 TEST: title is too long
 cli[\\@title:abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab]
 cli[cabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc]
@@ -136,6 +142,19 @@ cli[abcabcab\012]
 putrwout[this is plain terminal text\012]
 sblog[this is plain terminal text\012]
 stored title length: 128
+TEST: set endpoint ID
+endpnt[abcDEfgh]
+pty[rest of text]
+endpnt[abcDEfgh]
+TEST: set endpoint ID two calls A
+endpnt[1bcDEfg\000]
+endpnt[1bcDEfgz]
+pty[rest of text]
+endpnt[1bcDEfgz]
+TEST: set endpoint ID two calls b
+endpnt[\000\000\000\000\000\000\000\000]
+pty[--rest of test]
+endpnt[z1bjkEfg]
 TEST: do not include altscreen content in scrollback log
 sblog[xyz\012]
 sblog[abcrest\012]

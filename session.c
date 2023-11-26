@@ -36,7 +36,8 @@ int is_ephem(void) { return !termid; }
  * memset call. */
 static struct {
 	unsigned short swrow, swcol;
-	/* chars read into either winsize or ttl, depending on value of escp */
+	/* chars read into either winsize, ttl, or client_state's endpnt,
+	   depending on value of escp */
 	unsigned altbufsz;
 	char winsize[8];
 
@@ -44,6 +45,7 @@ static struct {
 	 * '1': next char is escaped
 	 * 'w': reading window size
 	 * 't': reading title into ttl
+	 * 'i': reading endpoint ID int client_state's endpnt
 	 */
 	char escp;
 
@@ -201,7 +203,6 @@ static void deletechrahead(void)
  */
 void process_tty_out(struct fdbuf *rout, const void *buf_, ssize_t len)
 {
-	char lastescbyt;
 	const unsigned char *buf = buf_;
 
 	if (len < 0) len = strlen(buf_);
@@ -328,7 +329,7 @@ static void recountttl(struct wrides *de)
 	fdb_finsh(&b);
 }
 
-int extractqueryarg(const char *pref, char **dest)
+static int extractqueryarg(const char *pref, char **dest)
 {
 	size_t preflen;
 	const char *end;
@@ -420,9 +421,16 @@ void _Noreturn subproc_main(void)
 static const char *socksdir(void)
 {
 	static char *sd;
+	const char *sockenv;
+
 	if (sd) return sd;
 
-	xasprintf(&sd, "%s/socks", state_dir());
+	sockenv = getenv("WERMSOCKSDIR");
+	if (sockenv)
+		sd = strdup(sockenv);
+	else
+		xasprintf(&sd, "%s/socks", state_dir());
+
 	if (mkdir(sd, 0700) && errno != EEXIST) err(1, "cannot create %s", sd);
 
 	return sd;
@@ -545,26 +553,6 @@ struct iterprofspec {
 	unsigned diaglog	: 1;
 };
 
-/* Transfers the prior recbyts bytes from srcf, measured from one byte before
- * the current seek position of srcf, to dstfd. Returns with the seek position
- * of srcf in the same position as when called. */
-static void recallfiletofd(FILE *srcf, int recbyts, struct fdbuf *dstfd)
-{
-	char c;
-
-	if (fseek(srcf, -1-recbyts, SEEK_CUR) < 0)
-		err(1, "fseek by -%d", 1+recbyts);
-
-	clearerr(srcf);
-	while (recbyts--) {
-		c = getc(srcf);
-		if (ferror(srcf)) err(1, "transferring byte");
-		fdb_apnc(dstfd, c);
-	}
-
-	if (getc(srcf) == EOF) err(1, "ignoring last byte");
-}
-
 static void newsessinhtml(struct iterprofspec *spc, char k, const char *nmarg)
 {
 	const char *litext = nmarg, *litrid = nmarg;
@@ -655,6 +643,7 @@ static int proflines(
 			switch (c) {
 			case '.': case '&': case '?': case '+': case '%':
 			case ' ': case '=': case '/': case '\\': case '"':
+			case '<': case '>':
 				fprintf(stderr,
 					"illegal char '%c' in profile name", c);
 				err = 1;
@@ -793,7 +782,7 @@ static const char *profpath(void)
 	return profpathsavd=p;
 }
 
-void recount_state(struct wrides *de)
+static void recountstate(struct wrides *de)
 {
 	full_write(de, wts.altscren ? "\\s2" : "\\s1", -1);
 	if (wts.ttl[0]) recountttl(de);
@@ -823,6 +812,92 @@ void send_pream(int fd)
 	}));
 }
 
+/* Array with elements:
+	0: print_atch_clis() array
+	1: termid string
+	2: title string */
+static void atchstatejson(struct wrides *cliutd)
+{
+	struct fdbuf hbuf = {cliutd};
+
+	fdb_apnc(&hbuf, '[');
+
+	print_atch_clis(&hbuf);
+	fdb_apnc(&hbuf, ',');
+	fdb_json(&hbuf, termid ? termid : "", -1);
+	fdb_apnc(&hbuf, ',');
+	if (ttllen())	fdb_json(&hbuf, wts.ttl,	ttllen());
+	else		fdb_json(&hbuf, wts.linebuf,	wts.linesz);
+
+	fdb_apnd(&hbuf, "]\n", -1);
+	fdb_finsh(&hbuf);
+}
+
+static void fwdlinetostdout(int fd)
+{
+	int rdn;
+	char buf[512];
+
+	for (;;) {
+		rdn = read(fd, buf, sizeof(buf));
+
+		if (rdn < 0) {
+			if (errno == EINTR) continue;
+			perror("read line from socket");
+			break;
+		}
+
+		fwrite(buf, rdn, 1, stdout);
+		if (buf[rdn-1] == '\n') break;
+	}
+}
+
+static _Noreturn void atchsesnlist(void)
+{
+	DIR *skd;
+	struct dirent *sken;
+	char *spth = 0;
+	int sc, firs = 1;
+
+	if (!(skd = opendir(socksdir()))) {
+		perror("opendir: socks");
+		puts("error opening socks directory");
+		exit(0);
+	}
+
+	putchar('[');
+	for (;;) {
+		errno = 0;
+		sken = readdir(skd);
+		if (!sken) {
+			if (errno) perror("readdir: socks");
+			break;
+		}
+
+		if (strncmp(sken->d_name, "prs%", 4) &&
+		    strncmp(sken->d_name, "eph%", 4))
+			continue;
+
+		xasprintf(&spth, "%s/%s", socksdir(), sken->d_name);
+		sc = connect_uds_as_client(spth);
+		free(spth);
+		if (sc < 0) continue;
+
+		if (!firs) putchar(',');
+		firs = 0;
+
+		full_write(&(struct wrides){sc}, "\\A", -1);
+		fwdlinetostdout(sc);
+		close(sc);
+	}
+
+	putchar(']');
+
+	closedir(skd);
+
+	exit(0);
+}
+
 static void writetosubproccore(
 	/* Where to send output for the process; this is raw keyboard input. */
 	struct wrides *procde,
@@ -830,11 +905,13 @@ static void writetosubproccore(
 	/* Where to send output for attached client. */
 	struct wrides *clioutde,
 
+	struct clistate *cls,
+
 	/* Data received from client which is the escaped keyboard input. */
 	const unsigned char *buf,
 	unsigned bufsz)
 {
-	unsigned wi, ri, row, col;
+	unsigned wi;
 	unsigned char byte, cursmvbyte;
 	struct fdbuf kbdb = {procde};
 
@@ -869,6 +946,7 @@ static void writetosubproccore(
 
 			case 'w':
 			case 't':
+			case 'i':
 				wts.altbufsz = 0;
 				wts.escp = byte;
 				break;
@@ -877,9 +955,16 @@ static void writetosubproccore(
 				dump();
 				break;
 
-			/* no-op escape used for alerting master that it's OK to read
-			 * from subproc. */
-			case 'N':	break;
+			/* escape that alerts master we want to see terminal
+			   output, and to alert master that it's OK to read
+			   from subproc since there is a client ready to read
+			   the output. */
+			case 'N':
+				cls->wantsoutput=1;
+				recountstate(clioutde);
+				break;
+
+			case 'A':	atchstatejson(clioutde); break;
 
 			/* directions, home, end */
 			case '^':	cursmvbyte = 'A'; break;
@@ -924,6 +1009,14 @@ static void writetosubproccore(
 
 			break;
 
+		case 'i':
+			if (wts.altbufsz >= sizeof cls->endpnt) abort();
+
+			cls->endpnt[wts.altbufsz] = byte;
+			if (++wts.altbufsz == sizeof cls->endpnt) wts.escp = 0;
+
+			break;
+
 		default: errx(1, "unknown escape: %d", wts.escp);
 		}
 	}
@@ -931,13 +1024,14 @@ static void writetosubproccore(
 	fdb_finsh(&kbdb);
 }
 
-void process_kbd(int ptyfd, int clioutfd, unsigned char *buf, size_t bufsz)
+void process_kbd(int ptyfd, int clioutfd, struct clistate *cls,
+		 unsigned char *buf, size_t bufsz)
 {
 	struct wrides ptyde = { ptyfd }, clide = { clioutfd };
 
 	struct winsize ws = {0};
 
-	writetosubproccore(&ptyde, &clide, buf, bufsz);
+	writetosubproccore(&ptyde, &clide, cls, buf, bufsz);
 
 	if (!wts.sendsigwin) return;
 
@@ -955,6 +1049,32 @@ static void putrwout(void)
 	tsrout.len = 0;
 }
 
+static struct clistate *testclistate(char op)
+{
+	static struct clistate *s;
+
+	switch (op) {
+	case 'g':
+		if (!s) abort();
+	break;
+	case 'r':
+		free(s);
+		s = calloc(1, sizeof(*s));
+	break;
+	case 'i':
+		full_write(&(struct wrides){1, "endpnt"},
+			   s->endpnt, sizeof(s->endpnt));
+	break;
+	case 'o':
+		printf("wantsoutput=%u\n", s->wantsoutput);
+	break;
+
+	default: abort();
+	}
+
+	return s;
+}
+
 static void testreset(void)
 {
 	memset(&wts, 0, sizeof(wts));
@@ -966,17 +1086,14 @@ static void testreset(void)
 	free(sblvl);	sblvl = 0;
 
 	profpathsavd = "";
+	testclistate('r');
 }
 
-static void writetosp0term(const char *s)
+static void writetosp0term(const void *s)
 {
 	struct wrides pty = {1, "pty"}, cli = {1, "cli"};
 
-	size_t len;
-
-	len = strlen(s);
-
-	writetosubproccore(&pty, &cli, (const unsigned char *)s, len);
+	writetosubproccore(&pty, &cli, testclistate('g'), s, strlen(s));
 
 	if (wts.sendsigwin)
 		printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
@@ -1166,11 +1283,6 @@ static void testiterprofs(void)
 	}));
 }
 
-static void recountstate4test(void)
-{
-	recount_state(&((struct wrides){ 1, "recount_state" }));
-}
-
 static void writelgon(void)
 {
 	wts.logde.fd = 1;
@@ -1181,7 +1293,6 @@ static void writelgon(void)
 static void _Noreturn testmain(void)
 {
 	int i;
-	struct wrides routde = {1, "rout"};
 
 	tstdesc("WRITE_TO_SUBPROC_CORE");
 
@@ -1195,11 +1306,15 @@ static void _Noreturn testmain(void)
 
 	tstdesc("no-op escape \\N:");
 	testreset();
+	testclistate('o');
 	writetosp0term("\\N");
+	testclistate('o');
 
 	tstdesc("change window size after \\N:");
 	testreset();
+	testclistate('o');
 	writetosp0term("\\N\\w00990011");
+	testclistate('o');
 
 	tstdesc("missing newline:");
 	testreset();
@@ -1420,16 +1535,16 @@ static void _Noreturn testmain(void)
 
 	tstdesc("dump of state");
 	testreset();
-	recountstate4test();
+	writetosp0term("\\N");
 	process_tty_out(&tsrout, "\033[?47h", -1); putrwout();
-	recountstate4test();
-	recountstate4test();
+	writetosp0term("\\N");
+	writetosp0term("\\N");
 	process_tty_out(&tsrout, "\033[?47l", -1); putrwout();
-	recountstate4test();
+	writetosp0term("\\N");
 	process_tty_out(&tsrout, "\033[?1049h", -1); putrwout();
-	recountstate4test();
+	writetosp0term("\\N");
 	process_tty_out(&tsrout, "\033[?1049l", -1); putrwout();
-	recountstate4test();
+	writetosp0term("\\N");
 
 	tstdesc("do not save bell character in plain text log");
 	testreset();
@@ -1466,14 +1581,14 @@ static void _Noreturn testmain(void)
 	testreset();
 	writetosp0term("\\tsometitle\n");
 	putrwout();
-	recountstate4test();
+	writetosp0term("\\N");
 	putrwout();
 
 	tstdesc("... continued: unset title, respond with empty title");
 	writetosp0term("thisisnormalkeybinput\\t\n");
 	putrwout();
 	printf("(should not include title here): ");
-	recountstate4test();
+	writetosp0term("\\N");
 	putrwout();
 
 	tstdesc("title is too long");
@@ -1486,6 +1601,29 @@ static void _Noreturn testmain(void)
 	/* line buffer should not be clobbered by overflowing ttl buffer. */
 	process_tty_out(&tsrout, "\r\n", -1);
 	printf("stored title length: %zu\n", strnlen(wts.ttl, sizeof wts.ttl));
+
+	tstdesc("set endpoint ID");
+	testreset();
+	writetosp0term("\\iabcDEfgh");
+	testclistate('i');
+	writetosp0term("rest of text");
+	testclistate('i');
+
+	tstdesc("set endpoint ID two calls A");
+	testreset();
+	writetosp0term("\\i1bcDEfg");
+	testclistate('i');
+	writetosp0term("z");
+	testclistate('i');
+	writetosp0term("rest of text");
+	testclistate('i');
+
+	tstdesc("set endpoint ID two calls b");
+	testreset();
+	writetosp0term("\\i");
+	testclistate('i');
+	writetosp0term("z1bjkEfg--rest of test");
+	testclistate('i');
 
 	tstdesc("do not include altscreen content in scrollback log");
 	writelgon();
@@ -1601,16 +1739,19 @@ int main(int argc, char **argv)
 	argc--;
 	argv++;
 
-	if (1 == argc && !strcmp("test", *argv)) testmain();
-	if (1 == argc && !strcmp("newsessinlinks", *argv)) {
-		iterprofs(profpath(), &((struct iterprofspec){
-			.sigde = &((struct wrides){ 1 }),
-			.newsessin = 1,
-			.diaglog = 1,
-		}));
-		exit(0);
+	if (1 == argc) {
+		if (!strcmp("test",	*argv)) testmain();
+		if (!strcmp("/showenv",	*argv)) doshowenv();
+		if (!strcmp("/atchses",	*argv)) atchsesnlist();
+		if (!strcmp("/newsess",	*argv)) {
+			iterprofs(profpath(), &((struct iterprofspec){
+				.sigde = &((struct wrides){ 1 }),
+				.newsessin = 1,
+				.diaglog = 1,
+			}));
+			exit(0);
+		}
 	}
-	if (1 == argc && !strcmp("/showenv", *argv)) doshowenv();
 
 	processquerystr(getenv("WERMFLAGS"));
 
@@ -1654,6 +1795,8 @@ int main(int argc, char **argv)
 	unsetenv("QUERY_STRING");
 
 	if (termid && !strchr(termid, '.')) appendunqid();
+
+	/* TODO: validate termid against illegal characters */
 
 	prepfordtach();
 	dtach_main();

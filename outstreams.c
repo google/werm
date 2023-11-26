@@ -121,6 +121,25 @@ void fdb_routs(struct fdbuf *b, const char *s, ssize_t len)
 	while (len--) fdb_routc(b, *s++);
 }
 
+void fdb_json(struct fdbuf *b, const char *s, ssize_t len)
+{
+	if (len < 0) len = strlen(s);
+
+	fdb_apnc(b, '"');
+	while (len--) {
+		if (*s < ' ' || *s == '"' || *s == '\\') {
+			fdb_apnd(b, "\\u00", -1);
+			fdb_apnc(b, hexdig(*s >> 4));
+			fdb_apnc(b, hexdig(*s));
+		}
+		else
+			fdb_apnc(b, *s);
+
+		s++;
+	}
+	fdb_apnc(b, '"');
+}
+
 void fdb_itoa(struct fdbuf *b, int i)
 {
 	char bf[sizeof(int) * 4], *bc = bf;

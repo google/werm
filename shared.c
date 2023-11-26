@@ -11,6 +11,8 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#include "shared.h"
+
 char *dtach_sock;
 int first_attach;
 

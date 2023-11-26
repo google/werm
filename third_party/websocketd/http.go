@@ -94,7 +94,7 @@ func (h *WebsocketdServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if req.URL.Path == "/showenv" {
+	if req.URL.Path == "/showenv" || req.URL.Path == "/newsess" || req.URL.Path == "/atchses" {
 		upth := req.URL.Path
 
 		log.Access("serve subcommand: %s", upth);

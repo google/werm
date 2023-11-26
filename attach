@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<!-- Copyright 2023 Google LLC
+
+  -- Use of this source code is governed by a BSD-style
+  -- license that can be found in the LICENSE file or at
+  -- https://developers.google.com/open-source/licenses/bsd
+  -->
+
+<meta charset='utf-8'/>
+<html>
+<head>
+	<title>attach</title>
+<style>
+td.loose {
+	padding-right:20pt;
+}
+h1 {
+	margin-top: 7pt;
+	margin-bottom:8pt;
+	padding-bottom:8pt;
+	border-bottom: solid 1px yellow;
+}
+#ephemeral-sessions {
+	padding-top: 1em;
+	font-size: 0.8em;
+}
+.column {
+	padding-top: 6pt;
+	padding-bottom: 6pt;
+	padding-left: 24pt;
+	padding-right: 24pt;
+	border: 2px solid yellow;
+}
+.newsessin-list {
+	margin-top: 1em;
+	padding-left: 0;
+	list-style-type: none;
+}
+a.newsessin-link {
+	text-decoration: none;
+}
+a {
+	color: white;
+}
+a.tid-link {
+	color: #8f8;
+	text-decoration: none;
+}
+.samecltd {
+	color: #4bb;
+	font-weight: bold;
+}
+.diffcltd {
+	color: #f88;
+	font-weight: bold;
+}
+a.ttl-link {
+	color: white;
+	text-decoration: none;
+}
+.feedback {
+	padding: 0.5em;
+	font-size: 0.7em;
+}
+</style>
+</head>
+<body style="font-family: monospace; font-size: 14px;  background-color: black; color: #8f8;">
+<table style="border: 2px solid yellow; border-collapse: collapse">
+
+<tr>
+<td nowrap class=column style="vertical-align:top">
+	<h1>New</h1>
+	<div	id=newsesnlinks>	</div>
+<td nowrap class=column style="vertical-align:top">
+	<h1>Existing</h1>
+	<table	id=atchsesnlist>	</table>
+	<div	id=ephemeral-sessions>	</div>
+</tr>
+
+<tr>
+<td colspan=2 class=feedback>
+	Werm issue tracker on <a href="https://github.com/google/werm">GitHub</a><br>
+	Other feedback welcome at <a href="mailto:matvore@chromium.org">matvore@chromium.org</a>
+</tr>
+
+</table>
+</body>
+<script src=endptid.js></script>
+<script>
+var nsreq = new XMLHttpRequest();
+nsreq.open('GET', '/newsess', true);
+nsreq.responseType = 'text';
+function reqok(r) { return r.readyState == r.DONE && r.status == 200; }
+
+nsreq.onload = function ()
+{
+	if (!reqok(nsreq)) return;
+
+	document.getElementById('newsesnlinks').innerHTML = nsreq.responseText;
+};
+nsreq.send();
+
+var atreq = new XMLHttpRequest();
+atreq.open('GET', '/atchses', true);
+atreq.responseType = 'text';
+atreq.onload = function ()
+{
+	var sesdat, ephcnt = 0, atchtbl, me = endptid();
+
+	if (!reqok(atreq)) return;
+
+	sesdat = JSON.parse(atreq.responseText);
+
+	sesdat.sort(function(at, bt)
+	{
+		var ap, bp, atid = at[1], btid = bt[1];
+
+		/* Sort ephemerals last */
+		if (!atid || !btid) {
+			if (atid) return -1;
+			if (btid) return 1;
+			return 0;
+		}
+
+		ap = atid.split('.')[0];
+		bp = btid.split('.')[0];
+
+		if (ap != bp)		return ap < bp		? -1 : 1;
+		if (at[2] != bt[2])	return at[2] < bt[2]	? -1 : 1;
+
+		/* Terminal ID's for non-ephemerals should always be different.
+		 */
+		return atid < btid	? -1 : 1;
+	});
+
+	while (!sesdat[sesdat.length-1][1]) {
+		ephcnt++;
+		sesdat.pop();
+	}
+
+	document.getElementById('ephemeral-sessions').innerText =
+		'Ephemeral sessions: ' + ephcnt
+
+	atchtbl = document.getElementById('atchsesnlist');
+	sesdat.forEach(function (ses)
+	{
+		var tid, atr, ttlesc, samecl, diffcl;
+
+		tid = ses[1];
+		atr = document.createElement('tr');
+
+		ttlesc = ses[2]
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>', '&gt;');
+
+		samecl = diffcl = 0;
+		ses[0].forEach(function(atid)
+		{
+			if (atid == me)	samecl++;
+			else		diffcl++;
+		});
+		samecl = ['&nbsp;', '*'][samecl] || samecl;
+		diffcl = [' ', '.'][diffcl] || diffcl;
+
+		atr.innerHTML = (
+			'<td><a class=tid-link href="/?termid=' + tid + '">' +
+			'[<strong>' + tid + '</strong>]</a>' +
+			'<td class=samecltd>' + samecl +
+			'<td class=diffcltd>' + diffcl +
+
+			'<td><a class=ttl-link href="/?termid=' + tid + '">' +
+			(ttlesc || tid) + '</a>'
+		);
+
+		atchtbl.appendChild(atr);
+	});
+};
+atreq.send();
+
+host = location.host.replace(/^localhost:/, ':');
+document.title += '[' + host + ']';
+
+</script>
+</html>

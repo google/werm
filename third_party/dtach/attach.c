@@ -18,6 +18,11 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ DEC 2023
+
+ - make connect_socket chdir-and-retry logic a separate function and allow
+   other modules to call it
+
  NOV 2023
 
  - attach_main is void instead of int and does not return at all on error
@@ -45,7 +50,7 @@
 
 /* Connects to a unix domain socket */
 static int
-connect_socket(char *name)
+connect_socket(const char *name)
 {
 	int s;
 	struct sockaddr_un sockun;
@@ -81,6 +86,46 @@ connect_socket(char *name)
 	return s;
 }
 
+int connect_uds_as_client(const char *name)
+{
+	char *slash, *nmcp = 0;
+	int ern = 0, dirfd = -1, s;
+
+	s = connect_socket(name);
+	if (s >= 0 || errno != ENAMETOOLONG) return s;
+
+	nmcp = strdup(name);
+	slash = strrchr(nmcp, '/');
+	if (!slash) {
+		ern = ENAMETOOLONG;
+		goto cleanup;
+	}
+
+	/* Try to shorten the socket's path name by using chdir. */
+	dirfd = open(".", O_RDONLY);
+
+	if (dirfd < 0) {
+		ern = errno;
+		goto cleanup;
+	}
+
+	*slash = '\0';
+	if (chdir(nmcp) < 0) {
+		ern = errno;
+		goto cleanup;
+	}
+
+	s = connect_socket(nmcp + 1);
+	if (s < 0) ern = errno;
+	fchdir(dirfd);
+
+cleanup:
+	free(nmcp);
+	if (dirfd >= 0) close(dirfd);
+	errno = ern;
+	return s;
+}
+
 /* Signal */
 static RETSIGTYPE
 die(int sig)
@@ -100,31 +145,7 @@ void attach_main(int noerror)
 
 	set_argv0('a');
 
-	/* Attempt to open the socket. Don't display an error if noerror is 
-	** set. */
-	s = connect_socket(dtach_sock);
-	if (s < 0 && errno == ENAMETOOLONG)
-	{
-		char *slash = strrchr(dtach_sock, '/');
-
-		/* Try to shorten the socket's path name by using chdir. */
-		if (slash)
-		{
-			int dirfd = open(".", O_RDONLY);
-
-			if (dirfd >= 0)
-			{
-				*slash = '\0';
-				if (chdir(dtach_sock) >= 0)
-				{
-					s = connect_socket(slash + 1);
-					fchdir(dirfd);
-				}
-				*slash = '/';
-				close(dirfd);
-			}
-		}
-	}
+	s = connect_uds_as_client(dtach_sock);
 	if (s < 0) {
 		if (noerror) return;
 		exit_msg("es", "dtach connect_socket errno: ", errno);

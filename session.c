@@ -62,6 +62,10 @@ static struct {
 	unsigned writelg	: 1;
 	unsigned writerawlg	: 1;
 
+	/* True if the ttl contents were set by the client, false if the ttl
+	   was populated automatically with line contents. */
+	unsigned clnttl		: 1;
+
 	/* Logs (either text only, or raw subproc output) are written to these
 	 * fd's if writelg,writerawlg are 1. */
 	struct wrides logde, rawlogde;
@@ -103,6 +107,7 @@ static void dump(void)
 	logescaped(f, wts.escbuf, wts.escsz);
 	fprintf(f, "altscr:  %u\n", wts.altscren);
 	fprintf(f, "appcurs: %u\n", wts.appcursor);
+	fprintf(f, "clnttl: %u\n", wts.clnttl);
 	fprintf(f, "windim: %u:%u\n", wts.swrow, wts.swcol);
 	fprintf(f, "ttl: (sz=%u)\n", ttllen());
 	logescaped(f, wts.ttl, ttllen());
@@ -136,6 +141,11 @@ static _Bool consumeesc(const char *pref, size_t preflen)
  */
 #define TMpeek(buf, i) ((buf)[(i) % sizeof(buf)])
 #define TMpoke(buf, i, val) do { (buf)[(i) % sizeof(buf)] = (val); } while (0)
+
+static void TMpokettl(int toff, int b)
+{
+	if (toff >= 0 && toff < sizeof(wts.ttl)) wts.ttl[toff] = b;
+}
 
 static void TMlineresize(int sz)
 {
@@ -302,6 +312,10 @@ void process_tty_out(struct fdbuf *rout, const void *buf_, ssize_t len)
 		if (wts.linesz == wts.linepos) TMlineresize(wts.linepos+1);
 		TMpoke(wts.linebuf, wts.linepos, *buf);
 		TMlinepos(wts.linepos+1);
+		if (!wts.clnttl && *buf != '\n') {
+			TMpokettl(wts.linesz-1,	*buf);
+			TMpokettl(wts.linesz,	0);
+		}
 
 		if (*buf != '\n' && wts.linesz < sizeof(wts.linebuf)) goto eol;
 
@@ -324,7 +338,7 @@ static void recountttl(struct wrides *de)
 	struct fdbuf b = {.de = de};
 
 	fdb_apnd(&b, "\\@title:", -1);
-	fdb_apnd(&b, wts.ttl, ttllen());
+	if (wts.clnttl) fdb_apnd(&b, wts.ttl, ttllen());
 	fdb_apnc(&b, '\n');
 	fdb_finsh(&b);
 }
@@ -826,8 +840,7 @@ static void atchstatejson(struct wrides *cliutd)
 	fdb_apnc(&hbuf, ',');
 	fdb_json(&hbuf, termid ? termid : "", -1);
 	fdb_apnc(&hbuf, ',');
-	if (ttllen())	fdb_json(&hbuf, wts.ttl,	ttllen());
-	else		fdb_json(&hbuf, wts.linebuf,	wts.linesz);
+	fdb_json(&hbuf, wts.ttl, ttllen());
 
 	fdb_apnd(&hbuf, "]\n", -1);
 	fdb_finsh(&hbuf);
@@ -1002,9 +1015,9 @@ static void writetosubproccore(
 			if (byte == '\n') {
 				wts.escp = 0;
 				byte = 0;
+				wts.clnttl = !!wts.altbufsz;
 			}
-			if (wts.altbufsz < sizeof wts.ttl)
-				wts.ttl[wts.altbufsz++] = byte;
+			TMpokettl(wts.altbufsz++, byte);
 			if (!byte) recountttl(clioutde);
 
 			break;
@@ -1674,6 +1687,24 @@ static void _Noreturn testmain(void)
 	for (i = 0; i < sizeof(wts.linebuf) - 1; i++)
 		process_tty_out(&tsrout, "*", -1);
 	process_tty_out(&tsrout, "\r\033[32@!!!\r\n", -1);
+
+	tstdesc("text from current line in \\A output");
+	testreset();
+	termid = strdup("statejsontest");
+	process_tty_out(&tsrout, "foo!\r\nbar?", -1);
+	writetosp0term("\\A");
+	tstdesc("... text from prior line");
+	process_tty_out(&tsrout, "\r\n\r\n", -1);
+	writetosp0term("\\A");
+	tstdesc("... override with client-set title");
+	writetosp0term("\\tmy ttl 42\n");
+	writetosp0term("\\A");
+	process_tty_out(&tsrout, "another line\r\n", -1);
+	writetosp0term("\\A");
+	writetosp0term("\\t\n");
+	writetosp0term("\\A");
+	process_tty_out(&tsrout, "again, ttl from line\r\n", -1);
+	writetosp0term("\\A");
 
 	testiterprofs();
 	testqrystring();

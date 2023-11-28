@@ -224,6 +224,16 @@ From the attach page you can create or reconnect to persistent sessions.
  * The "New" list always starts with a "basic" link, which starts a profile
    of the empty name.
 
+### Existing session titles
+
+Each existing session is shown with its title, which can be set explicitly with
+the set title macro `raS T `, invoked when the terminal is open, which locks the
+title to whatever text is on the current line. If the title is not set with
+that macro, or if it has been unset with `laU T `, then the title is the
+current line of text. If the alternative screen is open (such as with `less` or
+an editor) then the last line of text printed before entering the alternate
+screen is shown (for instance, `$ vim foo.txt`).
+
 ## SCROLLBACK
 
 To access the scrollback buffer in a non-ephemeral shell, press `laH L `.

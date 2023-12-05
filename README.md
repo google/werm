@@ -208,9 +208,9 @@ mnemonics and the long-form name used by the JS Event API.
 ## ATTACH PAGE
 
 Open the attach page by going to `http://localhost:8090/attach`, or using the
-`rarsS T ` or `rarsA T ` macros from within a terminal (see HOW TO READ MACRO
-SHORTCUTS). The former shortcut uses a new tab (Separate) while the latter
-replaces the current tab.
+`rarsS T ` or `rarsA T ` macros from within a terminal (see [How to read macro
+shortcuts](#how-to-read-macro-shortcuts). The former shortcut uses a new tab
+(Separate) while the latter replaces the current tab.
 
 From the attach page you can create or reconnect to persistent sessions.
 
@@ -281,8 +281,8 @@ These and other functions are defined in `$WERMSRCDIR/util/logview`
 ## WERMFLAGS ENVVAR
 
 The environment variable `$WERMFLAGS` is a URL query string without the leading
-question mark, e.g. `foo=1&bar=2` or `baz=3`. This must be set when starting the
-server, and the following values are supported:
+question mark, e.g. `foo=1&bar=2` or `baz=3`. If used, it must be set when
+starting the server, and the following values are supported:
 
 | flag name   | value                                                      |
 | ----------- | ---------------------------------------------------------- |

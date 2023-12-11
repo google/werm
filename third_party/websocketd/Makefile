@@ -10,26 +10,26 @@
 # To manually invoke the locally installed Go, use ./go
 
 # Go installation config.
-GO_VER=1.11.5
+WERMGOLANGVER?=1.11.5
+WERMGOLANGDIR?=go-$(WERMGOLANGVER)
 SYSTEM_NAME:=$(shell uname -s | tr '[:upper:]' '[:lower:]')
 SYSTEM_ARCH:=$(shell uname -m)
 GO_ARCH:=$(if $(filter x86_64, $(SYSTEM_ARCH)),amd64,386)
-GO_VERSION:=$(GO_VER).$(SYSTEM_NAME)-$(GO_ARCH)
+GO_VERSION:=$(WERMGOLANGVER).$(SYSTEM_NAME)-$(GO_ARCH)
 GO_DOWNLOAD_URL:=https://dl.google.com/go/go$(GO_VERSION).tar.gz
-GO_DIR:=go-$(GO_VER)
 
 # Build websocketd binary
-websocketd: $(GO_DIR)/bin/go $(wildcard *.go) $(wildcard ../gorillaws/*.go)
-	$(GO_DIR)/bin/go build
+websocketd: $(WERMGOLANGDIR)/bin/go $(wildcard *.go) $(wildcard ../gorillaws/*.go)
+	$(WERMGOLANGDIR)/bin/go build
 
-localgo: $(GO_DIR)/bin/go
+localgo: $(WERMGOLANGDIR)/bin/go
 
 # Download and unpack Go distribution.
-$(GO_DIR)/bin/go:
-	mkdir -p $(GO_DIR)
+$(WERMGOLANGDIR)/bin/go:
+	mkdir -p $(WERMGOLANGDIR)
 	rm -f $@
-	@echo Downloading and unpacking Go $(GO_VERSION) to $(GO_DIR)
-	curl -s $(GO_DOWNLOAD_URL) | tar xfz - --strip-components=1 -C $(GO_DIR)
+	@echo Downloading and unpacking Go $(GO_VERSION) to $(WERMGOLANGDIR)
+	curl -s $(GO_DOWNLOAD_URL) | tar xfz - --strip-components=1 -C $(WERMGOLANGDIR)
 
 # Clean up binary
 clean:

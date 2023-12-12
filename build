@@ -66,6 +66,7 @@ $!s/$/\\012/
 	 test/raw/*.c \
 	 third_party/dtach/*.c \
 	 tm.c \
+	 wts.c \
 	 -lutil ||
 		exit 1
 

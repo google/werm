@@ -7,6 +7,7 @@
 #include "shared.h"
 #include "outstreams.h"
 #include "test/raw/data.h"
+#include "wts.h"
 
 #include <stdint.h>
 #include <limits.h>
@@ -30,90 +31,6 @@ static const char *qs;
 static size_t argv0sz;
 
 int is_ephem(void) { return !termid; }
-
-/* Name is based on Write To Subproc but this contains process_kbd state too.
- * We put this in a single struct so all logic state can be reset with a single
- * memset call. */
-static struct {
-	unsigned short swrow, swcol;
-	/* chars read into either winsize, ttl, or client_state's endpnt,
-	   depending on value of escp */
-	unsigned altbufsz;
-	char winsize[8];
-
-	/* 0: reading raw characters
-	 * '1': next char is escaped
-	 * 'w': reading window size
-	 * 't': reading title into ttl
-	 * 'i': reading endpoint ID int client_state's endpnt
-	 */
-	char escp;
-
-	/* title set by client */
-	char ttl[128];
-
-	/* Buffers for content about to be written to logs */
-	unsigned char linebuf[1024], escbuf[1024];
-	unsigned linesz, linepos, escsz;
-
-	unsigned altscren	: 1;
-	unsigned appcursor	: 1;
-	unsigned sendsigwin	: 1;
-	unsigned writelg	: 1;
-	unsigned writerawlg	: 1;
-
-	/* True if the ttl contents were set by the client, false if the ttl
-	   was populated automatically with line contents. */
-	unsigned clnttl		: 1;
-
-	/* Logs (either text only, or raw subproc output) are written to these
-	 * fd's if writelg,writerawlg are 1. */
-	struct wrides logde, rawlogde;
-} wts;
-
-static void logescaped(FILE *f, const void *buf_, size_t sz)
-{
-	const unsigned char *buf = buf_;
-
-	while (sz--) {
-		if (*buf >= ' ' && *buf != 0x7f)
-			fputc(*buf, f);
-		else
-			fprintf(f, "\\%03o", *buf);
-		buf++;
-	}
-	fputc('\n', f);
-}
-
-static unsigned ttllen(void) { return strnlen(wts.ttl, sizeof wts.ttl); }
-
-static void dump(void)
-{
-	char *dumpfn;
-	FILE *f;
-	static unsigned dimp;
-
-	xasprintf(&dumpfn, "/tmp/werm.dump.%lld.%u",
-		  (long long)getpid(), dimp++);
-	f = fopen(dumpfn, "w");
-	if (!f) warn("could not fopen %s for dumping state", dumpfn);
-	free(dumpfn);
-	if (!f) return;
-
-	fprintf(f, "escp: %d (%c)\n", wts.escp, wts.escp);
-	fprintf(f, "linebuf: (pos=%u, sz=%us)\n", wts.linepos, wts.linesz);
-	logescaped(f, wts.linebuf, wts.linesz);
-	fprintf(f, "escbuf: (%u bytes)\n", wts.escsz);
-	logescaped(f, wts.escbuf, wts.escsz);
-	fprintf(f, "altscr:  %u\n", wts.altscren);
-	fprintf(f, "appcurs: %u\n", wts.appcursor);
-	fprintf(f, "clnttl: %u\n", wts.clnttl);
-	fprintf(f, "windim: %u:%u\n", wts.swrow, wts.swcol);
-	fprintf(f, "ttl: (sz=%u)\n", ttllen());
-	logescaped(f, wts.ttl, ttllen());
-
-	fclose(f);
-}
 
 static _Bool consumeesc(const char *pref, size_t preflen)
 {
@@ -338,7 +255,7 @@ static void recountttl(struct wrides *de)
 	struct fdbuf b = {.de = de};
 
 	fdb_apnd(&b, "\\@title:", -1);
-	if (wts.clnttl) fdb_apnd(&b, wts.ttl, ttllen());
+	if (wts.clnttl) fdb_apnd(&b, wts.ttl, ttl_len());
 	fdb_apnc(&b, '\n');
 	fdb_finsh(&b);
 }
@@ -840,7 +757,7 @@ static void atchstatejson(struct wrides *cliutd)
 	fdb_apnc(&hbuf, ',');
 	fdb_json(&hbuf, termid ? termid : "", -1);
 	fdb_apnc(&hbuf, ',');
-	fdb_json(&hbuf, wts.ttl, ttllen());
+	fdb_json(&hbuf, wts.ttl, ttl_len());
 
 	fdb_apnd(&hbuf, "]\n", -1);
 	fdb_finsh(&hbuf);
@@ -965,7 +882,7 @@ static void writetosubproccore(
 				break;
 
 			case 'd':
-				dump();
+				dump_wts();
 				break;
 
 			/* escape that alerts master we want to see terminal

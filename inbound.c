@@ -67,6 +67,7 @@ void fwrd_inbound_frames(int sock)
 		*bfc &= 0x7f;
 
 		switch (*bfc) {
+		default: break; /* close, pong, or reserved code */
 		case 0: case 1: case 2:
 			/* data */
 
@@ -117,7 +118,6 @@ void fwrd_inbound_frames(int sock)
 			full_write(&(struct wrides){1},
 				   pongmsg, sizeof(pongmsg));
 		break;
-		default: /* close, pong, or reserved code. do nothing */
 		}
 	}
 	while (bfi < bfsz);

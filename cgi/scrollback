@@ -11,9 +11,6 @@ termid=`echo $QUERY_STRING | sed '
 '`
 
 cat <<EOF
-Content-type: text/html
-
-
 <!DOCTYPE html>
 <meta charset='utf-8'/>
 <meta http-equiv="expires" content="-1" />

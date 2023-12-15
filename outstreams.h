@@ -63,9 +63,9 @@ void fdb_routs(struct fdbuf *b, const char *s, ssize_t len);
    can be parsed as JSON. */
 void fdb_json(struct fdbuf *b, const char *s, ssize_t len);
 
-/* Converts an int to a string and appends it to b. Escaping is not necessary if
- * this is used for terminal output to the client. */
-void fdb_itoa(struct fdbuf *b, int i);
+/* Converts a number to a string and appends it to b. Escaping is not necessary
+   if this is used for terminal output to the client. */
+void fdb_itoa(struct fdbuf *b, long long i);
 
 /* Writes an entire buffer to the given file descriptor. If len is -1, prints
  * buf_ as a null-terminated string. */

@@ -9,7 +9,12 @@
 #include "test/raw/data.h"
 #include <md4c-html.h>
 #include "wts.h"
+#include "http.h"
+#include "spawner.h"
+#include "dtachctx.h"
 
+#include <sys/wait.h>
+#include <libgen.h>
 #include <sys/stat.h>
 #include <stdint.h>
 #include <limits.h>
@@ -31,8 +36,6 @@ static char *argv0, *termid, *logview, *sblvl, *dtachlog;
 static const char *qs;
 
 static size_t argv0sz;
-
-int is_ephem(void) { return !termid; }
 
 static _Bool consumeesc(const char *pref, size_t preflen)
 {
@@ -262,7 +265,7 @@ static void recountttl(struct wrides *de)
 	fdb_finsh(&b);
 }
 
-static int extractqueryarg(const char *pref, char **dest)
+static int parsequeryarg(const char *pref, char **dest)
 {
 	size_t preflen;
 	const char *end;
@@ -316,10 +319,10 @@ static void processquerystr(const char *fullqs)
 		if (*qs == '&') qs++;
 		if (!*qs) break;
 
-		if (extractqueryarg("termid=", &termid)) continue;
-		if (extractqueryarg("logview=", &logview)) continue;
-		if (extractqueryarg("sblvl=", &sblvl)) continue;
-		if (extractqueryarg("dtachlog=", &dtachlog)) continue;
+		if (parsequeryarg("termid=",	&termid		)) continue;
+		if (parsequeryarg("logview=",	&logview	)) continue;
+		if (parsequeryarg("sblvl=",	&sblvl		)) continue;
+		if (parsequeryarg("dtachlog=",	&dtachlog	)) continue;
 
 		fprintf(stderr,
 			"invalid query string arg at char pos %zu in '%s'\n",
@@ -328,8 +331,6 @@ static void processquerystr(const char *fullqs)
 		qs = strchrnul(qs, '&');
 	}
 }
-
-static char **srvargv;
 
 static void cdhome(void)
 {
@@ -341,14 +342,11 @@ static void cdhome(void)
 	else if (-1 == chdir(home)) warn("chdir to home: '%s'", home);
 }
 
-void _Noreturn subproc_main(void)
+void _Noreturn subproc_main(Dtachctx dc)
 {
 	const char *shell;
 
-	if (srvargv) {
-		execv(srvargv[0], srvargv);
-		err(1, "execv server");
-	}
+	if (dc->spargs) { set_argv0(dc, 's'); spawner(dc->spargs); }
 
 	shell = getenv("SHELL");
 	if (!shell) {
@@ -412,16 +410,10 @@ static int opnforlog(const struct tm *tim, const char *suff)
 	return fd;
 }
 
-void maybe_open_logs(void)
+void open_logs(void)
 {
 	time_t now;
 	struct tm tim;
-
-	/* Do not save scrollbacks for ephemeral terminals, as these are
-	 * used for grepping scrollback logs, so they can be very large
-	 * and included redundant data that will be confusing to see in
-	 * some recursive analysis of scrollbacks. */
-	if (is_ephem()) return;
 
 	now = time(NULL);
 	if (!localtime_r(&now, &tim)) err(1, "cannot get time");
@@ -440,30 +432,29 @@ void maybe_open_logs(void)
 	}
 }
 
-/* This is needed for a predictable string to use in the socket name, or a
- * human-identifiable placeholder. A percent is used in this string to spearate
- * the profile name from the prefix since % is not allowed in profile names. */
-static const char *maybetermid(void)
+static Dtachctx prepfordtach(void)
 {
-	static char *pcpid;
-
-	if (pcpid) return pcpid;
-
-	if (termid)	xasprintf(&pcpid, "prs%%%s", termid);
-	else		xasprintf(&pcpid, "eph%%%lld", (long long) getpid());
-
-	return pcpid;
-}
-
-static void prepfordtach(void)
-{
+	Dtachctx dc = calloc(1, sizeof(*dc));
 	char *dtlogfn = 0;
 	int lgfd = -1, ok;
+	struct fdbuf sp = {0};
 
-	if (dtach_sock) errx(1, "dtach_sock already set: %s", dtach_sock);
-	xasprintf(&dtach_sock, "%s/%s", socksdir(), maybetermid());
+	/* sp is a predictable string to use in the socket name or related
+	   process names. A percent is used in this string to separate the
+	   profile name from the prefix since % is not allowed in profile
+	   names. */
+	fdb_apnd(&sp, socksdir(), -1);
+	if (termid)	{fdb_apnd(&sp, "/prs%", -1); fdb_apnd(&sp, termid, -1);}
+	else		{fdb_apnd(&sp, "/eph%", -1); fdb_itoa(&sp, getpid());}
+	fdb_apnc(&sp, 0);
 
-	if (!dtachlog) return;
+	dc->sockpath = (char *) sp.bf;
+	sp.bf = 0;
+	fdb_finsh(&sp);
+
+	dc->isephem = !termid;
+
+	if (!dtachlog) return dc;
 
 	ok = 0;
 	xasprintf(&dtlogfn, "/tmp/dtachlog.%lld", (long long) getpid());
@@ -476,13 +467,12 @@ static void prepfordtach(void)
 	fprintf(stderr, "opened %s for dtach logging? %d\n", dtlogfn, ok);
 	if (lgfd > 0) close(lgfd);
 	free(dtlogfn);
+
+	return dc;
 }
 
 struct iterprofspec {
 	/* where to send any non-log, non-diagnostic output. */
-	struct wrides *sigde;
-
-	/* (internal) buffer used for writing to sigde. */
 	struct fdbuf *sigb;
 
 	/* output new sessionm link for each profile to sigfd */
@@ -550,7 +540,7 @@ static int proflines(
 	c = '\n';
 	do {
 		if (c == '\n') {
-			cmpname = is_ephem() ? "" : termid;
+			cmpname = termid ? termid : "";
 
 			namemat = 0;
 			fld = 'n';
@@ -649,8 +639,6 @@ static void iterprofs(const char *ppaths_, struct iterprofspec *spc)
 
 	struct dirent *den;
 	int namematc = 0;
-	struct fdbuf sigbuf = {spc->sigde};
-	spc->sigb = &sigbuf;
 
 	/* "--" prefix to sort this category first. This hack can be removed
 	 * once the sorting logic is moved out of shell. */
@@ -699,9 +687,6 @@ static void iterprofs(const char *ppaths_, struct iterprofspec *spc)
 	free(ppaths);
 	free(ffn);
 
-	fdb_finsh(&sigbuf);
-	spc->sigb = 0;
-
 	if (namematc || !termid || !*termid) return;
 
 	if (spc->sendauxjs || spc->sendpream)
@@ -727,45 +712,49 @@ static const char *profpath(void)
 
 static void recountstate(struct wrides *de)
 {
+	struct fdbuf sigb = {de};
 	full_write(de, wts.altscren ? "\\s2" : "\\s1", -1);
 	if (wts.ttl[0]) recountttl(de);
 
 	iterprofs(profpath(), &((struct iterprofspec){
-		.sigde = de,
+		.sigb = &sigb,
 		.sendauxjs = 1,
 		.diaglog = 1,
 	}));
+	fdb_finsh(&sigb);
 }
 
 void send_pream(int fd)
 {
-	struct wrides de = { fd };
+	struct fdbuf ob = {&(struct wrides){fd}};
 
 	if (logview) {
-		full_write(&de, ". $WERMSRCDIR/util/logview ", -1);
-		full_write(&de, logview, -1);
-		full_write(&de, "\r", -1);
-		return;
+		fdb_apnd(&ob, ". $WERMSRCDIR/util/logview ", -1);
+		fdb_apnd(&ob, logview, -1);
+		fdb_apnd(&ob, "\r", -1);
+	}
+	else {
+		iterprofs(profpath(), &((struct iterprofspec){
+			.sigb = &ob,
+			.sendpream = 1,
+			.diaglog = 1,
+		}));
 	}
 
-	iterprofs(profpath(), &((struct iterprofspec){
-		.sigde = &de,
-		.sendpream = 1,
-		.diaglog = 1,
-	}));
+	fdb_finsh(&ob);
 }
 
 /* Array with elements:
 	0: print_atch_clis() array
 	1: termid string
 	2: title string */
-static void atchstatejson(struct wrides *cliutd)
+static void atchstatejson(Dtachctx dc, struct wrides *cliutd)
 {
 	struct fdbuf hbuf = {cliutd};
 
 	fdb_apnc(&hbuf, '[');
 
-	print_atch_clis(&hbuf);
+	print_atch_clis(dc, &hbuf);
 	fdb_apnc(&hbuf, ',');
 	fdb_json(&hbuf, termid ? termid : "", -1);
 	fdb_apnc(&hbuf, ',');
@@ -775,7 +764,7 @@ static void atchstatejson(struct wrides *cliutd)
 	fdb_finsh(&hbuf);
 }
 
-static void fwdlinetostdout(int fd)
+static void fwdlinetobuf(int fd, struct fdbuf *ob)
 {
 	int rdn;
 	char buf[512];
@@ -789,25 +778,26 @@ static void fwdlinetostdout(int fd)
 			break;
 		}
 
-		fwrite(buf, rdn, 1, stdout);
+		fdb_apnd(ob, buf, rdn);
 		if (buf[rdn-1] == '\n') break;
 	}
 }
 
-static _Noreturn void atchsesnlist(void)
+static void atchsesnlis(struct wrides *de)
 {
 	DIR *skd;
 	struct dirent *sken;
 	char *spth = 0;
 	int sc, firs = 1;
+	struct fdbuf rb = {0};
 
 	if (!(skd = opendir(socksdir()))) {
 		perror("opendir: socks");
 		puts("error opening socks directory");
-		exit(0);
+		exit(1);
 	}
 
-	putchar('[');
+	fdb_apnc(&rb, '[');
 	for (;;) {
 		errno = 0;
 		sken = readdir(skd);
@@ -825,19 +815,19 @@ static _Noreturn void atchsesnlist(void)
 		free(spth);
 		if (sc < 0) continue;
 
-		if (!firs) putchar(',');
+		if (!firs) fdb_apnc(&rb, ',');
 		firs = 0;
 
 		full_write(&(struct wrides){sc}, "\\A", -1);
-		fwdlinetostdout(sc);
+		fwdlinetobuf(sc, &rb);
 		close(sc);
 	}
 
-	putchar(']');
+	fdb_apnc(&rb, ']');
+	resp_dynamc(de, 'j', 200, rb.bf, rb.len);
+	fdb_finsh(&rb);
 
 	closedir(skd);
-
-	exit(0);
 }
 
 static void writetosubproccore(
@@ -847,6 +837,7 @@ static void writetosubproccore(
 	/* Where to send output for attached client. */
 	struct wrides *clioutde,
 
+	Dtachctx dc,
 	struct clistate *cls,
 
 	/* Data received from client which is the escaped keyboard input. */
@@ -906,7 +897,7 @@ static void writetosubproccore(
 				recountstate(clioutde);
 				break;
 
-			case 'A':	atchstatejson(clioutde); break;
+			case 'A':	atchstatejson(dc, clioutde); break;
 
 			/* directions, home, end */
 			case '^':	cursmvbyte = 'A'; break;
@@ -966,29 +957,45 @@ static void writetosubproccore(
 	fdb_finsh(&kbdb);
 }
 
-void process_kbd(int ptyfd, int clioutfd, struct clistate *cls,
+void process_kbd(int clioutfd, Dtachctx dc, struct clistate *cls,
 		 unsigned char *buf, size_t bufsz)
 {
-	struct wrides ptyde = { ptyfd }, clide = { clioutfd };
+	struct wrides ptyde = { dc->the_pty.fd }, clide = { clioutfd };
 
 	struct winsize ws = {0};
 
-	writetosubproccore(&ptyde, &clide, cls, buf, bufsz);
+	writetosubproccore(&ptyde, &clide, dc, cls, buf, bufsz);
 
 	if (!wts.sendsigwin) return;
 
 	ws.ws_row = wts.swrow;
 	ws.ws_col = wts.swcol;
-	if (0 > ioctl(ptyfd, TIOCSWINSZ, &ws)) warn("setting window size");
+	if (0 > ioctl(dc->the_pty.fd, TIOCSWINSZ, &ws))
+		warn("setting window size");
 }
 
-static struct fdbuf tsrout = {};
+static struct fdbuf tsrout;
 
 static void putrwout(void)
 {
 	struct wrides de = {1, "putrwout"};
 	full_write(&de, tsrout.bf, tsrout.len);
 	tsrout.len = 0;
+}
+
+static Dtachctx testdc(char op)
+{
+	static Dtachctx dc;
+
+	switch (op) {
+		case 'g':	if (!dc) abort();
+	break;	case 'r':
+		free(dc);
+		dc = calloc(1, sizeof(*dc));
+	break;	default: abort();
+	}
+
+	return dc;
 }
 
 static struct clistate *testclistate(char op)
@@ -1029,13 +1036,15 @@ static void testreset(void)
 
 	profpathsavd = "";
 	testclistate('r');
+	testdc('r');
 }
 
 static void writetosp0term(const void *s)
 {
 	struct wrides pty = {1, "pty"}, cli = {1, "cli"};
 
-	writetosubproccore(&pty, &cli, testclistate('g'), s, strlen(s));
+	writetosubproccore(
+		&pty, &cli, testdc('g'), testclistate('g'), s, strlen(s));
 
 	if (wts.sendsigwin)
 		printf("sigwin r=%d c=%d\n", wts.swrow, wts.swcol);
@@ -1064,6 +1073,7 @@ static void testqrystring(void)
 static void testiterprofs(void)
 {
 	struct wrides sigde = {1, "profsig"};
+	struct fdbuf sigb = {&sigde, 512};
 
 	tstdesc("empty WERMPROFPATH");
 	testreset();
@@ -1074,155 +1084,174 @@ static void testiterprofs(void)
 	testreset();
 	iterprofs(
 		"test/profilesnoent::test/profiles1",
-		&((struct iterprofspec){ 0 }));
+		&((struct iterprofspec){ &sigb }));
+	fdb_finsh(&sigb);
 
 	tstdesc("match js and print");
 	testreset();
 	termid = strdup("hasstuff");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("name error but matches other line to print auxjs");
 	testreset();
 	termid = strdup("bad.name");
 	iterprofs("test/profiles2", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("name error no match");
 	testreset();
 	termid = strdup("xyz");
 	iterprofs("test/profiles2", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("name error but matches other line to print preamble");
 	testreset();
 	termid = strdup("bad");
 	iterprofs("test/profiles2", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty preamble for match 1");
 	testreset();
 	termid = strdup("allempty");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty preamble for match 2");
 	testreset();
 	termid = strdup("emptypream");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty preamble for match 3");
 	testreset();
 	termid = strdup("emptypreamjs");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("long preamble 1");
 	testreset();
 	termid = strdup("longpream1");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("long preamble 2");
 	testreset();
 	termid = strdup("longpream2");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty js for match 1");
 	testreset();
 	termid = strdup("emptypreamjs");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty js for match 2");
 	testreset();
 	termid = strdup("allempty");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty js for match 3");
 	testreset();
 	termid = strdup("emptyjs1");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty js for match 4");
 	testreset();
 	termid = strdup("emptyjs2");
 	iterprofs("test/profiles1", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("url-encoding-related chars not allowed in termid");
 	testreset();
 	iterprofs("test/profiles3", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("bad names while outputting new session list");
 	testreset();
 	iterprofs("test/profiles3", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.newsessin = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("dump newsessin list");
 	testreset();
 	iterprofs("test/profilesname", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.newsessin = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("empty profile name");
 	testreset();
 	iterprofs("test/emptyprof", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.newsessin = 1,
 	}));
 	termid = strdup("");
 	iterprofs("test/emptyprof", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 	}));
 	iterprofs("test/emptyprof", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 
 	tstdesc("ephemeral session uses basic profile config");
 	testreset();
 	iterprofs("test/emptyprof", &((struct iterprofspec) {
-		&sigde,
+		&sigb,
 		.sendpream = 1,
 		.sendauxjs = 1,
 	}));
+	fdb_finsh(&sigb);
 }
 
 static void writelgon(void)
@@ -1638,13 +1667,17 @@ static void _Noreturn testmain(void)
 	testiterprofs();
 	testqrystring();
 	test_outstreams();
+	test_http();
 
 	exit(0);
 }
 
-void set_argv0(char role)
+void set_argv0(Dtachctx dc, char role)
 {
-	snprintf(argv0, argv0sz, "Wer%c.%s", role, maybetermid());
+	char *bname = strdup(dc->sockpath);
+	memset(argv0, ' ', argv0sz);
+	snprintf(argv0, argv0sz, "Wer%c.%s", role, basename(bname));
+	free(bname);
 }
 
 static void appendunqid(void)
@@ -1670,112 +1703,255 @@ static void appendunqid(void)
 	free(sfix);
 }
 
-static void _Noreturn doshowenv(void)
-{
-	int syst;
-
-	/* Let perror and other errors show in the page. */
-	if (0 > dup2(1, 2)) printf("dup2 stderr to stdout error! %d\n", errno);
-
-	if (0 > (syst=system("env")))
-		perror("starting 'env'");
-	else if (syst)
-		printf("\n'env' exited with error: %d\n", WEXITSTATUS(syst));
-
-	exit(0);
-}
-
-static _Noreturn void unrecargs(void)
-{
-	fprintf(stderr, "unrecognized arguments\n");
-	exit(1);
-}
-
 static void m4hout(const MD_CHAR *buf, MD_SIZE sz, void *ud)
 {
-	full_write(ud, buf, sz);
+	fdb_apnd(ud, buf, sz);
 }
 
-static _Noreturn void servreadme(void)
+static void servereadme(struct wrides *de)
 {
+	struct fdbuf d = {0};
 	char *path, *mdsrc, *mdc, *mdend;
-	const char *fail = 0;
 	struct stat sb;
-	int fd;
+	int sfd;
 	ssize_t redn;
-	struct wrides d = {1};
 
 	xasprintf(&path, "%s/README.md", getenv("WERMSRCDIR"));
-	if (0 > stat(path, &sb)) { fail = "stat"; goto end; }
+	sfd = open(path, O_RDONLY);
+	if (0 > sfd)			{ perror("open md"); exit(1); }
+	if (0 > fstat(sfd, &sb))	{ perror("fstat md"); exit(1); }
+	free(path);
 
 	mdc = mdsrc = malloc(sb.st_size);
 	mdend = mdsrc + sb.st_size;
 
-	fd = open(path, O_RDONLY);
-	if (0 > fd) { fail = "open"; goto end; }
-
 	while (mdc != mdend) {
-		redn = read(fd, mdc, mdend - mdc);
+		redn = read(sfd, mdc, mdend - mdc);
 		if (0 > redn && errno == EINTR) continue;
-		if (0 > redn) { fail = "read"; goto end; }
+		if (0 > redn) { perror("read md"); exit(1); }
 
 		mdc += redn;
 	}
 
-	full_write(&d, "<html><head><title>README.md</title>", -1);
-	full_write(&d, "<link rel=stylesheet href=common.css>", -1);
-	full_write(&d, "<link rel=stylesheet href=readme.css>", -1);
-	full_write(&d, "</head><body>", -1);
+	fdb_apnd(&d, "<html><head><title>README.md</title>", -1);
+	fdb_apnd(&d, "<link rel=stylesheet href=common.css>", -1);
+	fdb_apnd(&d, "<link rel=stylesheet href=readme.css>", -1);
+	fdb_apnd(&d, "</head><body>", -1);
 	md_html(mdsrc, sb.st_size, m4hout, &d, MD_FLAG_TABLES, 0);
-	full_write(&d, "</body></html>", -1);
+	fdb_apnd(&d, "</body></html>", -1);
 
-end:
-	if (fail) {
-		perror("processing README.md");
-		fprintf(stderr, "(%s)\n", fail);
+	resp_dynamc(de, 'h', 200, d.bf, d.len);
+	fdb_finsh(&d);
+}
+
+static int maybeservefont(struct wrides *de, const char *resource)
+{
+	int fni, scann;
+	const char *p;
+	char *qualp;
+
+	scann = -1;
+	sscanf(resource, "/fn%d.ttf%n", &fni, &scann);
+	if (strlen(resource) != scann) return 0;
+
+	switch (fni) {
+	default: return 0;
+	break; case 0: p = "oldschool-pc-fonts/ibm_ega_8x8";
+	break; case 1: p = "oldschool-pc-fonts/hp_100lx_10x11";
+	break; case 2: p = "shinonome/jfdot_7x14";
+	break; case 3: p = "oldschool-pc-fonts/ibm_vga_8x16";
+	break; case 4: p = "oldschool-pc-fonts/ibm_vga_9x16";
+	break; case 5: p = "oldschool-pc-fonts/dos_v_ibm_8x19";
+	break; case 6: p = "oldschool-pc-fonts/cl_stringray_8x19";
+	break; case 7: p = "oldschool-pc-fonts/ibm_xga_ai_12x20";
+	break; case 8: p = "oldschool-pc-fonts/ibm_xga_ai_12x23";
+	break; case 9: p = "oldschool-pc-fonts/dos_v_re_12x30";
 	}
-	exit(!!fail);
+
+	xasprintf(&qualp, "/third_party/%s.ttf", p);
+	resp_static(de, 'f', qualp);
+	return 1;
+}
+
+static _Noreturn void becomewebsocket(const char *quer)
+{
+	/* These query args settings do not get inherited from the spawner to
+	   children. */
+	free(dtachlog);
+	dtachlog = 0;
+	free(termid);
+	termid = 0;
+
+	processquerystr(quer);
+	if (termid) {
+		checktid();
+		if (!strchr(termid, '.')) appendunqid();
+	}
+
+	dtach_main(prepfordtach());
+}
+
+static void begnsesnlis(struct wrides *de)
+{
+	struct fdbuf b = {0};
+
+	iterprofs(profpath(), &((struct iterprofspec){
+		.sigb = &b,
+		.newsessin = 1,
+		.diaglog = 1,
+	}));
+
+	resp_dynamc(de, 'h', 200, b.bf, b.len);
+}
+
+static void externalcgi(struct wrides *de, char hdr, Httpreq *rq)
+{
+	char *binp;
+	struct fdbuf b = {0};
+	int p[2];
+	pid_t cpid;
+	ssize_t redn;
+	unsigned char inb[4096];
+
+	if (0>pipe(p))			{ perror("pipe cgi"	); exit(1); }
+	if (0>(cpid=fork()))		{ perror("fork cgi"	); exit(1); }
+	if (!cpid && 0>dup2(p[1], 1))	{ perror("dup p1"	); exit(1); }
+	if (0>close(p[1]))		{ perror("close p1"	); exit(1); }
+
+	if (!cpid) {
+		close(p[0]);
+
+		xasprintf(&binp, "%s/cgi%s",
+			  getenv("WERMSRCDIR"), rq->resource);
+		setenv("QUERY_STRING", rq->query, 1);
+		execl(binp, binp, NULL);
+		perror("execl for external cgi");
+		exit(1);
+	}
+
+	for (;;) {
+		redn = read(p[0], inb, sizeof(inb));
+		if (!redn)	break;
+		if (0<redn)	fdb_apnd(&b, inb, redn);
+		if (0>redn && errno != EINTR)	{ perror("read"); goto er; }
+	}
+
+	resp_dynamc(de, hdr, 200, b.bf, b.len);
+
+	if (0>waitpid(cpid, 0, 0)) { perror("waitpid"); goto er; }
+
+	goto cleanup;
+
+er:
+	resp_dynamc(de, 't', 403, 0, 0);
+
+cleanup:
+	fdb_finsh(&b);
+}
+
+static void httphandlers(struct wrides *out, Httpreq *rq)
+{
+	const char *rs = rq->resource;
+
+	if (maybeservefont(out, rs))	return;
+
+	if (!strcmp(rs, "/"))		{ resp_static(out, 'h', "/index.html");
+									return;}
+	if (!strcmp(rs, "/attach"))	{ resp_static(out, 'h', rs);	return;}
+	if (!strcmp(rs, "/common.css"))	{ resp_static(out, 'c', rs);	return;}
+	if (!strcmp(rs, "/readme.css"))	{ resp_static(out, 'c', rs);	return;}
+	if (!strcmp(rs, "/endptid.js"))	{ resp_static(out, 'j', rs);	return;}
+	if (!strcmp(rs, "/aux.js"))	{ externalcgi(out, 'j', rq);	return;}
+	if (!strcmp(rs, "/scrollback"))	{ externalcgi(out, 'h', rq);	return;}
+	if (!strcmp(rs, "/hterm"))	{ externalcgi(out, 'j', rq);	return;}
+	if (!strcmp(rs, "/showenv"))	{ externalcgi(out, 't', rq);	return;}
+	if (!strcmp(rs, "/atchses"))	{ atchsesnlis(out);		return;}
+	if (!strcmp(rs, "/readme"))	{ servereadme(out);		return;}
+	if (!strcmp(rs, "/newsess"))	{ begnsesnlis(out);		return;}
+
+	resp_dynamc(out, 't', 404, 0, 0);
+}
+
+int http_serv(void)
+{
+	struct fdbuf b = {0};
+	struct wrides out = {1};
+	Httpreq rq = {0};
+	const char *rs = rq.resource;
+
+	http_read_req(stdin, &rq, &out);
+	if (rq.error) return 0;
+	if (rq.validws) becomewebsocket(rq.query);
+
+	/* TODO(github.com/google/werm/issues/1) will it be more secure to also
+	   verify Origin/Host are consistent? */
+	if (rq.restrictfetchsite
+	    && strcmp(rs, "/")
+	    && strcmp(rs, "/attach")
+	) {
+		fdb_apnd(&b, "Not accepting redirects for this resource: ", -1);
+		fdb_apnd(&b, rs, -1);
+		fdb_apnc(&b, '\n');
+		resp_dynamc(&out, 't', 403, b.bf, b.len);
+		fdb_finsh(&b);
+	}
+	else
+		httphandlers(&out, &rq);
+
+	return rq.keepaliv;
+}
+
+static void addsrcdirenv(void)
+{
+	char buf[PATH_MAX], *dn;
+	const char *wsd = getenv("WERMSRCDIR");
+
+	if (wsd && wsd[0]) return;
+
+	if (!realpath(argv0, buf))		{ perror("realpath"); goto er; }
+	dn = dirname(buf);
+	if (0 > setenv("WERMSRCDIR", dn, 1))	{ perror("setenv"); goto er; }
+
+	return;
+
+er:
+	fprintf(stderr, "cannot auto-set $WERMSRCDIR, argv0=%s\n", argv0);
+	exit(1);
 }
 
 int main(int argc, char **argv)
 {
+	Dtachctx dc;
+
 	errno = 0;
 	if (setvbuf(stdout, 0, _IONBF, 0))
 		err(1, "could not turn off stdout buffering");
 
-	argv0 = argv[0];
-	argv0sz = strlen(argv0)+1;
-	memset(argv0, ' ', argv0sz-1);
-
 	if (argc < 1) errx(1, "unexpected argc value: %d", argc);
+
+	argv0 = argv[0];
+	addsrcdirenv();
+
+#if __linux__
+	/* All elements in argv are in a contiguous block of memory. */
+	argv0sz = argv[argc-1]-argv[0] + strlen(argv[argc-1]) + 1;
+#else
+	argv0sz = strlen(argv0)+1;
+#endif
+
 	argc--;
 	argv++;
+	if (1 == argc && !strcmp(*argv, "test"))	testmain();
 
-	if (1 == argc) {
-		if (!strcmp("test",	*argv)) testmain();
-		if (!strcmp("/showenv",	*argv)) doshowenv();
-		if (!strcmp("/atchses",	*argv)) atchsesnlist();
-		if (!strcmp("/readme",	*argv)) servreadme();
-		if (!strcmp("/newsess",	*argv)) {
-			iterprofs(profpath(), &((struct iterprofspec){
-				.sigde = &((struct wrides){ 1 }),
-				.newsessin = 1,
-				.diaglog = 1,
-			}));
-			exit(0);
-		}
-		unrecargs();
-	}
-
-	processquerystr(getenv("WERMFLAGS"));
-
-	if (argc >= 1 && !strcmp("serve", *argv)) {
+	if (argc >= 1 && !strcmp(*argv, "spawner")) {
+		processquerystr(getenv("WERMFLAGS"));
 		iterprofs(profpath(), &((struct iterprofspec){ .diaglog = 1 }));
 
-		srvargv = argv+1;
 		termid = strdup("~spawner");
 		appendunqid();
-		prepfordtach();
+		dc = prepfordtach();
+		dc->spargs = parse_spawner_ports(argv + 1);
+
 		fprintf(stderr,
 "--- WARNING ---\n"
 "Saving scrollback logs under: %s\n"
@@ -1796,20 +1972,10 @@ int main(int argc, char **argv)
 		 * may timeout, as stdout/stderr will block indefinitely.
 		 * A side-effect of setting this is that pream will be ignored,
 		 * so if we decide to set it this must be refactored. */
-		first_attach = 1;
-		exit(dtach_master());
+		dc->firstatch = 1;
+		exit(dtach_master(dc));
 	}
 
-	if (argc) unrecargs();
-
-	processquerystr(getenv("QUERY_STRING"));
-	unsetenv("QUERY_STRING");
-
-	if (termid) {
-		checktid();
-		if (!strchr(termid, '.')) appendunqid();
-	}
-
-	prepfordtach();
-	dtach_main();
+	fprintf(stderr, "unrecognized arguments\n");
+	exit(1);
 }

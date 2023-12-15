@@ -56,29 +56,34 @@ $!s/$/\\012/
 )
 
 if ! cc -x c -std=c99 -I. \
-	-D_POSIX_C_SOURCE=200809L \
-	-D_XOPEN_SOURCE=600 \
-	-D_GNU_SOURCE \
-	-Werror=format \
-	-Werror=return-type \
-	-Werror=unused-variable \
-	-Werror=missing-declarations \
-	-Werror=unused-function \
-	-Werror=pointer-sign \
-	-Werror=implicit-function-declaration \
-	$WERMCCFLAGS \
-	-o session \
-	session.c \
-	inbound.c \
-	outstreams.c \
-	shared.c \
-	uniqid.c \
-	test/raw/*.c \
-	third_party/dtach/*.c \
-	tm.c \
-	wts.c \
-	-lutil \
-	-lmd4c-html
+	-D_POSIX_C_SOURCE=200809L		\
+	-D_XOPEN_SOURCE=600			\
+	-D_GNU_SOURCE				\
+	-Werror=format				\
+	-Werror=return-type			\
+	-Werror=unused-variable			\
+	-Werror=missing-declarations		\
+	-Werror=unused-function			\
+	-Werror=pointer-sign			\
+	-Werror=implicit-function-declaration	\
+	-Werror=incompatible-pointer-types	\
+	$WERMCCFLAGS				\
+	-o run					\
+	session.c				\
+	http.c					\
+	inbound.c				\
+	outstreams.c				\
+	shared.c				\
+	spawner.c				\
+	uniqid.c				\
+	test/raw/*.c				\
+	third_party/dtach/*.c			\
+	tm.c					\
+	wts.c					\
+	-lutil					\
+	-lmd4c-html				\
+	-lssl					\
+	-lcrypto
 then
 	echo 'Build failed - do you need to install dependencies?'	>&2
 	grep -A4 'following packages are installed' README.md		>&2
@@ -96,9 +101,9 @@ else
 	$ctags --format=1 `cat /tmp/tag_files.$$`
 fi
 
-echo 'running session test...' >&2
-for tfn in 'session test' testtm; do
-	./$tfn || echo "TEST $tfn TERMINATED WITH ERROR !!1!"
+echo 'running tests...' >&2
+for tfn in 'run test' testtm; do
+	./$tfn || echo "TEST '$tfn' TERMINATED WITH ERROR !!1!"
 done >/tmp/testout.$$ 2>&1
 
 err=
@@ -118,5 +123,4 @@ then
 	err=1
 fi
 
-test -z "$err" \
-&& make -C third_party/websocketd
+test -z "$err"

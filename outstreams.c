@@ -140,13 +140,13 @@ void fdb_json(struct fdbuf *b, const char *s, ssize_t len)
 	fdb_apnc(b, '"');
 }
 
-void fdb_itoa(struct fdbuf *b, int i)
+void fdb_itoa(struct fdbuf *b, long long i)
 {
-	char bf[sizeof(int) * 4], *bc = bf;
+	char bf[sizeof(long long) * 4], *bc = bf;
 
-	if (i == INT_MIN) {
-		fdb_itoa(b, INT_MIN/10);
-		fdb_itoa(b, INT_MAX%10 + 1);
+	if (i == LLONG_MIN) {
+		fdb_itoa(b, LLONG_MIN/10);
+		fdb_itoa(b, LLONG_MAX%10 + 1);
 		return;
 	}
 	if (i < 0) {
@@ -268,11 +268,6 @@ void _Noreturn exit_msg(const char *flags, const char *msg, int code)
 	fdb_routs(&b, msg, -1);
 	if (code != -1) fdb_itoa(&b, code);
 
-	if (strchr(flags, 's')) {
-		fdb_routs(&b, " socket: ", -1);
-		fdb_routs(&b, dtach_sock, -1);
-	}
-
 	/* Reset colors in case a new master process is started in the same
 	 * browser window. */
 	fdb_routs(&b, " \033[0m\r\n", -1);
@@ -309,10 +304,14 @@ void test_outstreams(void)
 	fdb_apnc(&b, '\n');
 	fdb_itoa(&b, 100000);
 	fdb_apnc(&b, '\n');
-	/* Implementation is agnostic to INT_* limits but the test is not. */
 	fdb_itoa(&b, INT_MIN);
 	fdb_apnc(&b, '\n');
 	fdb_itoa(&b, INT_MAX);
+	fdb_apnc(&b, '\n');
+
+	fdb_itoa(&b, LLONG_MIN);
+	fdb_apnc(&b, ' ');
+	fdb_itoa(&b, LLONG_MAX);
 	fdb_apnc(&b, '\n');
 	fdb_finsh(&b);
 

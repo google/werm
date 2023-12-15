@@ -691,49 +691,44 @@ function term_init()
 		return true;
 	}
 
-	// [0] font-family, [1] font-size (height), [2] cell-width,
-	// [3] padded-cell-height
-	// [4] weight of bold face - set to 400 to disable
-	// [5] 0-255 bg brightness
-	// [6] 0-255 text brightness.
-	// [7] font directory
+	// [0] font-size (height)
+	// [1] cell-width
+	// [2] padded-cell-height
+	// [3] weight of bold face - set to 400 to disable
+	// [4] 0-255 bg brightness
+	// [5] 0-255 text brightness.
 	// Small fonts require overriding Chrome's minimum font size setting.
 	wfns = [
-		['ibm_ega_8x8',		8 ,	8 ,	9 ,	400, 26, 230, 1],
-		['hp_100lx_10x11',	12,	10,	13,	400, 26, 230, 1],
-		['jfdot_7x14',		14,	7,	14,	700, 26, 245, 2],
-		['ibm_vga_8x16',	16,	8,	16,	400, 26, 230, 1],
-		['ibm_vga_9x16',	16,	9,	16,	400, 26, 230, 1],
-		['dos_v_ibm_8x19',	20,	8,	19,	400, 26, 230, 1],
-		['cl_stringray_8x19',	20,	8,	19,	400, 26, 230, 1],
-		['ibm_xga_ai_12x20',	20,	12,	19,	400, 26, 245, 1],
-		['ibm_xga_ai_12x23',	24,	12,	23,	400, 26, 230, 1],
-		['dos_v_re_12x30',	32,	12,	28,	700, 26, 230, 1],
-	];
-	var fndirs = [
-		'/',
-		'/third_party/oldschool-pc-fonts',
-		'/third_party/shinonome',
+		[8,	8,	9,	400, 26, 230],
+		[12,	10,	13,	400, 26, 230],
+		[14,	7,	14,	700, 26, 245],
+		[16,	8,	16,	400, 26, 230],
+		[16,	9,	16,	400, 26, 230],
+		[20,	8,	19,	400, 26, 230],
+		[20,	8,	19,	400, 26, 230],
+		[20,	12,	19,	400, 26, 245],
+		[24,	12,	23,	400, 26, 230],
+		[32,	12,	28,	700, 26, 230],
 	];
 
 	set_font = function(ndx)
 	{
 		var f = wfns[ndx];
 
-		t.scroll_port.x_screen.style.fontFamily = f[0];
-		t.setFontSize(f[1]);
+		t.scroll_port.x_screen.style.fontFamily = `fn${ndx}`;
+		t.setFontSize(f[0]);
 
-		t.scroll_port.characterSize = {width: f[2], height: f[3]};
+		t.scroll_port.characterSize = {width: f[1], height: f[2]};
 		t.scroll_port.resize();
 		t.updateCssCharsize_();
 
-		t.setCssVar('bold-weight', f[4]);
+		t.setCssVar('bold-weight', f[3]);
 		t.setCssVar('dpi-fudge', 1/window.devicePixelRatio);
 
 		t.setRgbColorCssVar('background-color',
-				    `rgb(${f[5]}, ${f[5]}, ${f[5]})`);
+				    `rgb(${f[4]}, ${f[4]}, ${f[4]})`);
 		t.setRgbColorCssVar('foreground-color',
-				    `rgb(${f[6]}, ${f[6]}, ${f[6]})`);
+				    `rgb(${f[5]}, ${f[5]}, ${f[5]})`);
 	};
 
 	var font_key;
@@ -1118,9 +1113,10 @@ function term_init()
 		}
 	}
 
-	function loadfnt(n, sz, dir, ndx)
+	function loadfnt(f, ndx)
 	{
-		t.document_.fonts.add(new FontFace(n, `url(${dir}/${n}.ttf)`));
+		var n = `fn${ndx}`, sz = f[0];
+		t.document_.fonts.add(new FontFace(n, `url(/${n}.ttf)`));
 		t.document_.fonts.load(`${sz}px ${n}`).then(function()
 		{
 			if (ndx == 4) set_font(4);
@@ -1144,9 +1140,7 @@ function term_init()
 		t.scroll_port.getDocument().body.onkeydown = sporkeydown;
 		t.scroll_port.getDocument().body.onkeyup = sporkeyup;
 		t.setCssVar('dpi-fudge', 1);
-		wfns.forEach(function(fnt, ndx) {
-			loadfnt(fnt[0], fnt[1], fndirs[fnt[7]], ndx);
-		});
+		wfns.forEach(loadfnt);
 	};
 
 	t.decorate(document.querySelector('#terminal'));

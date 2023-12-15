@@ -18,6 +18,10 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ JAV 2023
+
+ - move |struct pty| here to share it with Werm
+
  NOV 2023
 
  - deleted EOS define
@@ -38,7 +42,6 @@
 #define dtach_h
 
 #include "third_party/dtach/config.h"
-#include "shared.h"
 
 #include <errno.h>
 #include <err.h>
@@ -110,9 +113,17 @@
 */
 #define BUFSIZE 4096
 
-void attach_main(int noerror);
+struct dtach_ctx;
+void attach_main(struct dtach_ctx *dc, int noerror);
+void _Noreturn dtach_main(struct dtach_ctx *dc);
+int dtach_master(struct dtach_ctx *dc);
 
-#ifdef sun
-#define BROKEN_MASTER
-#endif
+/* The pty struct - The pty information is stored here. */
+struct pty {
+	/* File descriptor of the pty */
+	int fd;
+	/* Process id of the child. */
+	pid_t pid;
+};
+
 #endif

@@ -18,6 +18,13 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ JAN 2024
+
+ - attach_main takes Dtachctx as an argument
+
+ - do not delete socket with atexit in master process, or in dtach_main. Delete
+   it when ECONNREFUSED is returned in connect_socket instead.
+
  DEC 2023
 
  - make connect_socket chdir-and-retry logic a separate function and allow
@@ -47,6 +54,16 @@
 #include "third_party/dtach/dtach.h"
 #include "outstreams.h"
 #include "inbound.h"
+#include "shared.h"
+
+static int
+isoldfile(const struct stat *sb)
+{
+	time_t t;
+	if (time(&t) == (time_t) -1) abort();
+
+	return t - sb->st_ctime > 300;
+}
 
 /* Connects to a unix domain socket */
 static int
@@ -80,6 +97,10 @@ connect_socket(const char *name)
 				return -1;
 			else if (!S_ISSOCK(st.st_mode) || S_ISREG(st.st_mode))
 				errno = ENOTSOCK;
+			else if (isoldfile(&st))
+				unlink(name);
+
+			errno = ECONNREFUSED;
 		}
 		return -1;
 	}
@@ -137,15 +158,15 @@ die(int sig)
 		exit_msg("e", "unexpected signal: ", sig);
 }
 
-void attach_main(int noerror)
+void attach_main(Dtachctx dc, int noerror)
 {
 	unsigned char buf[BUFSIZE];
 	fd_set readfds;
 	int s;
 
-	set_argv0('a');
+	set_argv0(dc, 'a');
 
-	s = connect_uds_as_client(dtach_sock);
+	s = connect_uds_as_client(dc->sockpath);
 	if (s < 0) {
 		if (noerror) return;
 		exit_msg("es", "dtach connect_socket errno: ", errno);

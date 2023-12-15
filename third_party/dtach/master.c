@@ -20,8 +20,23 @@
 
  JAN 2024
 
+ - move ownership of clients linked list to Dtachctx and refactor references to
+   it.
+
+ - do not delete socket with atexit in master process, or in dtach_main. Delete
+   it when ECONNREFUSED is returned in connect_socket instead.
+
  - see if the child exited explicitly rather than rely on EIO being returned
    from select, so the master proc can terminate for all child types.
+
+ - remove window size from the_pty as window size is tracked elsewhere
+
+ - remove BROKEN_MASTER field and related functionality from the_pty as it is
+   not needed for target os's
+
+ - move |struct pty| to dtach.h to share it with Werm code
+
+ - remove the_pty global var and store it in Dtachctx instead
 
  DEC 2023
 
@@ -76,22 +91,8 @@
 
 #include "third_party/dtach/dtach.h"
 #include "outstreams.h"
+#include "shared.h"
 #include <sys/wait.h>
-
-/* The pty struct - The pty information is stored here. */
-struct pty
-{
-	/* File descriptor of the pty */
-	int fd;
-#ifdef BROKEN_MASTER
-	/* File descriptor of the slave side of the pty. For broken systems. */
-	int slave;
-#endif
-	/* Process id of the child. */
-	pid_t pid;
-	/* The current window size of the pty. */
-	struct winsize ws;
-};
 
 /* A connected client */
 struct client
@@ -106,33 +107,9 @@ struct client
 	struct clistate cls;
 };
 
-/* The list of connected clients. */
-static struct client *clients;
-/* The pseudo-terminal created for the child process. */
-static struct pty the_pty;
-
-/* Unlink the socket */
-static void
-unlink_socket(void)
-{
-	unlink(dtach_sock);
-}
-
 /* Signal */
 static RETSIGTYPE 
-die(int sig)
-{
-	/* Well, the child died. */
-	if (sig == SIGCHLD)
-	{
-#ifdef BROKEN_MASTER
-		/* Damn you Solaris! */
-		close(the_pty.fd);
-#endif
-		return;
-	}
-	exit(1);
-}
+die(int sig) { if (sig != SIGCHLD) exit(1); }
 
 /* Sets a file descriptor to non-blocking mode. */
 static int
@@ -158,27 +135,14 @@ setnonblocking(int fd)
 
 /* Initialize the pty structure. */
 static int
-init_pty(void)
+init_pty(struct pty *p)
 {
-	/* Use the original terminal's settings. We don't have to set the
-	** window size here, because the attacher will send it in a packet. */
-	memset(&the_pty.ws, 0, sizeof(struct winsize));
-
 	/* Create the pty process */
-	the_pty.pid = forkpty(&the_pty.fd, NULL, NULL, NULL);
-	if (the_pty.pid < 0) {
+	if (0 > (p->pid=forkpty(&p->fd, NULL, NULL, NULL))) {
 		perror("forkpty");
 		abort();
 	}
-	if (the_pty.pid != 0) {
-#ifdef BROKEN_MASTER
-		char *buf;
-
-		buf = ptsname(the_pty.fd);
-		the_pty.slave = open(buf, O_RDWR|O_NOCTTY);
-#endif
-	}
-	return the_pty.pid;
+	return p->pid;
 }
 
 /* Creates a new unix domain socket. */
@@ -253,13 +217,13 @@ static int cliwrite(int fd, const unsigned char *b, size_t sz)
 	return 'o';
 }
 
-static int sendrout(fd_set *writabl)
+static int sendrout(Dtachctx dc, fd_set *writabl)
 {
 	struct client *p;
 	int nclients;
 
 	/* Send the data out to the clients. */
-	for (p = clients, nclients = 0; p; p = p->next) {
+	for (p = dc->cls, nclients = 0; p; p = p->next) {
 		if (!FD_ISSET(p->fd, writabl)) continue;
 
 		switch (cliwrite(p->fd, therout.bf, therout.len)) {
@@ -276,7 +240,7 @@ static int sendrout(fd_set *writabl)
 /* Process activity on the pty - Input and terminal changes are sent out to
 ** the attached clients. If the pty goes away, we die. */
 static void
-pty_activity(int s)
+pty_activity(Dtachctx dc, int s)
 {
 	unsigned char preprocb[BUFSIZE];
 	struct client *p;
@@ -284,7 +248,7 @@ pty_activity(int s)
 	int highest_fd, nclients, preproclen;
 
 	/* Read the pty activity */
-	preproclen = read(the_pty.fd, preprocb, sizeof(preprocb));
+	preproclen = read(dc->the_pty.fd, preprocb, sizeof(preprocb));
 
 	/* Error -> die */
 	if (preproclen <= 0) {
@@ -304,7 +268,7 @@ pty_activity(int s)
 		FD_ZERO(&writefds);
 		FD_SET(s, &readfds);
 		highest_fd = s;
-		for (p = clients, nclients = 0; p; p = p->next)
+		for (p = dc->cls, nclients = 0; p; p = p->next)
 		{
 			if (!p->cls.wantsoutput)
 				continue;
@@ -318,7 +282,7 @@ pty_activity(int s)
 		if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
 			break;
 
-		nclients = sendrout(&writefds);
+		nclients = sendrout(dc, &writefds);
 
 		/* Try again if nothing happened. */
 	} while (!FD_ISSET(s, &readfds) && nclients == 0);
@@ -326,11 +290,11 @@ pty_activity(int s)
 
 /* Process activity on the control socket */
 static void
-control_activity(int s)
+control_activity(Dtachctx dc, int s)
 {
 	int fd;
 	struct client *p;
- 
+
 	/* Accept the new client and link it in. */
 	fd = accept(s, NULL, NULL);
 	if (fd < 0)
@@ -344,20 +308,20 @@ control_activity(int s)
 	/* Link it in. */
 	p = calloc(1, sizeof(struct client));
 	p->fd = fd;
-	p->pprev = &clients;
+	p->pprev = &dc->cls;
 	p->next = *(p->pprev);
 	if (p->next)
 		p->next->pprev = &p->next;
 	*(p->pprev) = p;
 }
 
-void print_atch_clis(struct fdbuf *b)
+void print_atch_clis(Dtachctx dc, struct fdbuf *b)
 {
 	struct client *q;
 	const char *pref = "";
 
 	fdb_apnc(b, '[');
-	for (q = clients; q; q = q->next) {
+	for (q = dc->cls; q; q = q->next) {
 		if (!q->cls.wantsoutput) continue;
 
 		fdb_apnd(b, pref, -1);
@@ -369,7 +333,7 @@ void print_atch_clis(struct fdbuf *b)
 
 /* Process activity from a client. */
 static void
-client_activity(struct client *p)
+client_activity(Dtachctx dc, struct client *p)
 {
 	ssize_t len;
 	unsigned char buf[512];
@@ -389,13 +353,13 @@ client_activity(struct client *p)
 		free(p);
 		return;
 	}
-	process_kbd(the_pty.fd, p->fd, &p->cls, buf, len);
+	process_kbd(p->fd, dc, &p->cls, buf, len);
 }
 
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
 static _Noreturn void
-masterprocess(int s)
+masterprocess(Dtachctx dc, int s)
 {
 	struct client *p, *next;
 	fd_set readfds;
@@ -403,14 +367,11 @@ masterprocess(int s)
 
 	/* Okay, disassociate ourselves from the original terminal, as we
 	** don't care what happens to it. */
-	if (!is_ephem()) setsid();
-
-	/* Set a trap to unlink the socket when we die. */
-	atexit(unlink_socket);
+	if (!dc->isephem) setsid();
 
 	/* Create a pty in which the process is running. */
 	signal(SIGCHLD, die);
-	if (!init_pty()) {
+	if (!init_pty(&dc->the_pty)) {
 		/* Child of master. Becomes the subproc, such as the shell. We
 		 * need to close the control socket so lsof can give an accurate
 		 * picture of whether the sockets are in use. This keeps /attach
@@ -419,15 +380,20 @@ masterprocess(int s)
 		 * this event prevents ~spawner.<ID> from staying open by each
 		 * master proc. */
 		close(s);
-		subproc_main();
+		subproc_main(dc);
 	}
+	set_argv0(dc, 'm');
 
-	maybe_open_logs();
+	/* Do not save scrollbacks for ephemeral terminals, as these are
+	   used for grepping scrollback logs, so they can be very large
+	   and included redundant data that will be confusing to see in
+	   some recursive analysis of scrollbacks. */
+	if (!dc->isephem) open_logs();
 
 	/* Set up some signals. */
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGXFSZ, SIG_IGN);
-	signal(SIGHUP, is_ephem() ? die : SIG_IGN);
+	signal(SIGHUP, dc->isephem ? die : SIG_IGN);
 	signal(SIGTTIN, SIG_IGN);
 	signal(SIGTTOU, SIG_IGN);
 	signal(SIGINT, die);
@@ -455,18 +421,18 @@ masterprocess(int s)
 		** When first_attach is unset, wait until the client attaches
 		** before trying to read from the pty.
 		*/
-		if (!first_attach && clients && clients->cls.wantsoutput) {
-			first_attach = 1;
-			send_pream(the_pty.fd);
+		if (!dc->firstatch && dc->cls && dc->cls->cls.wantsoutput) {
+			dc->firstatch = 1;
+			send_pream(dc->the_pty.fd);
 		}
 
-		if (first_attach) {
-			FD_SET(the_pty.fd, &readfds);
-			if (the_pty.fd > highest_fd)
-				highest_fd = the_pty.fd;
+		if (dc->firstatch) {
+			FD_SET(dc->the_pty.fd, &readfds);
+			if (dc->the_pty.fd > highest_fd)
+				highest_fd = dc->the_pty.fd;
 		}
 
-		for (p = clients; p; p = p->next)
+		for (p = dc->cls; p; p = p->next)
 		{
 			FD_SET(p->fd, &readfds);
 			if (p->fd > highest_fd)
@@ -481,7 +447,7 @@ masterprocess(int s)
 			   is EINTR in that case.
 
 			   For other child processes, EIO seems to be given. */
-			if (0 <= waitpid(the_pty.pid, 0, WNOHANG)) exit(0);
+			if (0 <= waitpid(dc->the_pty.pid, 0, WNOHANG)) exit(0);
 			if (errno == EINTR || errno == EAGAIN)
 				continue;
 			exit(1);
@@ -489,32 +455,32 @@ masterprocess(int s)
 
 		/* New client? */
 		if (FD_ISSET(s, &readfds))
-			control_activity(s);
+			control_activity(dc, s);
 		/* Activity on a client? */
-		for (p = clients; p; p = next)
+		for (p = dc->cls; p; p = next)
 		{
 			next = p->next;
 			if (FD_ISSET(p->fd, &readfds))
-				client_activity(p);
+				client_activity(dc, p);
 		}
-		if (!clients && first_attach && is_ephem()) exit(0);
+		if (!dc->cls && dc->firstatch && dc->isephem) exit(0);
 		/* pty activity? */
-		if (FD_ISSET(the_pty.fd, &readfds))
-			pty_activity(s);
+		if (FD_ISSET(dc->the_pty.fd, &readfds))
+			pty_activity(dc, s);
 	}
 }
 
 int
-dtach_master(void)
+dtach_master(Dtachctx dc)
 {
 	int s;
 	pid_t pid;
 
 	/* Create the unix domain socket. */
-	s = create_socket(dtach_sock);
+	s = create_socket(dc->sockpath);
 	if (s < 0 && errno == ENAMETOOLONG)
 	{
-		char *slash = strrchr(dtach_sock, '/');
+		char *slash = strrchr(dc->sockpath, '/');
 
 		/* Try to shorten the socket's path name by using chdir. */
 		if (slash)
@@ -524,7 +490,7 @@ dtach_master(void)
 			if (dirfd >= 0)
 			{
 				*slash = '\0';
-				if (chdir(dtach_sock) >= 0)
+				if (chdir(dc->sockpath) >= 0)
 				{
 					s = create_socket(slash + 1);
 					fchdir(dirfd);
@@ -537,7 +503,7 @@ dtach_master(void)
 	if (s < 0)
 	{
 		perror("dtach create_socket");
-		fprintf(stderr, "Socket path: %s\n", dtach_sock);
+		fprintf(stderr, "Socket path: %s\n", dc->sockpath);
 		return 1;
 	}
 
@@ -546,14 +512,13 @@ dtach_master(void)
 	if (pid < 0)
 	{
 		perror("dtach: fork");
-		unlink_socket();
+		unlink(dc->sockpath);
 		return 1;
 	}
 	else if (pid == 0)
 	{
 		/* Child - this becomes the master */
-		set_argv0('m');
-		masterprocess(s);
+		masterprocess(dc, s);
 	}
 	/* Parent - just return. */
 

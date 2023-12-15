@@ -31,6 +31,7 @@
  - add error for dtach_sock not being set */
 
 #include "third_party/dtach/dtach.h"
+#include "dtachctx.h"
 
 /*
 ** dtach is a quick hack, since I wanted the detach feature of screen without
@@ -42,21 +43,21 @@
 const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004-2016 Ned T. Crigler";
 
 void _Noreturn
-dtach_main(void)
+dtach_main(Dtachctx dc)
 {
-	if (!dtach_sock) errx(1, "dtach_sock must be set");
+	if (!dc->sockpath) { fprintf(stderr, "sockpath must be set"); abort(); }
 
 	/* Try to attach first. If that doesn't work, create a new socket. */
-	attach_main(1);
+	attach_main(dc, 1);
 
 	if (errno == ECONNREFUSED || errno == ENOENT)
 	{
 		if (errno == ECONNREFUSED)
-			unlink(dtach_sock);
-		if (dtach_master() != 0)
+			unlink(dc->sockpath);
+		if (dtach_master(dc) != 0)
 			exit(1);
 	}
 
-	attach_main(0);
+	attach_main(dc, 0);
 	exit(0);
 }

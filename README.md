@@ -84,7 +84,7 @@ This is not an officially supported Google product.
 
  * Verify the following packages are installed:
 
-   [Debian] libmd4c-dev libmd4c-html0-dev
+   [Debian] libmd4c-dev libmd4c-html0-dev libssl-dev
 
    [Arch] core/make extra/md4c
 
@@ -99,9 +99,6 @@ This is not an officially supported Google product.
    $ ./build
    ```
 
-   The first time you build it will download Go to compile a third-party
-   component. This takes a little longer. It keeps Go inside the werm directory.
-
    `~/.local/werm/src`, or wherever you choose to put the Werm source, is
    known as `$WERMSRCDIR`. This environment variable is available to all
    child processes of the server, including terminal sessions.
@@ -110,10 +107,10 @@ This is not an officially supported Google product.
 
    **FOR THE WEB SERVER TO OPERATE THE LOCAL MACHINE**
 
-   Run: `$ ./run --port=8090 --address=localhost`
+   Run: `$ ./run spawner 127.0.0.1:8090`
 
    Note that any logged in user will be able to start a shell as the user, since
-   the port is accessible on localhost.
+   the port is accessible from localhost.
 
    This is sufficient for single-user machines. The opened port can be accessed
    in a local web browser or remotely with local ssh port forwarding:
@@ -128,7 +125,7 @@ This is not an officially supported Google product.
 
    ```
    $ umask 0077
-   $ ./run --uds=/tmp/werm.$USER.sock
+   $ ./run spawner [uds]:/tmp/werm.$USER.sock
    ```
 
    And then use port forwarding in your SSH command arguments (works with Chrome
@@ -326,7 +323,7 @@ it before executing `run`.
 
 The environment variable `$WERMSOCKSDIR` is the absolute path in which sockets
 for each session are stored. This does not affect the socket specified with
-`--uds`. It defaults to `$WERMVARDIR/socks`. Set it before executing `run`.
+`[uds]:`. It defaults to `$WERMVARDIR/socks`. Set it before executing `run`.
 
 <a name=wermflags></a>
 ### WERMFLAGS

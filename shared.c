@@ -14,9 +14,6 @@
 
 #include "shared.h"
 
-char *dtach_sock;
-int first_attach;
-
 int xasprintf(char **strp, const char *format, ...)
 {
 	int res;

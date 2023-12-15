@@ -271,11 +271,9 @@ reading profile dir at: test/emptyprof
 profsig[sin-link" href="/?termid="><em>basic</em></a></ul>\012<ul id="ctl-g]
 profsig[rp" class="newsessin-list"><li><a class="newsessin-link" href="/]
 profsig[?termid=ok1">ok1</a><li><a class="newsessin-link" href="/?termid]
-profsig[=ok2">ok2</a></ul>\012]
 reading profile dir at: test/emptyprof
-profsig[echo empty1\012]
 reading profile dir at: test/emptyprof
-profsig[\\@auxjs:jsempty2\012]
+profsig[=ok2">ok2</a></ul>\012echo empty1\012\\@auxjs:jsempty2\012]
 TEST: ephemeral session uses basic profile config
 reading profile dir at: test/emptyprof
 profsig[echo empty1\012\\@auxjs:jsempty2\012]
@@ -294,6 +292,7 @@ goodbye
 100000
 -2147483648
 2147483647
+-9223372036854775808 9223372036854775807
 customcap[abcdefg]
 customcap[hijklmn]
 customcap[opqrstu]
@@ -307,6 +306,40 @@ customcap+multipleapnd[a121aba121aba121]
 customcap+multipleapnd[aba121aba121aba1]
 customcap+multipleapnd[21aba121aba121ab]
 customcap+multipleapnd[a]
+TRIVIAL RESOURCE AND BLANK QUERY
+resource: /
+restrict fetch site: 0 valid ws: 0 head: 0
+INTERESTING PATH+QUERY
+resource: /asdf
+query: xyz=a%3fb%20c
+restrict fetch site: 0 valid ws: 0 head: 0
+TEST ACCEPT-KEY CALCULATION
+httpresp[HTTP/1.1 101 Switching Protocols\015\012Upgrade: websocket\015\012Connection: Upgrade\015\012Sec-WebSocket-Accept: ojY9iP807Mv1clWz9CVeYgn+5As=\015\012\015\012]
+resource: /
+restrict fetch site: 0 valid ws: 1 head: 0
+TEST ACCEPT-KEY AGAIN
+httpresp[HTTP/1.1 101 Switching Protocols\015\012Upgrade: websocket\015\012Connection: Upgrade\015\012Sec-WebSocket-Accept: mhplOAo9s3jjqLKHqblXHGYOm60=\015\012\015\012]
+resource: /
+restrict fetch site: 0 valid ws: 1 head: 0
+EXAMPLE FROM RFC-6455
+httpresp[HTTP/1.1 101 Switching Protocols\015\012Upgrade: websocket\015\012Connection: Upgrade\015\012Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\015\012\015\012]
+resource: /
+restrict fetch site: 0 valid ws: 1 head: 0
+UNSUPPORTED METHOD POST
+httpresp[HTTP/1.1 405 Method Not Allowed\015\012Connection: keep-alive\015\012Content-Type: text/plain; charset=utf-8\015\012Content-Length: 0\015\012\015\012]
+rq.error is yes
+WEBSOCKET UPGRADE: KEY TOO SHORT
+httpresp[HTTP/1.1 400 Bad Request\015\012Connection: keep-alive\015\012Content-Type: text/plain; charset=utf-8\015\012Content-Length: 53\015\012\015\012]
+httpresp[challenge key wrong size\012  expected: 16\012  actual: 15\012]
+rq.error is yes
+WEBSOCKET UPGRADE: INVALID VERSION
+httpresp[HTTP/1.1 400 Bad Request\015\012Connection: keep-alive\015\012Content-Type: text/plain; charset=utf-8\015\012Content-Length: 45\015\012\015\012]
+httpresp[bad request\012websocket upgrade conditions: 11\012]
+rq.error is yes
+WEBSOCKET UPGRADE: INVALID CONNECTION HDR
+httpresp[HTTP/1.1 400 Bad Request\015\012Connection: keep-alive\015\012Content-Type: text/plain; charset=utf-8\015\012Content-Length: 45\015\012\015\012]
+httpresp[bad request\012websocket upgrade conditions: 13\012]
+rq.error is yes
 access obj with bad ID
 [binary_name]: bad id: -2
 valid use of new obj, then access invalid fld

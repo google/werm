@@ -23,7 +23,7 @@ extern int first_attach;
 struct clistate {
 	/* An opaque endpoint ID. This is chosen at random by the client and
 	   persisted indefinitely. */
-	unsigned char endpnt[8];
+	char endpnt[8];
 
 	/* Whether the client wants to receive terminal output and state
 	   updates. */

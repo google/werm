@@ -31,7 +31,7 @@ struct tmobj {
 	int32_t fct;
 
 	/* Values of the fields of this object */
-	uint32_t *fs;
+	int32_t *fs;
 };
 
 #define fld(id, fdx) (*fld_ptr(id, fdx))

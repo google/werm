@@ -484,7 +484,7 @@ struct iterprofspec {
 	unsigned diaglog	: 1;
 };
 
-static void newsessinhtml(struct iterprofspec *spc, char k, const char *nmarg)
+static void newsessinhtml(struct iterprofspec *spc, char k, const void *nmarg)
 {
 	const char *litext = nmarg, *litrid = nmarg;
 

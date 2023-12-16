@@ -75,7 +75,10 @@ This is not an officially supported Google product.
  * The Werm server, which is the local or remote machine running the terminals,
    only works on Linux for now.
 
- * Non-Chromium-based browsers are not supported for now.
+ * Chromium-based browsers are the most tested, but Firefox also appears to
+   work. You should change `ui.key.menuAccessKey` or turn off
+   `ui.key.menuAccessKeyFocuses` in about:config to prevent alt keys from being
+   intercepted and use them for their intended purpose of activating macros.
 
 ### Instructions
 

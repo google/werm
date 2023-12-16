@@ -92,90 +92,6 @@ lib.notNull = function(value) {
   lib.assert(value !== null);
   return value;
 };
-// SOURCE FILE: libdot/js/lib_polyfill.js
-// Copyright 2017 The Chromium OS Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-/**
- * @fileoverview Polyfills for ES2019+ features we want to use.
- * @suppress {duplicate} This file redefines many functions.
- */
-
-/** @const */
-lib.polyfill = {};
-
-/**
- * https://developer.mozilla.org/en-US/docs/Web/API/Blob/arrayBuffer
- *
- * @return {!Promise<!ArrayBuffer>}
- */
-lib.polyfill.BlobArrayBuffer = function() {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onabort = reader.onerror = () => reject(reader);
-    reader.readAsArrayBuffer(this);
-  });
-};
-
-if (typeof Blob.prototype.arrayBuffer != 'function') {
-  Blob.prototype.arrayBuffer = lib.polyfill.BlobArrayBuffer;
-}
-
-/**
- * https://developer.mozilla.org/en-US/docs/Web/API/Blob/text
- *
- * @return {!Promise<string>}
- */
-lib.polyfill.BlobText = function() {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onabort = reader.onerror = () => reject(reader);
-    reader.readAsText(this);
-  });
-};
-
-if (typeof Blob.prototype.arrayBuffer != 'function') {
-  Blob.prototype.text = lib.polyfill.BlobText;
-}
-// SOURCE FILE: libdot/js/lib_array.js
-// Copyright 2017 The Chromium OS Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-/**
- * @fileoverview Helper functions for (typed) arrays.
- */
-
-lib.array = {};
-
-/**
- * Compare two array-like objects entrywise.
- *
- * @template ARRAY_LIKE
- * @param {?ARRAY_LIKE} a The first array to compare.
- * @param {?ARRAY_LIKE} b The second array to compare.
- * @return {boolean} true if both arrays are null or they agree entrywise;
- *     false otherwise.
- */
-lib.array.compare = function(a, b) {
-  if (a === null || b === null) {
-    return a === null && b === null;
-  }
-
-  if (a.length !== b.length) {
-    return false;
-  }
-
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
-};
 // SOURCE FILE: libdot/js/lib_codec.js
 // Copyright 2018 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -2080,731 +1996,6 @@ lib.i18n.resolveLanguage = function(language) {
     return [lang];
   }
 };
-// SOURCE FILE: libdot/js/lib_preference_manager.js
-// Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-/**
- * Constructor for lib.PreferenceManager objects.
- *
- * These objects deal with persisting changes to stable storage and notifying
- * consumers when preferences change.
- *
- * It is intended that the backing store could be something other than HTML5
- * storage, but there aren't any use cases at the moment.  In the future there
- * may be a chrome api to store sync-able name/value pairs, and we'd want
- * that.
- *
- * @param {!lib.Storage} storage The storage object to use as a backing
- *     store.
- * @param {string=} prefix The optional prefix to be used for all preference
- *     names.  The '/' character should be used to separate levels of hierarchy,
- *     if you're going to have that kind of thing.  If provided, the prefix
- *     should start with a '/'.  If not provided, it defaults to '/'.
- * @constructor
- */
-lib.PreferenceManager = function(storage, prefix = '/') {
-  this.storage = storage;
-  this.storageObserver_ = this.onStorageChange_.bind(this);
-  this.storage.addObserver(this.storageObserver_);
-
-  this.trace = false;
-
-  if (!prefix.endsWith('/')) {
-    prefix += '/';
-  }
-
-  this.prefix = prefix;
-
-  // Internal state for when we're doing a bulk import from JSON and we want
-  // to elide redundant storage writes (for quota reasons).
-  this.isImportingJson_ = false;
-
-  /** @type {!Object<string, !lib.PreferenceManager.Record>} */
-  this.prefRecords_ = {};
-  this.globalObservers_ = [];
-  this.prefixObservers_ = [];
-
-  this.childFactories_ = {};
-
-  // Map of list-name to {map of child pref managers}
-  // As in...
-  //
-  //  this.childLists_ = {
-  //    'profile-ids': {
-  //      'one': PreferenceManager,
-  //      'two': PreferenceManager,
-  //      ...
-  //    },
-  //
-  //    'frob-ids': {
-  //      ...
-  //    }
-  //  }
-  this.childLists_ = {};
-};
-
-/**
- * Used internally to indicate that the current value of the preference should
- * be taken from the default value defined with the preference.
- *
- * Equality tests against this value MUST use '===' or '!==' to be accurate.
- *
- * @type {symbol}
- */
-lib.PreferenceManager.prototype.DEFAULT_VALUE = Symbol('DEFAULT_VALUE');
-
-/**
- * An individual preference.
- *
- * These objects are managed by the PreferenceManager, you shouldn't need to
- * handle them directly.
- *
- * @param {string} name The name of the new preference (used for indexing).
- * @param {*} defaultValue The default value for this preference.
- * @constructor
- */
-lib.PreferenceManager.Record = function(name, defaultValue) {
-  this.name = name;
-  this.defaultValue = defaultValue;
-  this.currentValue = this.DEFAULT_VALUE;
-  this.observers = [];
-};
-
-/**
- * A local copy of the DEFAULT_VALUE constant to make it less verbose.
- *
- * @type {symbol}
- */
-lib.PreferenceManager.Record.prototype.DEFAULT_VALUE =
-    lib.PreferenceManager.prototype.DEFAULT_VALUE;
-
-/**
- * Register a callback to be invoked when this preference changes.
- *
- * @param {function(string, string, !lib.PreferenceManager)} observer The
- *     function to invoke.  It will receive the new value, the name of the
- *     preference, and a reference to the PreferenceManager as parameters.
- */
-lib.PreferenceManager.Record.prototype.addObserver = function(observer) {
-  this.observers.push(observer);
-};
-
-/**
- * Unregister an observer callback.
- *
- * @param {function(string, string, !lib.PreferenceManager)} observer A
- *     previously registered callback.
- */
-lib.PreferenceManager.Record.prototype.removeObserver = function(observer) {
-  const i = this.observers.indexOf(observer);
-  if (i >= 0) {
-    this.observers.splice(i, 1);
-  }
-};
-
-/**
- * Fetch the value of this preference.
- *
- * @return {*} The value for this preference.
- */
-lib.PreferenceManager.Record.prototype.get = function() {
-  const result = this.currentValue === this.DEFAULT_VALUE ?
-      this.defaultValue : this.currentValue;
-
-  if (typeof this.defaultValue === 'object') {
-    // We want to return a COPY of the value so that users can
-    // modify the array or object without changing the value.
-    return JSON.parse(JSON.stringify(result));
-  }
-
-  return result;
-};
-
-/**
- * Update prefix and reset and reload storage, then notify prefix observers, and
- * all pref observers with new values.
- *
- * @param {string} prefix
- * @param {function()=} callback Optional function to invoke when completed.
- */
-lib.PreferenceManager.prototype.setPrefix = function(prefix, callback) {
-  if (!prefix.endsWith('/')) {
-    prefix += '/';
-  }
-  if (prefix === this.prefix) {
-    if (callback) {
-      callback();
-    }
-    return;
-  }
-
-  this.prefix = prefix;
-
-  for (const name in this.prefRecords_) {
-    this.prefRecords_[name].currentValue = this.DEFAULT_VALUE;
-  }
-
-  this.readStorage(() => {
-    for (const o of this.prefixObservers_) {
-      o(this.prefix, this);
-    }
-    this.notifyAll();
-    if (callback) {
-      callback();
-    }
-  });
-};
-
-/**
- * Read the backing storage for these preferences.
- *
- * You should do this once at initialization time to prime the local cache
- * of preference values.  The preference manager will monitor the backing
- * storage for changes, so you should not need to call this more than once.
- *
- * This function recursively reads storage for all child preference managers as
- * well.
- *
- * This function is asynchronous, if you need to read preference values, you
- * *must* wait for the callback.
- *
- * @param {function()=} callback Optional function to invoke when the read
- *     has completed.
- */
-lib.PreferenceManager.prototype.readStorage = function(callback = undefined) {
-  let pendingChildren = 0;
-
-  function onChildComplete() {
-    if (--pendingChildren == 0 && callback) {
-      callback();
-    }
-  }
-
-  const keys = Object.keys(this.prefRecords_).map((el) => this.prefix + el);
-
-  if (this.trace) {
-    console.log('Preferences read: ' + this.prefix);
-  }
-
-  this.storage.getItems(keys).then((items) => {
-      const prefixLength = this.prefix.length;
-
-      for (const key in items) {
-        const value = items[key];
-        const name = key.substr(prefixLength);
-        const needSync = (
-            name in this.childLists_ &&
-            (JSON.stringify(value) !=
-             JSON.stringify(this.prefRecords_[name].currentValue)));
-
-        this.prefRecords_[name].currentValue = value;
-
-        if (needSync) {
-          pendingChildren++;
-          this.syncChildList(name, onChildComplete);
-        }
-      }
-
-      if (pendingChildren == 0 && callback) {
-        setTimeout(callback);
-      }
-    });
-};
-
-/**
- * Define a preference.
- *
- * This registers a name, default value, and onChange handler for a preference.
- *
- * @param {string} name The name of the preference.  This will be prefixed by
- *     the prefix of this PreferenceManager before written to local storage.
- * @param {string|number|boolean|!Object|!Array|null} value The default value of
- *     this preference.  Anything that can be represented in JSON is a valid
- *     default value.
- * @param {function(*, string, !lib.PreferenceManager)=} onChange A
- *     function to invoke when the preference changes.  It will receive the new
- *     value, the name of the preference, and a reference to the
- *     PreferenceManager as parameters.
- */
-lib.PreferenceManager.prototype.definePreference = function(
-    name, value, onChange = undefined) {
-
-  let record = this.prefRecords_[name];
-  if (record) {
-    this.changeDefault(name, value);
-  } else {
-    record = this.prefRecords_[name] =
-        new lib.PreferenceManager.Record(name, value);
-  }
-
-  if (onChange) {
-    record.addObserver(onChange);
-  }
-};
-
-/**
- * Define multiple preferences with a single function call.
- *
- * @param {!Array<*>} defaults An array of 3-element arrays.  Each three element
- *     array should contain the [key, value, onChange] parameters for a
- *     preference.
- */
-lib.PreferenceManager.prototype.definePreferences = function(defaults) {
-  for (let i = 0; i < defaults.length; i++) {
-    this.definePreference(defaults[i][0], defaults[i][1], defaults[i][2]);
-  }
-};
-
-/**
- * Unregister an observer callback.
- *
- * @param {function(string, !lib.PreferenceManager)} observer A
- *     previously registered callback.
- */
-lib.PreferenceManager.prototype.removePrefixObserver = function(observer) {
-  const i = this.prefixObservers_.indexOf(observer);
-  if (i >= 0) {
-    this.prefixObservers_.splice(i, 1);
-  }
-};
-
-/**
- * Register to observe preference changes.
- *
- * @param {string} name The name of preference you wish to observe..
- * @param {function(*, string, !lib.PreferenceManager)} observer The callback.
- */
-lib.PreferenceManager.prototype.addObserver = function(name, observer) {
-  if (!(name in this.prefRecords_)) {
-    throw new Error(`Unknown preference: ${name}`);
-  }
-
-  this.prefRecords_[name].addObserver(observer);
-};
-
-/**
- * Register to observe preference changes.
- *
- * @param {?function()} global A callback that will happen for every preference.
- *     Pass null if you don't need one.
- * @param {!Object} map A map of preference specific callbacks.  Pass null if
- *     you don't need any.
- */
-lib.PreferenceManager.prototype.addObservers = function(global, map) {
-  if (global && typeof global != 'function') {
-    throw new Error('Invalid param: globals');
-  }
-
-  if (global) {
-    this.globalObservers_.push(global);
-  }
-
-  if (!map) {
-    return;
-  }
-
-  for (const name in map) {
-    this.addObserver(name, map[name]);
-  }
-};
-
-/**
- * Remove preference observer.
- *
- * @param {string} name The name of preference you wish to stop observing.
- * @param {function(*, string, !lib.PreferenceManager)} observer The observer to
- *     remove.
- */
-lib.PreferenceManager.prototype.removeObserver = function(name, observer) {
-  if (!(name in this.prefRecords_)) {
-    throw new Error(`Unknown preference: ${name}`);
-  }
-
-  this.prefRecords_[name].removeObserver(observer);
-};
-
-/**
- * Dispatch the change observers for all known preferences.
- *
- * It may be useful to call this after readStorage completes, in order to
- * get application state in sync with user preferences.
- *
- * This can be used if you've changed a preference manager out from under
- * a live object, for example when switching to a different prefix.
- */
-lib.PreferenceManager.prototype.notifyAll = function() {
-  for (const name in this.prefRecords_) {
-    this.notifyChange_(name);
-  }
-};
-
-/**
- * Notify the change observers for a given preference.
- *
- * @param {string} name The name of the preference that changed.
- */
-lib.PreferenceManager.prototype.notifyChange_ = function(name) {
-  const record = this.prefRecords_[name];
-  if (!record) {
-    throw new Error('Unknown preference: ' + name);
-  }
-
-  const currentValue = record.get();
-
-  for (let i = 0; i < this.globalObservers_.length; i++) {
-    this.globalObservers_[i](name, currentValue);
-  }
-
-  for (let i = 0; i < record.observers.length; i++) {
-    record.observers[i](currentValue, name, this);
-  }
-};
-
-/**
- * Remove a child preferences instance.
- *
- * Removes a child preference manager and clears any preferences stored in it.
- *
- * @param {string} listName The name of the child list containing the child to
- *     remove.
- * @param {string} id The child ID.
- */
-lib.PreferenceManager.prototype.removeChild = function(listName, id) {
-  const prefs = this.getChild(listName, id);
-  prefs.resetAll();
-
-  const ids = /** @type {!Array<string>} */ (this.get(listName));
-  const i = ids.indexOf(id);
-  if (i != -1) {
-    ids.splice(i, 1);
-    this.set(listName, ids, undefined, !this.isImportingJson_);
-  }
-
-  delete this.childLists_[listName][id];
-};
-
-/**
- * Return a child PreferenceManager instance for a given id.
- *
- * If the child list or child id is not known this will return the specified
- * default value or throw an exception if no default value is provided.
- *
- * @param {string} listName The child list to look in.
- * @param {string} id The child ID.
- * @param {!lib.PreferenceManager=} defaultValue The value to return if the
- *     child is not found.
- * @return {!lib.PreferenceManager} The specified child PreferenceManager.
- */
-lib.PreferenceManager.prototype.getChild = function(
-    listName, id, defaultValue = undefined) {
-  if (!(listName in this.childLists_)) {
-    throw new Error('Unknown child list: ' + listName);
-  }
-
-  const childList = this.childLists_[listName];
-  if (!(id in childList)) {
-    if (defaultValue === undefined) {
-      throw new Error('Unknown "' + listName + '" child: ' + id);
-    }
-
-    return defaultValue;
-  }
-
-  return childList[id];
-};
-
-/**
- * Reset a preference to its default state.
- *
- * This will dispatch the onChange handler if the preference value actually
- * changes.
- *
- * @param {string} name The preference to reset.
- */
-lib.PreferenceManager.prototype.reset = function(name) {
-  const record = this.prefRecords_[name];
-  if (!record) {
-    throw new Error('Unknown preference: ' + name);
-  }
-
-  this.storage.removeItem(this.prefix + name);
-
-  if (record.currentValue !== this.DEFAULT_VALUE) {
-    record.currentValue = this.DEFAULT_VALUE;
-    this.notifyChange_(name);
-  }
-};
-
-/**
- * Reset all preferences back to their default state.
- */
-lib.PreferenceManager.prototype.resetAll = function() {
-  const changed = [];
-
-  for (const listName in this.childLists_) {
-    const childList = this.childLists_[listName];
-    for (const id in childList) {
-      childList[id].resetAll();
-    }
-  }
-
-  for (const name in this.prefRecords_) {
-    if (this.prefRecords_[name].currentValue !== this.DEFAULT_VALUE) {
-      this.prefRecords_[name].currentValue = this.DEFAULT_VALUE;
-      changed.push(name);
-    }
-  }
-
-  const keys = Object.keys(this.prefRecords_).map(function(el) {
-      return this.prefix + el;
-  }.bind(this));
-
-  this.storage.removeItems(keys);
-
-  changed.forEach(this.notifyChange_.bind(this));
-};
-
-/**
- * Return true if two values should be considered not-equal.
- *
- * If both values are the same scalar type and compare equal this function
- * returns false (no difference), otherwise return true.
- *
- * This is used in places where we want to check if a preference has changed.
- * Compare complex values (objects or arrays) using JSON serialization. Objects
- * with more than a single primitive property may not have the same JSON
- * serialization, but for our purposes with default objects, this is OK.
- *
- * @param {*} a A value to compare.
- * @param {*} b A value to compare.
- * @return {boolean} Whether the two are not equal.
- */
-lib.PreferenceManager.prototype.diff = function(a, b) {
-  // If the types are different.
-  if ((typeof a) !== (typeof b)) {
-    return true;
-  }
-
-  // Or if the type is not a simple primitive one.
-  if (!(/^(undefined|boolean|number|string)$/.test(typeof a))) {
-    // Special case the null object.
-    if (a === null && b === null) {
-      return false;
-    } else {
-      return JSON.stringify(a) !== JSON.stringify(b);
-    }
-  }
-
-  // Do a normal compare for primitive types.
-  return a !== b;
-};
-
-/**
- * Change the default value of a preference.
- *
- * This is useful when subclassing preference managers.
- *
- * The function does not alter the current value of the preference, unless
- * it has the old default value.  When that happens, the change observers
- * will be notified.
- *
- * @param {string} name The name of the parameter to change.
- * @param {*} newValue The new default value for the preference.
- */
-lib.PreferenceManager.prototype.changeDefault = function(name, newValue) {
-  const record = this.prefRecords_[name];
-  if (!record) {
-    throw new Error('Unknown preference: ' + name);
-  }
-
-  if (!this.diff(record.defaultValue, newValue)) {
-    // Default value hasn't changed.
-    return;
-  }
-
-  if (record.currentValue !== this.DEFAULT_VALUE) {
-    // This pref has a specific value, just change the default and we're done.
-    record.defaultValue = newValue;
-    return;
-  }
-
-  record.defaultValue = newValue;
-
-  this.notifyChange_(name);
-};
-
-/**
- * Change the default value of multiple preferences.
- *
- * @param {!Object} map A map of name -> value pairs specifying the new default
- *     values.
- */
-lib.PreferenceManager.prototype.changeDefaults = function(map) {
-  for (const key in map) {
-    this.changeDefault(key, map[key]);
-  }
-};
-
-/**
- * Set a preference to a specific value.
- *
- * This will dispatch the onChange handler if the preference value actually
- * changes.
- *
- * @param {string} name The preference to set.
- * @param {*} newValue The value to set.  Anything that can be represented in
- *     JSON is a valid value.
- * @param {function()=} onComplete Callback when the set call completes.
- * @param {boolean=} saveToStorage Whether to commit the change to the backing
- *     storage or only the in-memory record copy.
- * @return {!Promise<void>} Promise which resolves once all observers are
- *     notified.
- */
-lib.PreferenceManager.prototype.set = function(
-    name, newValue, onComplete = undefined, saveToStorage = true) {
-  const record = this.prefRecords_[name];
-  if (!record) {
-    throw new Error('Unknown preference: ' + name);
-  }
-
-  const oldValue = record.get();
-
-  if (!this.diff(oldValue, newValue)) {
-    return Promise.resolve();
-  }
-
-  if (this.diff(record.defaultValue, newValue)) {
-    record.currentValue = newValue;
-    if (saveToStorage) {
-      this.storage.setItem(this.prefix + name, newValue).then(onComplete);
-    }
-  } else {
-    record.currentValue = this.DEFAULT_VALUE;
-    if (saveToStorage) {
-      this.storage.removeItem(this.prefix + name).then(onComplete);
-    }
-  }
-
-  // We need to manually send out the notification on this instance.  If we
-  // The storage event won't fire a notification because we've already changed
-  // the currentValue, so it won't see a difference.  If we delayed changing
-  // currentValue until the storage event, a pref read immediately after a write
-  // would return the previous value.
-  //
-  // The notification is async so clients don't accidentally depend on
-  // a synchronous notification.
-  return Promise.resolve().then(() => {
-    this.notifyChange_(name);
-  });
-};
-
-/**
- * Get the value of a preference.
- *
- * @param {string} name The preference to get.
- * @return {*} The preference's value.
- */
-lib.PreferenceManager.prototype.get = function(name) {
-  const record = this.prefRecords_[name];
-  if (!record) {
-    throw new Error('Unknown preference: ' + name);
-  }
-
-  return record.get();
-};
-
-/**
- * Get the default value of a preference.
- *
- * @param {string} name The preference to get.
- * @return {*} The preference's default value.
- */
-lib.PreferenceManager.prototype.getDefault = function(name) {
-  const record = this.prefRecords_[name];
-  if (!record) {
-    throw new Error(`Unknown preference: ${name}`);
-  }
-
-  return record.defaultValue;
-};
-
-/**
- * Get the boolean value of a preference.
- *
- * @param {string} name The preference to get.
- * @return {boolean}
- */
-lib.PreferenceManager.prototype.getBoolean = function(name) {
-  const result = this.get(name);
-  lib.assert(typeof result == 'boolean');
-  return result;
-};
-
-/**
- * Get the number value of a preference.
- *
- * @param {string} name The preference to get.
- * @return {number}
- */
-lib.PreferenceManager.prototype.getNumber = function(name) {
-  const result = this.get(name);
-  lib.assert(typeof result == 'number');
-  return result;
-};
-
-/**
- * Get the string value of a preference.
- *
- * @param {string} name The preference to get.
- * @return {string}
- */
-lib.PreferenceManager.prototype.getString = function(name) {
-  const result = this.get(name);
-  lib.assert(typeof result == 'string');
-  return result;
-};
-
-/**
- * Called when a key in the storage changes.
- *
- * @param {!Object} map Dictionary of changed settings.
- */
-lib.PreferenceManager.prototype.onStorageChange_ = function(map) {
-  for (const key in map) {
-    if (this.prefix) {
-      if (key.lastIndexOf(this.prefix, 0) != 0) {
-        continue;
-      }
-    }
-
-    const name = key.substr(this.prefix.length);
-
-    if (!(name in this.prefRecords_)) {
-      // Sometimes we'll get notified about prefs that are no longer defined.
-      continue;
-    }
-
-    const record = this.prefRecords_[name];
-
-    const newValue = map[key].newValue;
-    let currentValue = record.currentValue;
-    if (currentValue === record.DEFAULT_VALUE) {
-      currentValue = undefined;
-    }
-
-    if (this.diff(currentValue, newValue)) {
-      if (typeof newValue == 'undefined' || newValue === null) {
-        record.currentValue = record.DEFAULT_VALUE;
-      } else {
-        record.currentValue = newValue;
-      }
-
-      this.notifyChange_(name);
-    }
-  }
-};
 // SOURCE FILE: libdot/js/lib_resource.js
 // Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -3032,156 +2223,6 @@ lib.Storage.generateStorageChanges = function(oldStorage, newStorage) {
   }
 
   return changes;
-};
-// SOURCE FILE: libdot/js/lib_storage_memory.js
-// Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-/**
- * In-memory storage class with an async interface that is interchangeable with
- * other lib.Storage.* implementations.
- *
- * @constructor
- * @implements {lib.Storage}
- */
-lib.Storage.Memory = function() {
-  this.observers_ = [];
-  this.storage_ = {};
-};
-
-/**
- * Register a function to observe storage changes.
- *
- * @param {function(!Object)} callback The function to invoke when the storage
- *     changes.
- * @override
- */
-lib.Storage.Memory.prototype.addObserver = function(callback) {
-  this.observers_.push(callback);
-};
-
-/**
- * Unregister a change observer.
- *
- * @param {function(!Object)} callback A previously registered callback.
- * @override
- */
-lib.Storage.Memory.prototype.removeObserver = function(callback) {
-  const i = this.observers_.indexOf(callback);
-  if (i != -1) {
-    this.observers_.splice(i, 1);
-  }
-};
-
-/**
- * Update the internal storage state and generate change events for it.
- *
- * @param {!Object<string, *>} newStorage
- */
-lib.Storage.Memory.prototype.update_ = async function(newStorage) {
-  const changes = lib.Storage.generateStorageChanges(this.storage_, newStorage);
-  this.storage_ = newStorage;
-
-  // Force deferment for the standard API.
-  await 0;
-
-  // Don't bother notifying if there are no changes.
-  if (Object.keys(changes).length) {
-    this.observers_.forEach((o) => o(changes));
-  }
-};
-
-/**
- * Delete everything in this storage.
- *
- * @override
- */
-lib.Storage.Memory.prototype.clear = async function() {
-  return this.update_({});
-};
-
-/**
- * Return the current value of a storage item.
- *
- * @param {string} key The key to look up.
- * @override
- */
-lib.Storage.Memory.prototype.getItem = async function(key) {
-  return this.getItems([key]).then((items) => items[key]);
-};
-
-/**
- * Fetch the values of multiple storage items.
- *
- * @param {?Array<string>} keys The keys to look up.  Pass null for all keys.
- * @override
- */
-lib.Storage.Memory.prototype.getItems = async function(keys) {
-  const rv = {};
-  if (!keys) {
-    keys = Object.keys(this.storage_);
-  }
-
-  keys.forEach((key) => {
-    if (this.storage_.hasOwnProperty(key)) {
-      rv[key] = this.storage_[key];
-    }
-  });
-
-  // Force deferment for the standard API.
-  await 0;
-
-  return rv;
-};
-
-/**
- * Set a value in storage.
- *
- * @param {string} key The key for the value to be stored.
- * @param {*} value The value to be stored.  Anything that can be serialized
- *     with JSON is acceptable.
- * @override
- */
-lib.Storage.Memory.prototype.setItem = async function(key, value) {
-  return this.setItems({[key]: value});
-};
-
-/**
- * Set multiple values in storage.
- *
- * @param {!Object} obj A map of key/values to set in storage.
- * @override
- */
-lib.Storage.Memory.prototype.setItems = async function(obj) {
-  const newStorage = Object.assign({}, this.storage_);
-  for (const key in obj) {
-    // Normalize through JSON to mimic Local/Chrome backends.
-    newStorage[key] = JSON.parse(JSON.stringify(obj[key]));
-  }
-  return this.update_(newStorage);
-};
-
-/**
- * Remove an item from storage.
- *
- * @param {string} key The key to be removed.
- * @override
- */
-lib.Storage.Memory.prototype.removeItem = async function(key) {
-  return this.removeItems([key]);
-};
-
-/**
- * Remove multiple items from storage.
- *
- * @param {!Array<string>} keys The keys to be removed.
- * @override
- */
-lib.Storage.Memory.prototype.removeItems = async function(keys) {
-  const newStorage = Object.assign({}, this.storage_);
-  keys.forEach((key) => delete newStorage[key]);
-  return this.update_(newStorage);
 };
 // SOURCE FILE: libdot/third_party/intl-segmenter/intl-segmenter.js
 // Rough polyfill for Intl.Segmenter proposal
@@ -4871,397 +3912,173 @@ hterm.Options = function(copy = undefined) {
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/**
- * PreferenceManager subclass managing global NaSSH preferences.
- *
- * This is currently just an ordered list of known connection profiles.
- *
- * @param {!lib.Storage} storage Where to store preferences.
- * @param {string=} profileId Uses 'default' if not specified.
- * @extends {lib.PreferenceManager}
- * @constructor
- */
-hterm.PreferenceManager = function(
-    storage, profileId = hterm.Terminal.DEFAULT_PROFILE_ID) {
-  lib.PreferenceManager.call(this, storage,
-                             hterm.PreferenceManager.prefix_ + profileId);
-  Object.entries(hterm.PreferenceManager.defaultPreferences).forEach(
-      ([key, entry]) => {
-        this.definePreference(key, entry['default']);
-      });
+const hterm_pref = {
+  // If true, terminal bells in the background will create a Web ` +
+  // Notification. https://www.w3.org/TR/notifications/\n` +
+  // \n` +
+  // Displaying notifications requires permission from the user. When this ` +
+  // option is set to true, hterm will attempt to ask the user for ` +
+  // permission if necessary. Browsers might not show this permission ` +
+  // request if it was not triggered by a user action.\n` +
+  // \n` +
+  // Chrome extensions with the "notifications" permission have permission ` +
+  // to display notifications.`,
+  'desktop-notification-bell': false,
+
+  // The background color for text with no other color attributes.`,
+  'background-color': 'rgb(26, 26, 26)',
+
+  // CSS value of the background image size.`,
+  'background-size': '',
+
+  // CSS value of the background image position.\n` +
+  // \n` +
+  // For example:\n` +
+  //   10% 10%\n` +
+  //   center`,
+  'background-position': '',
+
+  // This is specified as an object. It is a sparse array, where each ` +
+  // property is the character set code and the value is an object that is ` +
+  // a sparse array itself. In that sparse array, each property is the ` +
+  // received character and the value is the displayed character.\n` +
+  // \n` +
+  // For example:\n` +
+  // { "0": {\n` +
+  //   "+": "\\u2192",\n` +
+  //   ",": "\\u2190",\n` +
+  //   "-": "\\u2191",\n` +
+  //   ".": "\\u2193",\n` +
+  //   "0": "\\u2588"\n} }`,
+  'character-map-overrides': null,
+
+  // Override colors in the default palette.\n` +
+  // \n` +
+  // This can be specified as an array or an object. If specified as an ` +
+  // object it is assumed to be a sparse array, where each property ` +
+  // is a numeric index into the color palette.\n` +
+  // \n` +
+  // Values can be specified as almost any CSS color value. This ` +
+  // includes #RGB, #RRGGBB, rgb(...), rgba(...), and any color names ` +
+  // that are also part of the standard X11 rgb.txt file.\n` +
+  // \n` +
+  // You can use 'null' to specify that the default value should be not ` +
+  // be changed. This is useful for skipping a small number of indices ` +
+  // when the value is specified as an array.\n` +
+  // \n` +
+  // For example, these both set color index 1 to blue:\n` +
+  //   {1: "#0000ff"}\n` +
+  //   [null, "#0000ff"]`,
+  'color-palette-overrides': null,
+
+  'copy-on-select': true,
+  // Automatically copy mouse selection to the clipboard.`,
+
+  'use-default-window-copy': false,
+  // Whether to use the default browser/OS's copy behavior.\n` +
+  // \n` +
+  // Allow the browser/OS to handle the copy event directly which might ` +
+  // improve compatibility with some systems (where copying doesn't work ` +
+  // at all), but makes the text selection less robust.\n` +
+  // \n` +
+  // For example, long lines that were automatically line wrapped will ` +
+  // be copied with the newlines still in them.`,
+
+  'clear-selection-after-copy': true,
+  // Whether to clear the selection after copying.`,
+
+  'east-asian-ambiguous-as-two-column': false,
+  // Whether East Asian Ambiguous characters have two column width.`,
+
+  'enable-8-bit-control': false,
+  // True to enable 8-bit control characters, false to ignore them.\n` +
+  // \n` +
+  // We'll respect the two-byte versions of these control characters ` +
+  // regardless of this setting.`,
+
+  'enable-bold': false,
+  // If true, use bold weight font for text with the bold/bright ` +
+  // attribute. False to use the normal weight font. Null to autodetect.`,
+
+  'enable-bold-as-bright': true,
+  // If true, use bright colors (8-15 on a 16 color palette) for any text ` +
+  // with the bold attribute. False otherwise.`,
+
+  'enable-blink': true,
+  // If true, respect the blink attribute. False to ignore it.`,
+
+  'enable-clipboard-notice': true,
+  // Whether to show a message in the terminal when the host writes to the ` +
+  // clipboard.`,
+
+  'enable-csi-j-3': true,
+  // Whether the Erase Saved Lines function (mode 3) of the Erase Display ` +
+  // command (CSI-J) may clear the terminal scrollback buffer.\n` +
+  // \n` +
+  // Enabling this by default is safe.`,
+
+  'foreground-color': 'rgb(230, 230, 230)',
+  // The foreground color for text with no other color attributes.`,
+
+  'enable-resize-status': false,
+  // Whether to show terminal dimensions when the terminal changes size.`,
+
+  'hide-mouse-while-typing': null,
+  // Whether to automatically hide the mouse cursor when typing. ` +
+  // By default, autodetect whether the platform/OS handles this.\n` +
+
+  'screen-padding-size': 3,
+  // The padding size in pixels around the border of the terminal screen.\n` +
+  // \n` +
+  // This controls the size of the border around the terminal screen so ` +
+  // the user can add some visible padding to the edges of the screen.`,
+
+  'screen-border-size': 1,
+  // The border size in pixels around the terminal screen.\n` +
+  // \n` +
+  // This controls the size of the border around the terminal screen to ` +
+  // create a visible line at the edges of the screen.`,
+
+  'screen-border-color': 'rgb(0, 64, 64)',
+  // The color for the border around the terminal screen.\n` +
+  // \n` +
+  // This controls the color of the border around the terminal screen to ` +
+  // create a visible line at the edges of the screen.`,
+
+  'scroll-wheel-may-send-arrow-keys': false,
+  // When using the alternative screen buffer, and DECCKM (Application ` +
+  // Cursor Keys) is active, mouse scroll wheel events will emulate arrow ` +
+  // keys.\n` +
+  // \n` +
+  // It can be temporarily disabled by holding the Shift key.\n` +
+  // \n` +
+  // This frequently comes up when using pagers (less) or reading man ` +
+  // pages or text editors (vi/nano) or using screen/tmux.`,
+
+  'scroll-wheel-move-multiplier': 1,
+  // The multiplier for mouse scroll wheel events when measured in ` +
+  // pixels.\n` +
+  // \n` +
+  // Alters how fast the page scrolls.`,
+
+  'terminal-encoding': 'utf-8', // or 'iso-2022', 'utf-8-locked',
+  // The default terminal encoding (DOCS).\n` +
+  // \n` +
+  // ISO-2022 enables character map translations (like graphics maps).\n` +
+  // UTF-8 disables support for those.\n` +
+  // \n` +
+  // The locked variant means the encoding cannot be changed at runtime ` +
+  // via terminal escape sequences.\n` +
+  // \n` +
+  // You should stick with UTF-8 unless you notice broken rendering with ` +
+  // legacy applications.`,
+
+  'allow-images-inline': null,
+  // Whether to allow the remote host to display images in the terminal.\n` +
+  // \n` +
+  // By default, we prompt until a choice is made.`,
 };
 
-/**
- * The storage key prefix to namespace the preferences.
- */
-hterm.PreferenceManager.prefix_ = '/hterm/profiles/';
-
-/**
- * List all the defined profiles.
- *
- * @param {!lib.Storage} storage Where to look for profiles.
- * @param {function(!Array<string>)} callback Called with the list of profiles.
- */
-hterm.PreferenceManager.listProfiles = function(storage, callback) {
-  storage.getItems(null).then((items) => {
-    const profiles = {};
-    for (const key of Object.keys(items)) {
-      if (key.startsWith(hterm.PreferenceManager.prefix_)) {
-        // Turn "/hterm/profiles/foo/bar/cow" to "foo/bar/cow".
-        const subKey = key.slice(hterm.PreferenceManager.prefix_.length);
-        // Turn "foo/bar/cow" into "foo".
-        profiles[subKey.split('/', 1)[0]] = true;
-      }
-    }
-    callback(Object.keys(profiles));
-  });
-};
-
-/** @enum {string} */
-hterm.PreferenceManager.Categories = {
-  Keyboard: 'Keyboard',
-  Appearance: 'Appearance',
-  CopyPaste: 'CopyPaste',
-  Sounds: 'Sounds',
-  Scrolling: 'Scrolling',
-  Encoding: 'Encoding',
-  Extensions: 'Extensions',
-  Miscellaneous: 'Miscellaneous',
-};
-
-/**
- * List of categories, ordered by display order (top to bottom)
- */
-hterm.PreferenceManager.categoryDefinitions = [
-  {id: hterm.PreferenceManager.Categories.Appearance,
-    text: 'Appearance (fonts, colors, images)'},
-  {id: hterm.PreferenceManager.Categories.CopyPaste,
-    text: 'Copy & Paste'},
-  {id: hterm.PreferenceManager.Categories.Encoding,
-    text: 'Encoding'},
-  {id: hterm.PreferenceManager.Categories.Keyboard,
-    text: 'Keyboard'},
-  {id: hterm.PreferenceManager.Categories.Scrolling,
-    text: 'Scrolling'},
-  {id: hterm.PreferenceManager.Categories.Sounds,
-    text: 'Sounds'},
-  {id: hterm.PreferenceManager.Categories.Extensions,
-    text: 'Extensions'},
-  {id: hterm.PreferenceManager.Categories.Miscellaneous,
-    text: 'Miscellaneous'},
-];
-
-/**
- * Internal helper to create a default preference object.
- *
- * @param {string} name The user readable name/title.
- * @param {!hterm.PreferenceManager.Categories} category The pref category.
- * @param {boolean|number|string|?Object} defaultValue The default pref value.
- * @param {string|!Array<string|null>} type The type for this pref (or an array
- *     for enums).
- * @param {string} help The user readable help text.
- * @return {!Object} The default pref object.
- */
-hterm.PreferenceManager.definePref_ = function(
-    name, category, defaultValue, type, help) {
-  return {
-    'name': name,
-    'category': category,
-    'default': defaultValue,
-    'type': type,
-    'help': help,
-  };
-};
-
-hterm.PreferenceManager.defaultPreferences = {
-  'desktop-notification-bell': hterm.PreferenceManager.definePref_(
-      'Create desktop notifications for alert bells',
-      hterm.PreferenceManager.Categories.Sounds,
-      false, 'bool',
-      `If true, terminal bells in the background will create a Web ` +
-      `Notification. https://www.w3.org/TR/notifications/\n` +
-      `\n` +
-      `Displaying notifications requires permission from the user. When this ` +
-      `option is set to true, hterm will attempt to ask the user for ` +
-      `permission if necessary. Browsers might not show this permission ` +
-      `request if it was not triggered by a user action.\n` +
-      `\n` +
-      `Chrome extensions with the "notifications" permission have permission ` +
-      `to display notifications.`,
-  ),
-
-  'background-color': hterm.PreferenceManager.definePref_(
-      'Background color',
-      hterm.PreferenceManager.Categories.Appearance,
-      'rgb(26, 26, 26)', 'color',
-      `The background color for text with no other color attributes.`,
-  ),
-
-  'background-size': hterm.PreferenceManager.definePref_(
-      'Background image size',
-      hterm.PreferenceManager.Categories.Appearance,
-      '', 'string',
-      `CSS value of the background image size.`,
-  ),
-
-  'background-position': hterm.PreferenceManager.definePref_(
-      'Background image position',
-      hterm.PreferenceManager.Categories.Appearance,
-      '', 'string',
-      `CSS value of the background image position.\n` +
-      `\n` +
-      `For example:\n` +
-      `  10% 10%\n` +
-      `  center`,
-  ),
-
-  'character-map-overrides': hterm.PreferenceManager.definePref_(
-      'Character map overrides',
-      hterm.PreferenceManager.Categories.Appearance,
-      null, 'value',
-      `This is specified as an object. It is a sparse array, where each ` +
-      `property is the character set code and the value is an object that is ` +
-      `a sparse array itself. In that sparse array, each property is the ` +
-      `received character and the value is the displayed character.\n` +
-      `\n` +
-      `For example:\n` +
-      `{ "0": {\n` +
-      `  "+": "\\u2192",\n` +
-      `  ",": "\\u2190",\n` +
-      `  "-": "\\u2191",\n` +
-      `  ".": "\\u2193",\n` +
-      `  "0": "\\u2588"\n} }`,
-  ),
-
-  'color-palette-overrides': hterm.PreferenceManager.definePref_(
-      'Initial color palette',
-      hterm.PreferenceManager.Categories.Appearance,
-      null, 'value',
-      `Override colors in the default palette.\n` +
-      `\n` +
-      `This can be specified as an array or an object. If specified as an ` +
-      `object it is assumed to be a sparse array, where each property ` +
-      `is a numeric index into the color palette.\n` +
-      `\n` +
-      `Values can be specified as almost any CSS color value. This ` +
-      `includes #RGB, #RRGGBB, rgb(...), rgba(...), and any color names ` +
-      `that are also part of the standard X11 rgb.txt file.\n` +
-      `\n` +
-      `You can use 'null' to specify that the default value should be not ` +
-      `be changed. This is useful for skipping a small number of indices ` +
-      `when the value is specified as an array.\n` +
-      `\n` +
-      `For example, these both set color index 1 to blue:\n` +
-      `  {1: "#0000ff"}\n` +
-      `  [null, "#0000ff"]`,
-  ),
-
-  'copy-on-select': hterm.PreferenceManager.definePref_(
-      'Automatically copy selected content',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      true, 'bool',
-      `Automatically copy mouse selection to the clipboard.`,
-  ),
-
-  'use-default-window-copy': hterm.PreferenceManager.definePref_(
-      'Let the browser handle text copying',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      false, 'bool',
-      `Whether to use the default browser/OS's copy behavior.\n` +
-      `\n` +
-      `Allow the browser/OS to handle the copy event directly which might ` +
-      `improve compatibility with some systems (where copying doesn't work ` +
-      `at all), but makes the text selection less robust.\n` +
-      `\n` +
-      `For example, long lines that were automatically line wrapped will ` +
-      `be copied with the newlines still in them.`,
-  ),
-
-  'clear-selection-after-copy': hterm.PreferenceManager.definePref_(
-      'Automatically clear text selection',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      true, 'bool',
-      `Whether to clear the selection after copying.`,
-  ),
-
-  'east-asian-ambiguous-as-two-column': hterm.PreferenceManager.definePref_(
-      'East Asian Ambiguous use two columns',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `Whether East Asian Ambiguous characters have two column width.`,
-  ),
-
-  'enable-8-bit-control': hterm.PreferenceManager.definePref_(
-      'Support non-UTF-8 C1 control characters',
-      hterm.PreferenceManager.Categories.Keyboard,
-      false, 'bool',
-      `True to enable 8-bit control characters, false to ignore them.\n` +
-      `\n` +
-      `We'll respect the two-byte versions of these control characters ` +
-      `regardless of this setting.`,
-  ),
-
-  'enable-bold': hterm.PreferenceManager.definePref_(
-      'Bold text behavior',
-      hterm.PreferenceManager.Categories.Appearance,
-      false, 'tristate',
-      `If true, use bold weight font for text with the bold/bright ` +
-      `attribute. False to use the normal weight font. Null to autodetect.`,
-  ),
-
-  'enable-bold-as-bright': hterm.PreferenceManager.definePref_(
-      'Use bright colors with bold text',
-      hterm.PreferenceManager.Categories.Appearance,
-      true, 'bool',
-      `If true, use bright colors (8-15 on a 16 color palette) for any text ` +
-      `with the bold attribute. False otherwise.`,
-  ),
-
-  'enable-blink': hterm.PreferenceManager.definePref_(
-      'Enable blinking text',
-      hterm.PreferenceManager.Categories.Appearance,
-      true, 'bool',
-      `If true, respect the blink attribute. False to ignore it.`,
-  ),
-
-  'enable-clipboard-notice': hterm.PreferenceManager.definePref_(
-      'Show notification when copying content',
-      hterm.PreferenceManager.Categories.CopyPaste,
-      true, 'bool',
-      `Whether to show a message in the terminal when the host writes to the ` +
-      `clipboard.`,
-  ),
-
-  'enable-csi-j-3': hterm.PreferenceManager.definePref_(
-      'Allow clearing of scrollback buffer (CSI-J-3)',
-      hterm.PreferenceManager.Categories.Miscellaneous,
-      true, 'bool',
-      `Whether the Erase Saved Lines function (mode 3) of the Erase Display ` +
-      `command (CSI-J) may clear the terminal scrollback buffer.\n` +
-      `\n` +
-      `Enabling this by default is safe.`,
-  ),
-
-  'foreground-color': hterm.PreferenceManager.definePref_(
-      'Text color',
-      hterm.PreferenceManager.Categories.Appearance,
-      'rgb(230, 230, 230)', 'color',
-      `The foreground color for text with no other color attributes.`,
-  ),
-
-  'enable-resize-status': hterm.PreferenceManager.definePref_(
-      'Show terminal dimensions when resized',
-      hterm.PreferenceManager.Categories.Appearance,
-      false, 'bool',
-      `Whether to show terminal dimensions when the terminal changes size.`,
-  ),
-
-  'hide-mouse-while-typing': hterm.PreferenceManager.definePref_(
-      'Hide mouse cursor while typing',
-      hterm.PreferenceManager.Categories.Keyboard,
-      null, 'tristate',
-      `Whether to automatically hide the mouse cursor when typing. ` +
-      `By default, autodetect whether the platform/OS handles this.\n` +
-      `\n` +
-      `Note: Your operating system might override this setting and thus you ` +
-      `might not be able to always disable it.`,
-  ),
-
-  'screen-padding-size': hterm.PreferenceManager.definePref_(
-      'Screen padding size',
-      hterm.PreferenceManager.Categories.Appearance,
-      3, 'int',
-      `The padding size in pixels around the border of the terminal screen.\n` +
-      `\n` +
-      `This controls the size of the border around the terminal screen so ` +
-      `the user can add some visible padding to the edges of the screen.`,
-  ),
-
-  'screen-border-size': hterm.PreferenceManager.definePref_(
-      'Screen border size',
-      hterm.PreferenceManager.Categories.Appearance,
-      1, 'int',
-      `The border size in pixels around the terminal screen.\n` +
-      `\n` +
-      `This controls the size of the border around the terminal screen to ` +
-      `create a visible line at the edges of the screen.`,
-  ),
-
-  'screen-border-color': hterm.PreferenceManager.definePref_(
-      'Screen border color',
-      hterm.PreferenceManager.Categories.Appearance,
-      'rgb(0, 64, 64)', 'color',
-      `The color for the border around the terminal screen.\n` +
-      `\n` +
-      `This controls the color of the border around the terminal screen to ` +
-      `create a visible line at the edges of the screen.`,
-  ),
-
-  'scroll-wheel-may-send-arrow-keys': hterm.PreferenceManager.definePref_(
-      'Emulate arrow keys with scroll wheel',
-      hterm.PreferenceManager.Categories.Scrolling,
-      false, 'bool',
-      `When using the alternative screen buffer, and DECCKM (Application ` +
-      `Cursor Keys) is active, mouse scroll wheel events will emulate arrow ` +
-      `keys.\n` +
-      `\n` +
-      `It can be temporarily disabled by holding the Shift key.\n` +
-      `\n` +
-      `This frequently comes up when using pagers (less) or reading man ` +
-      `pages or text editors (vi/nano) or using screen/tmux.`,
-  ),
-
-  'scroll-wheel-move-multiplier': hterm.PreferenceManager.definePref_(
-      'Mouse scroll wheel multiplier',
-      hterm.PreferenceManager.Categories.Scrolling,
-      1, 'int',
-      `The multiplier for mouse scroll wheel events when measured in ` +
-      `pixels.\n` +
-      `\n` +
-      `Alters how fast the page scrolls.`,
-  ),
-
-  'terminal-encoding': hterm.PreferenceManager.definePref_(
-      'Terminal encoding',
-      hterm.PreferenceManager.Categories.Encoding,
-      'utf-8', ['iso-2022', 'utf-8', 'utf-8-locked'],
-      `The default terminal encoding (DOCS).\n` +
-      `\n` +
-      `ISO-2022 enables character map translations (like graphics maps).\n` +
-      `UTF-8 disables support for those.\n` +
-      `\n` +
-      `The locked variant means the encoding cannot be changed at runtime ` +
-      `via terminal escape sequences.\n` +
-      `\n` +
-      `You should stick with UTF-8 unless you notice broken rendering with ` +
-      `legacy applications.`,
-  ),
-
-  'allow-images-inline': hterm.PreferenceManager.definePref_(
-      'Allow inline image display',
-      hterm.PreferenceManager.Categories.Extensions,
-      null, 'tristate',
-      `Whether to allow the remote host to display images in the terminal.\n` +
-      `\n` +
-      `By default, we prompt until a choice is made.`,
-  ),
-};
-
-hterm.PreferenceManager.prototype =
-    Object.create(lib.PreferenceManager.prototype);
-/** @override */
-hterm.PreferenceManager.constructor = hterm.PreferenceManager;
-
-/**
- * Changes profile and notifies all listeners with updated values.
- *
- * @param {string} profileId New profile to use.
- * @param {function()=} callback Optional function to invoke when completed.
- */
-hterm.PreferenceManager.prototype.setProfile = function(profileId, callback) {
-  lib.PreferenceManager.prototype.setPrefix.call(
-      this, hterm.PreferenceManager.prefix_ + profileId, callback);
-};
 // SOURCE FILE: hterm/js/hterm_pubsub.js
 // Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -5304,27 +4121,6 @@ hterm.PubSub.prototype.subscribe = function(subject, callback) {
   }
 
   this.observers_[subject].push(callback);
-};
-
-/**
- * Unsubscribe from a subject.
- *
- * @param {string} subject The subject to unsubscribe from.
- * @param {function(...)} callback A callback previously registered via
- *     subscribe().
- */
-hterm.PubSub.prototype.unsubscribe = function(subject, callback) {
-  const list = this.observers_[subject];
-  if (!list) {
-    throw new Error(`Invalid subject: ${subject}`);
-  }
-
-  const i = list.indexOf(callback);
-  if (i < 0) {
-    throw new Error(`Not subscribed: ${subject}`);
-  }
-
-  list.splice(i, 1);
 };
 
 /**

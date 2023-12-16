@@ -562,23 +562,6 @@ function term_init()
 		window.open('/?termid=' + nid);
 	}
 
-	t.onTerminalReady = function()
-	{
-		var io = t.io.push();
-
-		io.sendString = function(s) { signal(sanit(s)); };
-		io.onTerminalResize = function(c, r) {
-			signal(dimensignal(c, r));
-		};
-
-		term_ready = true;
-		display('');
-
-		window.t = t;
-	};
-
-	t.decorate(document.querySelector('#terminal'));
-
 	dead_key_hist = ['?', 'x', '?', 'x'];
 	function push_dead_key_hist(e)
 	{
@@ -739,18 +722,6 @@ function term_init()
 		t.setRgbColorCssVar('foreground-color',
 				    `rgb(${f[6]}, ${f[6]}, ${f[6]})`);
 	};
-
-	wfns.forEach(function(fnt, ndx) {
-		var name = fnt[0], sz = fnt[1], dir = fndirs[fnt[7]], fce;
-
-		t.document_.fonts.add(
-			new FontFace(name, `url(${dir}/${name}.ttf)`));
-		t.document_.fonts.load(`${sz}px ${name}`).then(function()
-		{
-			if (ndx === 4) set_font(4);
-		});
-	});
-	t.setCssVar('dpi-fudge', 1);
 
 	var font_key;
 	function set_font_key(key)
@@ -1073,7 +1044,7 @@ function term_init()
 		return true;
 	}
 
-	t.scroll_port.getDocument().body.onkeydown = function(e)
+	function sporkeydown(e)
 	{
 		var ce;
 
@@ -1094,9 +1065,9 @@ function term_init()
 		}
 		e.stopPropagation();
 		e.preventDefault();
-	};
+	}
 
-	t.scroll_port.getDocument().body.onkeyup = function(e)
+	function sporkeyup(e)
 	{
 		var hist, dki;
 
@@ -1131,7 +1102,40 @@ function term_init()
 			if (-1 === hist.search(deadkey_map[dki][0])) continue;
 			signal(deadkey_map[dki][1]);
 		}
+	}
+
+	function loadfnt(n, sz, dir, ndx)
+	{
+		t.document_.fonts.add(new FontFace(n, `url(${dir}/${n}.ttf)`));
+		t.document_.fonts.load(`${sz}px ${n}`).then(function()
+		{
+			if (ndx == 4) set_font(4);
+		});
+	}
+
+	t.onTerminalReady = function()
+	{
+		var io = t.io.push();
+
+		io.sendString = function(s) { signal(sanit(s)); };
+		io.onTerminalResize = function(c, r) {
+			signal(dimensignal(c, r));
+		};
+
+		term_ready = true;
+		display('');
+
+		window.t = t;
+
+		t.scroll_port.getDocument().body.onkeydown = sporkeydown;
+		t.scroll_port.getDocument().body.onkeyup = sporkeyup;
+		t.setCssVar('dpi-fudge', 1);
+		wfns.forEach(function(fnt, ndx) {
+			loadfnt(fnt[0], fnt[1], fndirs[fnt[7]], ndx);
+		});
 	};
+
+	t.decorate(document.querySelector('#terminal'));
 }
 
 window.onload = function()

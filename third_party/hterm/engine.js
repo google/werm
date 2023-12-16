@@ -2725,12 +2725,6 @@ hterm.Terminal = function({profileId, storage} = {}) {
   // Set to true once terminal is initialized and onTerminalReady() is called.
   this.ready_ = false;
 
-  this.profileId_ = null;
-  this.storage_ = storage || new lib.Storage.Memory();
-
-  /** @type {?hterm.PreferenceManager} */
-  this.prefs_ = null;
-
   // Two screen instances.
   this.primaryScreen_ = new_screen();
   this.alternateScreen_ = new_screen();
@@ -2856,9 +2850,6 @@ hterm.Terminal = function({profileId, storage} = {}) {
 
   // TODO(crbug.com/1063219) Remove this once the bug is fixed.
   this.alwaysUseLegacyPasting = false;
-
-  this.setProfile(profileId || hterm.Terminal.DEFAULT_PROFILE_ID,
-                  function() { this.onTerminalReady(); }.bind(this));
 };
 
 /**
@@ -2949,187 +2940,127 @@ hterm.Terminal.prototype.tabWidth = 8;
  * @param {function()=} callback Optional callback to invoke when the
  *     profile transition is complete.
  */
-hterm.Terminal.prototype.setProfile = function(
-    profileId, callback = undefined) {
-  profileId = profileId.replace(/[/]/g, '');
-  if (this.profileId_ === profileId) {
-    if (callback) {
-      callback();
+hterm.Terminal.prototype.applyPrefs = function() {
+  var v;
+
+  v = hterm_pref['desktop-notification-bell'];
+  if (v && Notification) {
+    this.desktopNotificationBell_ = Notification.permission === 'granted';
+    if (!this.desktopNotificationBell_) {
+      // Note: We don't call Notification.requestPermission here because
+      // Chrome requires the call be the result of a user action (such as an
+      // onclick handler), and pref listeners are run asynchronously.
+      //
+      // A way of working around this would be to display a dialog in the
+      // terminal with a "click-to-request-permission" button.
+      console.warn('desktop-notification-bell is true but we do not have ' +
+                   'permission to display notifications.');
     }
-    return;
+  } else {
+    this.desktopNotificationBell_ = false;
   }
 
-  this.profileId_ = profileId;
+  this.setBackgroundColor(hterm_pref['background-color']);
 
-  if (this.prefs_) {
-    this.prefs_.setProfile(profileId, callback);
-    return;
+  this.scroll_port.setBackgroundSize(hterm_pref['background-size']);
+
+  v = hterm_pref['background-position'];
+  this.scroll_port.setBackgroundPosition(v);
+
+  v = hterm_pref['character-map-overrides'];
+  if (!(v == null || v instanceof Object)) {
+    console.warn('Preference character-map-modifications is not an ' +
+                 'object: ' + v);
+  } else {
+    this.vt.characterMaps.reset();
+    this.vt.characterMaps.setOverrides(v);
   }
 
-  this.prefs_ = new hterm.PreferenceManager(this.storage_, this.profileId_);
+  v = hterm_pref['color-palette-overrides'];
+  if (!(v == null || v instanceof Object || v instanceof Array)) {
+    console.warn('Preference color-palette-overrides is not an array or ' +
+                 'object: ' + v);
+  } else {
+    // Reset all existing colors first as the new palette override might not
+    // have the same mappings.  If the old one set colors the new one doesn't,
+    // those old mappings have to get cleared first.
+    lib.colors.stockPalette.forEach((c, i) => this.setColorPalette(i, c));
+    this.colorPaletteOverrides_.clear();
+  }
 
-  this.prefs_.addObservers(null, {
-    'desktop-notification-bell': (v) => {
-      if (v && Notification) {
-        this.desktopNotificationBell_ = Notification.permission === 'granted';
-        if (!this.desktopNotificationBell_) {
-          // Note: We don't call Notification.requestPermission here because
-          // Chrome requires the call be the result of a user action (such as an
-          // onclick handler), and pref listeners are run asynchronously.
-          //
-          // A way of working around this would be to display a dialog in the
-          // terminal with a "click-to-request-permission" button.
-          console.warn('desktop-notification-bell is true but we do not have ' +
-                       'permission to display notifications.');
-        }
-      } else {
-        this.desktopNotificationBell_ = false;
-      }
-    },
-
-    'background-color': (v) => {
-      this.setBackgroundColor(v);
-    },
-
-    'background-size': (v) => {
-      this.scroll_port.setBackgroundSize(v);
-    },
-
-    'background-position': (v) => {
-      this.scroll_port.setBackgroundPosition(v);
-    },
-
-    'character-map-overrides': (v) => {
-      if (!(v == null || v instanceof Object)) {
-        console.warn('Preference character-map-modifications is not an ' +
-                     'object: ' + v);
-        return;
+  if (v) {
+    for (const key in v) {
+      const i = parseInt(key, 10);
+      if (isNaN(i) || i < 0 || i > 255) {
+        console.log('Invalid value in palette: ' + key + ': ' + v[key]);
+        continue;
       }
 
-      this.vt.characterMaps.reset();
-      this.vt.characterMaps.setOverrides(v);
-    },
-
-    'color-palette-overrides': (v) => {
-      if (!(v == null || v instanceof Object || v instanceof Array)) {
-        console.warn('Preference color-palette-overrides is not an array or ' +
-                     'object: ' + v);
-        return;
-      }
-
-      // Reset all existing colors first as the new palette override might not
-      // have the same mappings.  If the old one set colors the new one doesn't,
-      // those old mappings have to get cleared first.
-      lib.colors.stockPalette.forEach((c, i) => this.setColorPalette(i, c));
-      this.colorPaletteOverrides_.clear();
-
-      if (v) {
-        for (const key in v) {
-          const i = parseInt(key, 10);
-          if (isNaN(i) || i < 0 || i > 255) {
-            console.log('Invalid value in palette: ' + key + ': ' + v[key]);
-            continue;
-          }
-
-          if (v[i]) {
-            const rgb = lib.colors.normalizeCSS(v[i]);
-            if (rgb) {
-              this.setColorPalette(i, rgb);
-              this.colorPaletteOverrides_.set(i, rgb);
-            }
-          }
+      if (v[i]) {
+        const rgb = lib.colors.normalizeCSS(v[i]);
+        if (rgb) {
+          this.setColorPalette(i, rgb);
+          this.colorPaletteOverrides_.set(i, rgb);
         }
       }
-
-      jsobj(scrTextAttr(this.primaryScreen_)).colorPaletteOverrides = [];
-      jsobj(scrTextAttr(this.alternateScreen_)).colorPaletteOverrides = [];
-    },
-
-    'copy-on-select': (v) => {
-      this.copyOnSelect = !!v;
-    },
-
-    'use-default-window-copy': (v) => {
-      this.useDefaultWindowCopy = !!v;
-    },
-
-    'clear-selection-after-copy': (v) => {
-      this.clearSelectionAfterCopy = !!v;
-    },
-
-    'east-asian-ambiguous-as-two-column': (v) => {
-      lib.wc.regardCjkAmbiguous = v;
-    },
-
-    'enable-8-bit-control': (v) => {
-      this.vt.enable8BitControl = !!v;
-    },
-
-    'enable-bold-as-bright': (v) => {
-      jsobj(scrTextAttr(this.primaryScreen_)).enableBoldAsBright = !!v;
-      jsobj(scrTextAttr(this.alternateScreen_)).enableBoldAsBright = !!v;
-    },
-
-    'foreground-color': (v) => {
-      this.setForegroundColor(v);
-    },
-
-    'hide-mouse-while-typing': (v) => {
-      this.setAutomaticMouseHiding(v);
-    },
-
-    'screen-padding-size': (v) => {
-      v = parseInt(v, 10);
-      if (isNaN(v) || v < 0) {
-        console.error(`Invalid screen padding size: ${v}`);
-        return;
-      }
-      this.setScreenPaddingSize(v);
-    },
-
-    'screen-border-size': (v) => {
-      v = parseInt(v, 10);
-      if (isNaN(v) || v < 0) {
-        console.error(`Invalid screen border size: ${v}`);
-        return;
-      }
-      this.setScreenBorderSize(v);
-    },
-
-    'screen-border-color': (v) => {
-      this.div_.style.borderColor = v;
-    },
-
-    'scroll-wheel-move-multiplier': (v) => {
-      this.setScrollWheelMoveMultipler(v);
-    },
-
-    'terminal-encoding': (v) => {
-      this.vt.setEncoding(v);
-    },
-
-    'allow-images-inline': (v) => {
-      this.allowImagesInline = v;
-    },
-  });
-
-  this.prefs_.readStorage(function() {
-    this.prefs_.notifyAll();
-
-    if (callback) {
-      this.ready_ = true;
-      callback();
     }
-  }.bind(this));
-};
+  }
 
-/**
- * Returns the preferences manager used for configuring this terminal.
- *
- * @return {!hterm.PreferenceManager}
- */
-hterm.Terminal.prototype.getPrefs = function() {
-  return lib.notNull(this.prefs_);
+  jsobj(scrTextAttr(this.primaryScreen_)).colorPaletteOverrides = [];
+  jsobj(scrTextAttr(this.alternateScreen_)).colorPaletteOverrides = [];
+
+  v = hterm_pref['copy-on-select'];
+  this.copyOnSelect = !!v;
+
+  v = hterm_pref['use-default-window-copy'];
+  this.useDefaultWindowCopy = !!v;
+
+  v = hterm_pref['clear-selection-after-copy'];
+  this.clearSelectionAfterCopy = !!v;
+
+  v = hterm_pref['east-asian-ambiguous-as-two-column'];
+  lib.wc.regardCjkAmbiguous = v;
+
+  v = hterm_pref['enable-8-bit-control'];
+  this.vt.enable8BitControl = !!v;
+
+  v = hterm_pref['enable-bold-as-bright'];
+  jsobj(scrTextAttr(this.primaryScreen_)).enableBoldAsBright = !!v;
+  jsobj(scrTextAttr(this.alternateScreen_)).enableBoldAsBright = !!v;
+
+  v = hterm_pref['foreground-color'];
+  this.setForegroundColor(v);
+
+  v = hterm_pref['hide-mouse-while-typing'];
+  this.setAutomaticMouseHiding(v);
+
+  v = hterm_pref['screen-padding-size'];
+  v = parseInt(v, 10);
+  if (isNaN(v) || v < 0) {
+    console.error(`Invalid screen padding size: ${v}`);
+    return;
+  }
+  this.setScreenPaddingSize(v);
+
+  v = hterm_pref['screen-border-size'];
+  v = parseInt(v, 10);
+  if (isNaN(v) || v < 0) {
+    console.error(`Invalid screen border size: ${v}`);
+    return;
+  }
+  this.setScreenBorderSize(v);
+
+  v = hterm_pref['screen-border-color'];
+  this.div_.style.borderColor = v;
+
+  v = hterm_pref['scroll-wheel-move-multiplier'];
+  this.setScrollWheelMoveMultipler(v);
+
+  v = hterm_pref['terminal-encoding'];
+  this.vt.setEncoding(v);
+
+  v = hterm_pref['allow-images-inline'];
+  this.allowImagesInline = v;
 };
 
 /**
@@ -3174,7 +3105,7 @@ hterm.Terminal.prototype.setSelectionEnabled = function(state) {
  */
 hterm.Terminal.prototype.setBackgroundColor = function(color) {
   if (color === undefined) {
-    color = this.prefs_.getString('background-color');
+    color = hterm_pref['background-color'];
   }
 
   this.backgroundColor_ = lib.colors.normalizeCSS(color);
@@ -3204,7 +3135,7 @@ hterm.Terminal.prototype.getBackgroundColor = function() {
  */
 hterm.Terminal.prototype.setForegroundColor = function(color) {
   if (color === undefined) {
-    color = this.prefs_.getString('foreground-color');
+    color = hterm_pref['foreground-color'];
   }
 
   this.foregroundColor_ = lib.colors.normalizeCSS(color);
@@ -3855,16 +3786,14 @@ hterm.Terminal.prototype.decorate = function(div) {
  * @private
  */
 hterm.Terminal.prototype.setupScrollPort_ = function() {
-  this.scroll_port.setBackgroundSize(this.prefs_.getString('background-size'));
-  this.scroll_port.setBackgroundPosition(
-      this.prefs_.getString('background-position'));
+  this.scroll_port.setBackgroundSize(hterm_pref['background-size']);
+  this.scroll_port.setBackgroundPosition(hterm_pref['background-position']);
   this.scroll_port.setAccessibilityReader(
       lib.notNull(this.accessibilityReader_));
 
   this.div_.focus = this.focus.bind(this);
 
-  this.setScrollWheelMoveMultipler(
-      this.prefs_.getNumber('scroll-wheel-move-multiplier'));
+  this.setScrollWheelMoveMultipler(hterm_pref['scroll-wheel-move-multiplier']);
 
   this.document_ = this.scroll_port.getDocument();
   this.accessibilityReader_.decorate(this.document_);
@@ -4050,6 +3979,10 @@ opacity: var(--hterm-curs-opac);
 
   this.scroll_port.focus();
   this.scroll_port.scheduleRedraw();
+
+  this.applyPrefs();
+  this.ready_ = true;
+  this.onTerminalReady();
 };
 
 /**
@@ -5437,7 +5370,7 @@ hterm.Terminal.prototype.paste = function() {
  * @param {string} str The string to copy.
  */
 hterm.Terminal.prototype.copyStringToClipboard = function(str) {
-  if (this.prefs_.get('enable-clipboard-notice')) {
+  if (hterm_pref['enable-clipboard-notice']) {
     if (!this.clipboardNotice_) {
       this.clipboardNotice_ = this.document_.createElement('div');
       this.clipboardNotice_.style.textAlign = 'center';
@@ -5507,58 +5440,6 @@ hterm.Terminal.prototype.displayImage = function(options, onLoad, onError) {
         options.type = 'image/svg+xml';
         break;
     }
-  }
-
-  // Has the user approved image display yet?
-  if (this.allowImagesInline !== true) {
-    if (this.allowImagesInline === false) {
-      this.showOverlay(hterm.msg('POPUP_INLINE_IMAGE_DISABLED', [],
-                       'Inline Images Disabled'));
-      return;
-    }
-
-    // Show a prompt.
-    let button;
-    const span = this.document_.createElement('span');
-
-    const label = this.document_.createElement('p');
-    label.innerText = hterm.msg('POPUP_INLINE_IMAGE', [], 'Inline Images');
-    label.style.textAlign = 'center';
-    span.appendChild(label);
-
-    button = this.document_.createElement('input');
-    button.type = 'button';
-    button.value = hterm.msg('BUTTON_BLOCK', [], 'block');
-    button.addEventListener('click', () => {
-      this.prefs_.set('allow-images-inline', false);
-      this.hideOverlay();
-    });
-    span.appendChild(button);
-
-    span.appendChild(new Text(' '));
-
-    button = this.document_.createElement('input');
-    button.type = 'button';
-    button.value = hterm.msg('BUTTON_ALLOW_SESSION', [], 'allow this session');
-    button.addEventListener('click', () => {
-      this.allowImagesInline = true;
-      this.hideOverlay();
-    });
-    span.appendChild(button);
-
-    span.appendChild(new Text(' '));
-
-    button = this.document_.createElement('input');
-    button.type = 'button';
-    button.value = hterm.msg('BUTTON_ALLOW_ALWAYS', [], 'always allow');
-    button.addEventListener('click', () => {
-      this.prefs_.set('allow-images-inline', true);
-      this.hideOverlay();
-    });
-    span.appendChild(button);
-
-    this.showOverlay(span, null);
-    return;
   }
 
   // See if we should show this object directly, or download it.
@@ -5774,7 +5655,7 @@ hterm.Terminal.prototype.copySelectionToClipboard = function() {
  * Show overlay with current terminal size.
  */
 hterm.Terminal.prototype.overlaySize = function() {
-  if (this.prefs_.get('enable-resize-status')) {
+  if (hterm_pref['enable-resize-status']) {
     this.showOverlay(`${this.screenSize.width} × ${this.screenSize.height}`);
   }
 };

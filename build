@@ -57,6 +57,7 @@ $!s/$/\\012/
 	 -Werror=missing-declarations \
 	 -Werror=unused-function \
 	 -Werror=pointer-sign \
+	 -Werror=implicit-function-declaration \
 	 $WERMCCFLAGS \
 	 -o session \
 	 session.c \

@@ -294,6 +294,17 @@ static int extractqueryarg(const char *pref, char **dest)
 
 int dtach_logging(void) { return !!dtachlog; }
 
+#define ILLEGALTERMIDCHARS "&?+% =/\\\"<>"
+
+static void checktid(void)
+{
+	char *tc;
+	for (tc = termid; *tc; tc++) {
+		if (strchr(ILLEGALTERMIDCHARS, *tc))
+			exit_msg("e", "termid query arg illegal char: ", *tc);
+	}
+}
+
 static void processquerystr(const char *fullqs)
 {
 	if (!fullqs) return;
@@ -571,16 +582,15 @@ static int proflines(
 				}
 				break;
 			}
-			switch (c) {
-			case '.': case '&': case '?': case '+': case '%':
-			case ' ': case '=': case '/': case '\\': case '"':
-			case '<': case '>':
+
+			if (strchr(ILLEGALTERMIDCHARS ".", c)) {
 				fprintf(stderr,
 					"illegal char '%c' in profile name", c);
 				err = 1;
 				namerr = 1;
 				cmpname = NULL;
 			}
+
 			if (cmpname && *cmpname++ != c) cmpname = NULL;
 			fdb_apnc(&nmbuf, c);
 
@@ -1673,6 +1683,12 @@ static void _Noreturn doshowenv(void)
 	exit(0);
 }
 
+static _Noreturn void unrecargs(void)
+{
+	fprintf(stderr, "unrecognized arguments\n");
+	exit(1);
+}
+
 int main(int argc, char **argv)
 {
 	errno = 0;
@@ -1699,6 +1715,7 @@ int main(int argc, char **argv)
 			}));
 			exit(0);
 		}
+		unrecargs();
 	}
 
 	processquerystr(getenv("WERMFLAGS"));
@@ -1734,17 +1751,15 @@ int main(int argc, char **argv)
 		exit(dtach_master());
 	}
 
-	if (argc) {
-		fprintf(stderr, "unrecognized arguments\n");
-		exit(1);
-	}
+	if (argc) unrecargs();
 
 	processquerystr(getenv("QUERY_STRING"));
 	unsetenv("QUERY_STRING");
 
-	if (termid && !strchr(termid, '.')) appendunqid();
-
-	/* TODO: validate termid against illegal characters */
+	if (termid) {
+		checktid();
+		if (!strchr(termid, '.')) appendunqid();
+	}
 
 	prepfordtach();
 	dtach_main();

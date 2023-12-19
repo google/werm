@@ -272,16 +272,31 @@ These and other functions are defined in `$WERMSRCDIR/util/logview`
    with editor and UI screens, unlike `laH M `. But everything else about its
    use is the same (Enter to copy text and close the tab).
 
- * Scrollbacks are saved to disk in `$WERMSRCDIR/var/YEAR/MONTH/DAY`, excluding
-   any content printed to the alternate screen. You can turn off the scrollback
-   feature and thereby prevent the logs from being written to disk by adding the
-   `sblvl=` argument to `$WERMFLAGS` (see [$WERMFLAGS](#wermflags-envvar)).
-   The default value of `sblvl` is `p` which means Plain scrollback logging is
-   enabled. Setting `sblvl` to `rp` (e.g. `export WERMFLAGS='sblvl=rp'`) would
-   also turn on Raw logging, which saves the subprocess unified stdout/stderr
-   streams (i.e. the raw bytes sent to the ptty) in files named `*.raw`.
+ * Scrollbacks are saved to disk in
+   <code>[$WERMVARDIR](#wermvardir)/YEAR/MONTH/DAY</code>, excluding any content
+   printed to the alternate screen. You can turn off the scrollback feature and
+   thereby prevent the logs from being written to disk by adding the `sblvl=`
+   argument to [$WERMFLAGS](#wermflags).  The default value of `sblvl` is `p`
+   which means `p`lain scrollback logging is enabled. Setting `sblvl` to `rp`
+   (e.g. `export WERMFLAGS='sblvl=rp'`) would also turn on Raw logging, which
+   saves the subprocess unified stdout/stderr streams (i.e. the raw bytes sent
+   to the ptty) in files named `*.raw`.
 
-## WERMFLAGS ENVVAR
+## Environment variables
+
+### WERMVARDIR
+
+The environment variable `$WERMVARDIR` is the absolute path in which some long-
+term records and runtime files are kept. It defaults to `$WERMSRCDIR/var`. Set
+it before executing `run`.
+
+### WERMSOCKSDIR
+
+The environment variable `$WERMSOCKSDIR` is the absolute path in which sockets
+for each session are stored. This does not affect the socket specified with
+`--uds`. It defaults to `$WERMVARDIR/socks`. Set it before executing `run`.
+
+### WERMFLAGS
 
 The environment variable `$WERMFLAGS` is a URL query string without the leading
 question mark, e.g. `foo=1&bar=2` or `baz=3`. If used, it must be set when
@@ -394,7 +409,7 @@ the regex `[a-z2-9]+` where the least significant digit is first, so typing
 terminals.
 
 To reset the unique ID back to a single digit, delete the file that begins with
-`$WERMSRCDIR/var/nextterid.` at any time.
+<code>[$WERMVARDIR](#wermvardir)/nextterid.</code> at any time.
 
 ## CAPSLOCK SIMULATION AND AUTO-OFF
 

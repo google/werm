@@ -10,6 +10,7 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <string.h>
 
 #include "shared.h"
 
@@ -40,15 +41,20 @@ int xasprintf(char **strp, const char *format, ...)
 const char *state_dir(void)
 {
 	static char *rd;
-	const char *wermdir;
+	const char *wermdir, *envd;
 
 	if (rd) return rd;
 
+	envd = getenv("WERMVARDIR");
+	if (envd) { rd = strdup(envd); goto prepare; }
+
 	wermdir = getenv("WERMSRCDIR");
 	if (!wermdir) errx(1, "$WERMSRCDIR is unset");
-
 	xasprintf(&rd, "%s/var", wermdir);
+
+prepare:
 	if (mkdir(rd, 0700) && errno != EEXIST) err(1, "cannot create %s", rd);
 
+	setenv("WERMVARDIR", rd, 1);
 	return rd;
 }

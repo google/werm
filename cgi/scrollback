@@ -84,7 +84,7 @@ document.onkeydown = function(ev)
 EOF
 
 # Use find rather than ls to avoid extra matches when $termid is empty.
-find "$WERMSRCDIR/var" \
+find "$WERMVARDIR" \
 	-mindepth 4 \
 	-name "$termid" \
 	-type f \

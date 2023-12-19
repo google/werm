@@ -5,7 +5,7 @@
 # https://developers.google.com/open-source/licenses/bsd
 
 termid=$1
-logfile=`find $WERMSRCDIR/var -path '*/hist' -prune -o -name $termid -print \
+logfile=`find "$WERMVARDIR" -path '*/hist' -prune -o -name $termid -print \
 | sort -r \
 | head -n 1`
 shift

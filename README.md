@@ -82,6 +82,12 @@ This is not an officially supported Google product.
 
 ### Instructions
 
+ * Verify the following packages are installed:
+
+   [Debian] libmd4c-dev libmd4c-html0-dev
+
+   [Arch] core/make extra/md4c
+
  * On your local or remote Linux machine, clone this repo to a convenient place
    and build. I recommend `~/.local/werm/src`:
 
@@ -143,6 +149,7 @@ This is not an officially supported Google product.
 
  * While any shell is open, type `laH T ` to start a new persistent shell
 
+<a name="macro-shortcuts"></a>
 ## How to read macro shortcuts
 
 To understand macros cited in this guide, you will need to know how
@@ -208,11 +215,12 @@ mnemonics and the long-form name used by the JS Event API.
    of macros. Note that on ChromeOS and e.g. Windows, meta pressed alone cannot
    be intercepted by Javascript, so meta is not used for macros.
 
+<a name=attach-page></a>
 ## ATTACH PAGE
 
 Open the attach page by going to `http://localhost:8090/attach`, or using the
 `rarsS T ` or `rarsA T ` macros from within a terminal (see [How to read macro
-shortcuts](#how-to-read-macro-shortcuts). The former shortcut uses a new tab
+shortcuts](#macro-shortcuts). The former shortcut uses a new tab
 (Separate) while the latter replaces the current tab.
 
 From the attach page you can create or reconnect to persistent sessions.
@@ -257,6 +265,7 @@ available:
 
 These and other functions are defined in `$WERMSRCDIR/util/logview`
 
+<a name=scrollback-features></a>
 ### Scrollback features
 
  * Open the scrollback in a new tab in an HTML `<textarea>` with macro `laH M `
@@ -284,6 +293,7 @@ These and other functions are defined in `$WERMSRCDIR/util/logview`
 
 ## Environment variables
 
+<a name=wermvardir></a>
 ### WERMVARDIR
 
 The environment variable `$WERMVARDIR` is the absolute path in which some long-
@@ -296,6 +306,7 @@ The environment variable `$WERMSOCKSDIR` is the absolute path in which sockets
 for each session are stored. This does not affect the socket specified with
 `--uds`. It defaults to `$WERMVARDIR/socks`. Set it before executing `run`.
 
+<a name=wermflags></a>
 ### WERMFLAGS
 
 The environment variable `$WERMFLAGS` is a URL query string without the leading
@@ -307,6 +318,7 @@ starting the server, and the following values are supported:
 | `dtachlog=` | set to anything to enable detailed logging for the dtach component to `/tmp/dtachlog.<pid>` files |
 | `sblvl=`    | see [SCROLLBACK FEATURES](#scrollback-features)            |
 
+<a name=profiles></a>
 ## PROFILES
 
 A profile is meant to label and setup a starting state for a shell session. It

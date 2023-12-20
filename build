@@ -47,38 +47,43 @@ $!s/$/\\012/
 	done
 )
 
-	cc -x c -std=c99 -I. \
-	 -D_POSIX_C_SOURCE=200809L \
-	 -D_XOPEN_SOURCE=600 \
-	 -D_GNU_SOURCE \
-	 -Werror=format \
-	 -Werror=return-type \
-	 -Werror=unused-variable \
-	 -Werror=missing-declarations \
-	 -Werror=unused-function \
-	 -Werror=pointer-sign \
-	 -Werror=implicit-function-declaration \
-	 $WERMCCFLAGS \
-	 -o session \
-	 session.c \
-	 inbound.c \
-	 outstreams.c \
-	 shared.c \
-	 uniqid.c \
-	 test/raw/*.c \
-	 third_party/dtach/*.c \
-	 tm.c \
-	 wts.c \
-	 -lutil ||
-		exit 1
+if ! cc -x c -std=c99 -I. \
+	-D_POSIX_C_SOURCE=200809L \
+	-D_XOPEN_SOURCE=600 \
+	-D_GNU_SOURCE \
+	-Werror=format \
+	-Werror=return-type \
+	-Werror=unused-variable \
+	-Werror=missing-declarations \
+	-Werror=unused-function \
+	-Werror=pointer-sign \
+	-Werror=implicit-function-declaration \
+	$WERMCCFLAGS \
+	-o session \
+	session.c \
+	inbound.c \
+	outstreams.c \
+	shared.c \
+	uniqid.c \
+	test/raw/*.c \
+	third_party/dtach/*.c \
+	tm.c \
+	wts.c \
+	-lutil \
+	-lmd4c-html
+then
+	echo 'Build failed - do you need to install dependencies?'	>&2
+	grep -A4 'following packages are installed' README.md		>&2
+	exit 1
+fi
 
 if ! ctags=`which ctags-exuberant`; then
 	echo '`sudo apt install exuberant-ctags` to make tags file' 2>&1
 else
-	find .	-path ./third_party/websocketd -prune -o	\
-		-path ./var -prune -o				\
-		-type f \( -name \*.h -o -name \*.c \)		\
-		-print >/tmp/tag_files.$$
+	find .	-path ./third_party/websocketd		-prune -o	\
+		-path ./var				-prune -o	\
+		-type f \( -name \*.h -o -name \*.c \)	-print		\
+	>/tmp/tag_files.$$
 
 	$ctags --format=1 `cat /tmp/tag_files.$$`
 fi
@@ -105,5 +110,5 @@ then
 	err=1
 fi
 
-test -n "$err" && exit 1
-make -C third_party/websocketd || exit 1
+test -z "$err" \
+&& make -C third_party/websocketd

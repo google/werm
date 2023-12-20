@@ -7,8 +7,10 @@
 #include "shared.h"
 #include "outstreams.h"
 #include "test/raw/data.h"
+#include <md4c-html.h>
 #include "wts.h"
 
+#include <sys/stat.h>
 #include <stdint.h>
 #include <limits.h>
 #include <time.h>
@@ -1689,6 +1691,49 @@ static _Noreturn void unrecargs(void)
 	exit(1);
 }
 
+static void m4hout(const MD_CHAR *buf, MD_SIZE sz, void *ud)
+{
+	full_write(ud, buf, sz);
+}
+
+static _Noreturn void servreadme(void)
+{
+	char *path, *mdsrc, *mdc, *mdend;
+	const char *fail = 0;
+	struct stat sb;
+	int fd;
+	ssize_t redn;
+	struct wrides d = {1};
+
+	xasprintf(&path, "%s/README.md", getenv("WERMSRCDIR"));
+	if (0 > stat(path, &sb)) { fail = "stat"; goto end; }
+
+	mdc = mdsrc = malloc(sb.st_size);
+	mdend = mdsrc + sb.st_size;
+
+	fd = open(path, O_RDONLY);
+	if (0 > fd) { fail = "open"; goto end; }
+
+	while (mdc != mdend) {
+		redn = read(fd, mdc, mdend - mdc);
+		if (0 > redn && errno == EINTR) continue;
+		if (0 > redn) { fail = "read"; goto end; }
+
+		mdc += redn;
+	}
+
+	full_write(&d, "<html><head><title>README.md</title></head><body>", -1);
+	md_html(mdsrc, sb.st_size, m4hout, &d, MD_FLAG_TABLES, 0);
+	full_write(&d, "</body></html>", -1);
+
+end:
+	if (fail) {
+		perror("processing README.md");
+		fprintf(stderr, "(%s)\n", fail);
+	}
+	exit(!!fail);
+}
+
 int main(int argc, char **argv)
 {
 	errno = 0;
@@ -1707,6 +1752,7 @@ int main(int argc, char **argv)
 		if (!strcmp("test",	*argv)) testmain();
 		if (!strcmp("/showenv",	*argv)) doshowenv();
 		if (!strcmp("/atchses",	*argv)) atchsesnlist();
+		if (!strcmp("/readme",	*argv)) servreadme();
 		if (!strcmp("/newsess",	*argv)) {
 			iterprofs(profpath(), &((struct iterprofspec){
 				.sigde = &((struct wrides){ 1 }),

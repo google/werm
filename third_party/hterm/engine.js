@@ -1544,7 +1544,7 @@ hterm.ScrollPort.prototype.paintIframeContents_ = function() {
       display: block;
       font-variant-ligatures: none;
       height: 100%;
-      overflow-y: scroll; overflow-x: hidden;
+      overflow-y: hidden; overflow-x: hidden;
       white-space: pre;
       width: 100%;
       outline: none !important;

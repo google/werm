@@ -1,0 +1,20 @@
+a {
+	color: #88f;
+}
+code {
+	color: #eee;
+}
+td {
+	padding-left: 6pt;
+	padding-right: 6pt;
+}
+th {
+	padding-left: 6pt;
+	padding-right: 6pt;
+	text-align: left;
+	border-bottom: 1px solid #ff8;
+}
+table {
+	border-spacing: 4pt;
+	border: 2px solid yellow;
+}

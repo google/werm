@@ -9,8 +9,14 @@
 <meta charset='utf-8'/>
 <html>
 <head>
-	<title>attach</title>
+<title>attach</title>
+
+<link rel=stylesheet href=common.css>
 <style>
+table.top-table {
+	border: 2px solid yellow;
+	border-collapse: collapse;
+}
 td.loose {
 	padding-right:20pt;
 }
@@ -64,8 +70,8 @@ a.ttl-link {
 }
 </style>
 </head>
-<body style="font-family: monospace; font-size: 14px;  background-color: black; color: #8f8;">
-<table style="border: 2px solid yellow; border-collapse: collapse">
+<body>
+<table class=top-table>
 
 <tr>
 <td nowrap class=column style="vertical-align:top">

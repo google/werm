@@ -1722,7 +1722,10 @@ static _Noreturn void servreadme(void)
 		mdc += redn;
 	}
 
-	full_write(&d, "<html><head><title>README.md</title></head><body>", -1);
+	full_write(&d, "<html><head><title>README.md</title>", -1);
+	full_write(&d, "<link rel=stylesheet href=common.css>", -1);
+	full_write(&d, "<link rel=stylesheet href=readme.css>", -1);
+	full_write(&d, "</head><body>", -1);
 	md_html(mdsrc, sb.st_size, m4hout, &d, MD_FLAG_TABLES, 0);
 	full_write(&d, "</body></html>", -1);
 

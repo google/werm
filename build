@@ -7,6 +7,14 @@
 
 cd `dirname $0`
 
+# Don't leak current Werm config into tests and builds
+unset WERMPROFPATH
+unset WERMSOCKSDIR
+unset WERMVARDIR
+unset WERMSRCDIR
+unset WERMJSPATH
+unset WERMFLAGS
+
 (
 	cd test/raw || exit 1
 

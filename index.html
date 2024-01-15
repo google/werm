@@ -258,7 +258,8 @@ function cookev(e)
 }
 
 var log_matching = 0, log_send = 0, log_display = 0, log_keys = 0, test = {},
-	log_mn, log_print, log_macks, log_packin, capsonwhile, display;
+	log_mn, log_print, log_macks, log_packin, capsonwhile, display,
+	show_barrier, set_font;
 
 function term_init()
 {
@@ -703,7 +704,7 @@ function term_init()
 		'/third_party/shinonome',
 	];
 
-	function set_font(ndx)
+	set_font = function(ndx)
 	{
 		var f = wfns[ndx];
 
@@ -840,14 +841,13 @@ function term_init()
 		barrier_dig[this] = code[1];
 		return /#[0-9]/.test(code) ? 'm' : 0;
 	}
-	function show_barrier()
+	show_barrier = function(col)
 	{
-		var col, s;
+		var s;
 
 		if (barrier_div) t.scroll_port.x_screen.removeChild(barrier_div);
 		barrier_div = null;
 
-		col = Number(barrier_dig.join(''));
 		if (!col) return;
 
 		barrier_div = t.document_.createElement('div');
@@ -863,7 +863,7 @@ function term_init()
 		s.top = '0';
 		s.height = '100%';
 		t.scroll_port.x_screen.appendChild(barrier_div);
-	}
+	};
 
 	function match_key(exp, mn)
 	{
@@ -930,7 +930,6 @@ function term_init()
 		['ralsE ', '\x1bA'],
 		['raA ', '->'],
 		['raT ', '\x14'],
-		['ralsT ', '\x1b\x14'],
 		['raD U M P ', signal.bind(0, '\\d')],
 		['raS T ', set_locked_title.bind(0, 'c')],
 		['raS B T ', set_locked_title.bind(0, 'b')],
@@ -947,7 +946,10 @@ function term_init()
 		[['la',
 		 set_barrier_dig.bind(0),
 		 set_barrier_dig.bind(1),
-		 set_barrier_dig.bind(2)], show_barrier],
+		 set_barrier_dig.bind(2)], function()
+		{
+			show_barrier(Number(barrier_dig.join('')));
+		}],
 	];
 
 	macro_map.push(['laH N ', function()

@@ -194,8 +194,6 @@ mnemonics and the long-form name used by the JS Event API.
    lost. Terminate such a shell with Ctrl+D or the `exit` command before closing
    the tab.
 
- * Press Shift+Backspace to send Ctrl+W (delete word) to the shell.
-
  * To add or remove macros, add it to the `macro_map` in `index.html` or a
    profile's JS code (see [PROFILES](#profiles)).
 
@@ -205,15 +203,26 @@ mnemonics and the long-form name used by the JS Event API.
    for return. Do not use shortcut mnemonics like `es` (escape) here, just the
    raw string.
 
- * Fonts are changed with `raF N **` where `**` is `A ` to `J ` in roughly
-   increasing size. E.g. press right-alt, F, N, A in sequence to choose the
-   smallest font. Ctrl-= and Ctrl-minus also work to change zoom, though this
-   will cause blur if it is not 200% or 300% zoom.
+ * <a name=fontmacro></a>Fonts are changed with `raF N **` where `**` is `A `
+   to `J ` in roughly increasing size. E.g. press right-alt, F, N, A in sequence
+   to choose the smallest font. Ctrl-= and Ctrl-minus also work to change zoom,
+   though this will cause blur if it is not 200% or 300% zoom.
 
  * Meta (i.e. super, apple on MacOS, search on ChromeOS) key is used in place of
    Alt for the terminal process. This is to allow Alt to be used for the start
    of macros. Note that on ChromeOS and e.g. Windows, meta pressed alone cannot
    be intercepted by Javascript, so meta is not used for macros.
+
+### Unconventional key mappings
+
+Some common terminal key sequences are bound to browser operations, so alternate
+mappings are used to send the sequence to the terminal:
+
+ * Shift+Backspace to send Ctrl+W<br>*Ctrl+W closes the browser tab*
+
+ * `raT ` macro to send Ctrl+T<br>*Ctrl+T creates a new browser tab*
+
+ * Shift+Enter to send Ctrl+N<br>*Ctrl+N creates a new browser window*
 
 <a name=attach-page></a>
 ## ATTACH PAGE
@@ -407,7 +416,27 @@ $ cat bar.js
 window.extended_macros.bar_macros = [
 	...
 ];
+show_barrier(80); /* Show marker after the 80th column, at page load. */
 ```
+
+### Setting the font
+
+You can set the font either at page load or with a macro with:
+
+```
+/* Use the tiniest font by default. */
+set_font(0);
+window.extended_macros.font_macros = [
+	/* Use a narrow font with a macro. */
+	['laN A R R O W ', function() { set_font(3); }],
+];
+```
+
+Where the argument is the zero-based index corresponding to the last letter used
+to activate it with the [default macro](#fontmacro). So to set the font
+corresponding to the `raF N B ` macro, `B` is the identifying letter, so you
+would use `set_font('B'.charCodeAt(0) - 65)` or more simply `set_font(1)`.
+
 
 ## TERMINAL ID
 

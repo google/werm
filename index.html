@@ -529,6 +529,12 @@ function term_init()
 					    [e.data]);
 			display(e.data);
 		};
+
+		sock.onclose = function(e)
+		{
+			var mtxt = '[lost connection to server]';
+			display(mtxt + mtxt.replaceAll(/./g, '\\08') + '\n');
+		};
 	}
 
 	prepare_sock();

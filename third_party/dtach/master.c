@@ -18,6 +18,11 @@
 
 /* WERM-SPECIFIC MODIFICATIONS
 
+ JAN 2024
+
+ - see if the child exited explicitly rather than rely on EIO being returned
+   from select, so the master proc can terminate for all child types.
+
  DEC 2023
 
  - delete unused killpty function
@@ -71,6 +76,7 @@
 
 #include "third_party/dtach/dtach.h"
 #include "outstreams.h"
+#include <sys/wait.h>
 
 /* The pty struct - The pty information is stored here. */
 struct pty
@@ -470,6 +476,12 @@ masterprocess(int s)
 		/* Wait for something to happen. */
 		if (select(highest_fd + 1, &readfds, NULL, NULL, NULL) < 0)
 		{
+			/* This seems to be needed in order for the master proc
+			   to terminate after the spawner is terminated. errno
+			   is EINTR in that case.
+
+			   For other child processes, EIO seems to be given. */
+			if (0 <= waitpid(the_pty.pid, 0, WNOHANG)) exit(0);
 			if (errno == EINTR || errno == EAGAIN)
 				continue;
 			exit(1);

@@ -254,6 +254,19 @@ current line of text. If the alternative screen is open (such as with `less` or
 an editor) then the last line of text printed before entering the alternate
 screen is shown (for instance, `$ vim foo.txt`).
 
+## TERMINATE WERM
+
+You can stop the server by opening the session titled `~spawner.<...>` from
+/attach, and then pressing Ctrl+C to terminate it. Alternatively, you can use
+this command if you already have a terminal open:
+
+```
+$ pgrep -f Werm.prs..spawner | xargs kill
+```
+
+Terminals that are already open will continue to work, and these steps will not
+terminate any attached or detached terminal sessions.
+
 ## SCROLLBACK
 
 To access the scrollback buffer in a non-ephemeral shell, press `laH L `.

@@ -354,7 +354,7 @@ function term_init()
 	display = function(s)
 	{
 		var next_esc, pend_i, c, pend_remain, nli, escpylo, coldex,
-			esclen;
+			esclen, toesc;
 
 		function pend(di) { return pend_display[pend_i + di]; }
 		function is_utf_trail(di) {
@@ -385,10 +385,16 @@ function term_init()
 		while (true) {
 			next_esc = s.indexOf('\\');
 			if (next_esc === -1) next_esc = s.length;
+			/* |toesc| check below is to not allow empty strings
+			   onto pend_display, as we would otherwise be unable to
+			   interpret utf-8 multibyte chars later on, as these
+			   must be contiguous byte values in the array. We don't
+			   want dtach and related stuff to become utf-8 aware so
+			   we handle that awkardness here. */
 			if (next_esc > 0) {
-				pend_display.push(
-					s.substr(0, next_esc)
-						.replaceAll('\n', ''));
+				toesc = s.substr(0, next_esc)
+					.replaceAll('\n', '');
+				if (toesc) pend_display.push(toesc);
 				s = s.substr(next_esc);
 			}
 

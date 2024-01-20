@@ -356,6 +356,23 @@ client_activity(Dtachctx dc, struct client *p)
 	process_kbd(p->fd, dc, &p->cls, buf, len);
 }
 
+static void handleselecterr(pid_t pty)
+{
+	int ern = errno;
+
+	/* This seems to be needed in order for the master proc to terminate
+	   after the spawner is terminated. errno is EINTR in that case.
+
+	   For other child processes, such as /bin/bash, EIO seems to be
+	   given. */
+	if (0 <= waitpid(pty, 0, WNOHANG)) exit(0);
+
+	if (ern == EINTR || ern == EAGAIN) return;
+
+	fprintf(stderr, "FATAL: select gave errno %d\n", ern);
+	exit(1);
+}
+
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
 static _Noreturn void
@@ -440,17 +457,9 @@ masterprocess(Dtachctx dc, int s)
 		}
 
 		/* Wait for something to happen. */
-		if (select(highest_fd + 1, &readfds, NULL, NULL, NULL) < 0)
-		{
-			/* This seems to be needed in order for the master proc
-			   to terminate after the spawner is terminated. errno
-			   is EINTR in that case.
-
-			   For other child processes, EIO seems to be given. */
-			if (0 <= waitpid(dc->the_pty.pid, 0, WNOHANG)) exit(0);
-			if (errno == EINTR || errno == EAGAIN)
-				continue;
-			exit(1);
+		if (select(highest_fd + 1, &readfds, NULL, NULL, NULL) < 0) {
+			handleselecterr(dc->the_pty.pid);
+			continue;
 		}
 
 		/* New client? */

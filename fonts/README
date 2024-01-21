@@ -1,0 +1,5 @@
+convert_ttf converts the ttf fonts in third-party to human-readable bitmaps. It
+only needs to be used when introducing a new font.
+
+Afterward running convert_ttf, the font can be edited by hand to tweak glyphs or
+add new ones.

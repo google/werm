@@ -1,0 +1,9 @@
+#!/bin/sh
+
+cd `dirname $0`
+
+cc	-g3					\
+	convert_ttf.c				\
+	../third_party/libschrift/schrift.c	\
+	-lm					\
+	-o convert_ttf

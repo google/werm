@@ -1,0 +1,211 @@
+.Dd January 30, 2021
+.Dt SCHRIFT 3
+.Os
+.Sh NAME
+.Nm schrift ,
+.Nm libschrift
+.Nd Lightweight TrueType font rendering library
+.Sh SYNOPSIS
+.Lb libschrift
+.In schrift.h
+.Ft const char *
+.Fn sft_version "void"
+.Ft SFT_Font *
+.Fn sft_loadmem "const void *mem" "unsigned long size"
+.Ft SFT_Font *
+.Fn sft_loadfile "const char *filename"
+.Ft void
+.Fn sft_freefont "SFT_Font *font"
+.Ft int
+.Fn sft_lmetrics "const SFT *sft" "SFT_LMetrics *metrics"
+.Ft int
+.Fn sft_lookup "const SFT *sft" "SFT_UChar codepoint" "SFT_Glyph *glyph"
+.Ft int
+.Fn sft_gmetrics "const SFT *sft" "SFT_Glyph glyph" "SFT_GMetrics *metrics"
+.Ft int
+.Fn sft_kerning "const SFT *sft" "SFT_Glyph leftGlyph" "SFT_Glyph rightGlyph" "SFT_Kerning *kerning"
+.Ft int
+.Fn sft_render "const SFT *sft" "SFT_Glyph glyph" "SFT_Image image"
+.Sh DESCRIPTION
+The function
+.Fn sft_version
+may be called to determine the version of
+.Nm .
+Since
+.Nm
+uses semantic versioning, the returned string is of the form \(dqMAJOR.MINOR.PATCH\(dq.
+.Ss Loading fonts
+.Fn sft_loadfile
+will load a font from a given filename (by mapping it into memory),
+whereas
+.Fn sft_loadmem
+can be given an arbitrary memory address and size (in bytes).
+This allows loading fonts from ZIP file streams etc.
+.sp
+Once a particular font is no longer needed, its memory should be freed again by calling
+.Fn sft_freefont .
+If the font has been loaded with
+.Fn sft_loadmem ,
+the underlying memory region will have to be freed separately.
+.Ss the SFT structure
+Most functions take a
+.Vt SFT
+as their primary argument.
+This is a structure to be filled out by the caller.
+It bundles multiple commonly needed parameters.
+The fields are as follows:
+.Bl -tag -width 8
+.It Va font
+The font to render with
+.It Va xScale
+The width of one em-square in pixels
+.It Va yScale
+The height of one em-square in pixels
+.It Va xOffset
+The horizontal offset to be applied before rendering to an image
+(Useful for subpixel-accurate positioning)
+.It Va yOffset
+The vertical offset to be applied before rendering to an image
+(Useful for subpixel-accurate positioning)
+.It Va flags
+A bitfield of binary flags
+.El
+.sp
+If the
+.Dv SFT_DOWNWARD_Y
+flag is set, the Y axis is interpreted to point downwards.
+Per default, it points upwards.
+.Ss Glyph ids
+.Nm
+operates in terms of glyph ids (of type
+.Vt SFT_Glyph ) ,
+which are font-specific identifiers assigned to renderable symbols (glyphs).
+The way to obtain a glyph id is to call
+.Fn sft_lookup .
+This function takes a Unicode codepoint in
+.Va codepoint
+and writes its corresponding glyph id into the variable pointed to by
+.Va glyph .
+.Ss Querying metrics
+.Fn sft_lmetrics
+calculates the typographic metrics neccessary for laying out multiple lines of text.
+.sp
+This function writes its output into the structure pointed to by
+.Va metrics .
+The fields are as follows:
+.Bl -tag -width 8
+.It Va ascender
+The distance from the baseline to the visual top of the text
+.It Va descender
+The distance from the baseline to the visual bottom of the text
+.It Va lineGap
+The default amount of horizontal padding between consecutive lines
+.El
+.sp
+When displaying multiple glyphs in a line, you have to keep track of the pen position.
+.Fn sft_gmetrics
+tells you where to draw the next glyph with respect to the pen position,
+and how to update it after rendering the glyph.
+.sp
+This function writes its output into the structure pointed to by
+.Va metrics .
+The fields are as follows:
+.Bl -tag -width 8
+.It Va advanceWidth
+How much the pen position should advance to the right after rendering the glyph
+.It Va leftSideBearing
+The offset that should be applied along the X axis from the pen position to the edge of the glyph image
+.It Va yOffset
+An offset along the Y axis relative to the pen position that should be applied when
+displaying the glyph
+.It Va minWidth
+The minimum width that an image needs such that the glyph can be properly rendered into it
+.It Va minHeight
+The minimum height that an image needs such that the glyph can be properly rendered into it
+.El
+.sp
+Some sequences of glyphs may look awkward if they're layed out naively.
+For example, the gap between the two characters \(dqVA\(dq might look disproportionally large.
+Kerning is a way to combat this artifact, by slightly moving the second character closer or further
+away by a small amount.
+.Fn sft_kerning
+may be used to retrieve kerning information for a given pair of glyph ids.
+.sp
+This function writes its output into the structure pointed to by
+.Va kerning .
+The fields are as follows:
+.Bl -tag -width 8
+.It Va xShift
+An amount that should be added to the pen's X position in-between the two glyphs
+.It Va yShift
+An amount that should be added to the pen's Y position in-between the two glyphs
+.El
+.Ss Rendering glyphs
+To actually render a glyph into a easily-displayable raster image, use
+.Fn sft_render .
+.sp
+Other than most functions,
+.Fn sft_render
+takes a structure in
+.Va image
+that is to be filled out by the caller.
+The fields are as follows:
+.Bl -tag -width 8
+.It Va pixels
+A pointer to an array of bytes, width * height in size
+.It Va width
+The number of pixels in a row of the image
+.It Va height
+The number of pixels in a column of the image
+.El
+.sp
+The image will be rendered into the memory provided in
+.Va pixels .
+Each byte corresponds to one pixel,
+with rows of the image being directly adjacent in memory without padding between them.
+Glyphs are rendered \(dqwhite on black\(dq,
+meaning the background has a pixel value of 0,
+and the foreground goes up to a value of 255.
+Pixel values follow a linear color ramp, unlike conventional computer screens.
+That is to say, they are
+.Em not gamma-corrected .
+These properties make it very easy to use images rendered with
+.Fn sft_render
+as alpha masks.
+.Sh RETURN VALUES
+.Fn sft_loadmem
+and
+.Fn sft_loadfile
+return
+.Dv NULL
+on error.
+.sp
+.Fn sft_lmetrics ,
+.Fn sft_lookup ,
+.Fn sft_hmetrics ,
+.Fn sft_kerning ,
+.Fn sft_extents ,
+and
+.Fn sft_render
+all return 0 on success and -1 on error.
+.Sh EXAMPLES
+See the source code of the
+.Sy demo
+for a detailed example of real-world usage of
+.Nm .
+.Sh AUTHORS
+.An Thomas Oltmann Aq Mt thomas.oltmann.hhg@gmail.com
+.Sh CAVEATS
+The only text encoding that
+.Nm
+understands is Unicode.
+.sp
+Similarly, the only kind of font file supported right now
+are TrueType (.ttf) fonts (Some OpenType fonts might work too,
+as OpenType is effectively a superset of TrueType).
+.sp
+As of v0.10.2, there is no support for right-to-left scripts
+.Em yet .
+.sp
+.Nm
+currently does not implement font hinting and probably never will.

@@ -1,0 +1,9 @@
+Name: libschrift
+URL: https://github.com/tomolt/libschrift
+License: https://opensource.org/license/isc-license-txt/
+
+Notes:
+Imported from commit 24737d2922b23df4a5692014f5ba03da0c296112, dated March 2023
+Removed compatibility shim and unneeded #define which caused compilation errors
+or warnings.
+Removed unneeded demo files and Github-related files.

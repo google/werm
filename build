@@ -15,6 +15,227 @@ unset WERMSRCDIR
 unset WERMJSPATH
 unset WERMFLAGS
 
+perl <<'EOF'
+my $fontcnt = 0;
+my $fntc;
+
+my @wfns = (
+	'26:230:128:8:0:third_party/oldschool-pc-fonts/ibm_ega_8x8.wermfont',
+	'26:230:128:12:0:third_party/oldschool-pc-fonts/hp_100lx_10x11.wermfont',
+	'16:250:512:14:1:third_party/shinonome/jfdot_7x14.wermfont',
+	'26:230:128:16:0:third_party/oldschool-pc-fonts/ibm_vga_8x16.wermfont',
+	'26:230:128:16:0:third_party/oldschool-pc-fonts/ibm_vga_9x16.wermfont',
+	'26:230:128:20:0:third_party/oldschool-pc-fonts/dos_v_ibm_8x19.wermfont',
+	'26:230:128:20:0:third_party/oldschool-pc-fonts/cl_stringray_8x19.wermfont',
+	'26:245:128:20:0:third_party/oldschool-pc-fonts/ibm_xga_ai_12x20.wermfont',
+	'26:230:128:24:0:third_party/oldschool-pc-fonts/ibm_xga_ai_12x23.wermfont',
+	'26:230:128:32:0:third_party/oldschool-pc-fonts/dos_v_re_12x30.wermfont',
+);
+
+sub procfnt {
+	my ($bgbrig, $fgbrig, $td, $h, $upw, $srfi) = split ':', $_[0];
+	my ($w) = $srfi =~ /_([0-9]+)x[0-9]+[.]wermfont$/;
+	my $gcnt = 0;
+	my @px;
+	my $mbit = 1;
+	my $xof = 0;
+	my $yof = 0;
+
+	for (1..($td * $td)) { push @px, 0; }
+
+	# font header, with fields:
+	#	narrow glyph width		1 byte
+	#	glyph height			1 byte
+	#	glyph count			2 bytes
+	#	texture width and height	2 bytes, one number
+	#	background brightness		1 byte
+	#	foreground brightness		1 byte
+	# glyph list, each glyph with fields:
+	#	codepoint and width		3 bytes
+	#		BIT	MEANING
+	#		23	is_wide
+	#		0-22	code point
+	# font image, each pixel 1 byte
+	#
+	# Glyphs are arranged predictably in the texture image, so specifying
+	# the exact position of each is not necessary.
+
+	open(my $fontsrc, '<', $srfi) or die "open: $!";
+
+	my $bits;
+	my $isbitline;
+	my $nextline = sub {
+		$bits = <$fontsrc>;
+		chomp $bits;
+		$isbitline = ($bits =~ /^[o.]+$/);
+	};
+
+	# glyph list data, the glyph metadata, as a list of integral byte values
+	my @glisd;
+
+	$nextline->();
+	while ($bits) {
+		$mbit <= 0x80	or die "insufficient space for the glyphs";
+		!$isbitline	or die "unexpected bitline";
+
+		my ($cop, $pixwd) = $bits =~ /^([a-f0-9]+) ([0-9]+)$/;
+		my $wide = ($pixwd == $w * 2) ? 0x80 : 0x00;
+
+		$pixwd == $w	or
+		$wide		or
+		die "invalid glyph width: $pixwd, line $ginf";
+
+		if ($pixwd + $xof > $td) {
+			$yof += $h;
+			$xof = 0;
+			if ($yof + $h > $td) {
+				$yof = 0;
+				$mbit <<= 1;
+			}
+		}
+		$gcnt++;
+
+		my $tdatof = $yof * $td + $xof;
+		$unlin = 0;
+		for (my $y = 0; ; $y++, $tdatof += $td) {
+			$nextline->();
+			$isbitline or last;
+			$y < $h or die "glyph too tall for this font";
+			for my $x (0..length($bits)-1) {
+				if ('o' eq substr($bits, $x, 1) eq 'o') {
+					$px[$tdatof + $x] |= $mbit;
+				}
+			}
+		}
+
+		$cop = hex $cop;
+		push @glisd, $cop>>16 | $wide;
+		push @glisd, $cop>>8;
+		push @glisd, $cop;
+
+		$xof += $pixwd;
+	}
+
+	my $bytesthisline=0;
+
+	my $bcount = 0;
+	my $writebyte = sub {
+		my $b = $_[0] & 0xff;
+		printf $fntc q[\%03o], $b;
+		$bcount++;
+		++$bytesthisline < 19 and return;
+
+		$bytesthisline = 0;
+		print $fntc qq["\n"];
+	};
+
+	print $fntc qq(static char fndat${fontcnt}[] =\n");
+
+	$writebyte->($w			);
+	$writebyte->($h			);
+	$writebyte->($gcnt	>> 8	);
+	$writebyte->($gcnt		);
+	$writebyte->($td	>> 8	);
+	$writebyte->($td		);
+	$writebyte->($bgbrig		);
+	$writebyte->($fgbrig		);
+	for my $b (@glisd, @px) {
+		$writebyte->($b);
+	}
+
+	print $fntc qq[";\n];
+
+	printf STDERR "glyph # in $srfi: $gcnt, final mask: 0x%x, size: %u\n",
+		$mbit, $bcount;
+	$fontcnt++;
+
+	return unless $upw;
+
+	my @wls = (	"0#define WERMFONT_CNT " . scalar(@wfns),
+			"0fn1(charwi, u)",
+			"0{",
+			"1u &= 0x7fffffff;",
+			"1if (u <= 0x7f) return 1;",
+			"1switch (u) {",
+			"1default: return 2;",
+	);
+
+	open(my $fs, '<', $srfi) or die "cannot open $srfi: $!";
+	while (my $fln = <$fs>) {
+		chomp $fln;
+		next if $fln !~ /^([^ ]*) ([^ ]*)$/;
+		my $cop = hex($1);
+		my $wid = $w==$2 ? 1 : 2;
+
+		next if $cop <= 0x7f or $wid == 2;
+
+		push @wls, sprintf("1case 0x%05x: return 1;", $cop);
+	}
+	$fs = 0;
+
+	push @wls,	"1}\n",
+			"0}\n";
+
+	open(my $whn, '>', 'charwi') or die "open charwi: $!";
+	for my $lin (@wls) {
+		chomp $lin;
+		my ($in, $st) = $lin =~ /^(.)(.*)$/;
+		print($whn ("\t" x $in) . $st . "\n");
+	}
+	$whn = 0;
+}
+
+sub mtime {
+	my ($f) = @_;
+
+	-e $f or return -1;
+
+	my @s = stat $f;
+	return $s[9];
+}
+
+my $fntime = 0x7fffffff;
+for $f (qw[charwi font.c]) {
+	my $mt = mtime $f;
+	$mt < $fntime and $fntime = $mt;
+}
+my $wftime = -1;
+for $w (@wfns) {
+	my @fs = split(':', $w);
+	my $f = $fs[5];
+	my $mt = mtime $f;
+	$mt > $wftime and $wftime = $mt;
+}
+
+if ($wftime > $fntime) {
+	print STDERR "generating font.c\n";
+	open($fntc, '>', 'font.c') or die "open font.c: $!";
+
+	print $fntc qq[#include "font.h"\n];
+	print $fntc qq[#include "http.h"\n];
+	print $fntc qq[#include <stdlib.h>\n];
+
+	for $f (@wfns) { procfnt $f }
+
+	print		$fntc qq[int fontcnt(void) { return $fontcnt; }\n];
+
+	print 		$fntc qq[void servefnt(struct wrides *de, int fi)\n];
+	print		$fntc qq[{\n];
+	print		$fntc qq[\tswitch (fi) {\n];
+	for my $fi (0..$fontcnt-1) {
+		print	$fntc qq[\tcase $fi:\n];
+		print	$fntc qq[\t\tresp_dynamc(];
+		print	$fntc qq[de, 'f', 200, fndat$fi, sizeof(fndat$fi)-1);\n];
+		print	$fntc qq[\t\treturn;\n];
+	}
+	print		$fntc qq[\t}\n];
+	print		$fntc qq[\tfprintf(stderr, "invalid font index: %d\\n", fi);\n];
+	print		$fntc qq[\tabort();\n];
+	print		$fntc qq[}\n];
+}
+
+EOF
+
 (
 	cd test/raw || exit 1
 
@@ -26,12 +247,12 @@ unset WERMFLAGS
 	do
 		fnb=`basename $fn`
 
-		printf 'extern const char test_%s[];\n' "$fnb" >> data.h
+		printf 'extern char test_%s[];\n' "$fnb" >> data.h
 		printf 'extern const size_t test_%s_size;\n' "$fnb" >> data.h
 
 		printf '#include "test/raw/data.h"\n' >| $fn.c
 		printf 'const size_t test_%s_size = %d;\n' "$fnb"  `wc -c <"$fn"` >> "$fn.c"
-		printf 'const char test_%s[] = ' "$fnb" >> "$fn.c"
+		printf 'char test_%s[] = ' "$fnb" >> "$fn.c"
 
 		touch /tmp/line.$$
 		while :; do
@@ -55,21 +276,26 @@ $!s/$/\\012/
 	done
 )
 
-if ! cc -x c -std=c99 -I. \
+if test -z "${CC}"; then
+	CC=cc
+fi
+
+if ! $CC -x c -std=c99 -I. \
 	-D_POSIX_C_SOURCE=200809L		\
 	-D_XOPEN_SOURCE=600			\
 	-D_GNU_SOURCE				\
 	-Werror=format				\
-	-Werror=return-type			\
+	-Wno-return-type			\
 	-Werror=unused-variable			\
 	-Werror=missing-declarations		\
-	-Werror=unused-function			\
+	-Wunused-function			\
 	-Werror=pointer-sign			\
 	-Werror=implicit-function-declaration	\
 	-Werror=incompatible-pointer-types	\
 	$WERMCCFLAGS				\
 	-o run					\
 	session.c				\
+	font.c					\
 	http.c					\
 	inbound.c				\
 	outstreams.c				\
@@ -78,7 +304,6 @@ if ! cc -x c -std=c99 -I. \
 	uniqid.c				\
 	test/raw/*.c				\
 	third_party/dtach/*.c			\
-	tm.c					\
 	wts.c					\
 	-lutil					\
 	-lmd4c-html				\
@@ -93,17 +318,43 @@ fi
 if ! ctags=`which ctags-exuberant`; then
 	echo '`sudo apt install exuberant-ctags` to make tags file' 2>&1
 else
-	find .	-path ./third_party/websocketd		-prune -o	\
-		-path ./var				-prune -o	\
-		-type f \( -name \*.h -o -name \*.c \)	-print		\
+	tmfiles='./teng ./third_party/st/tmeng ./third_party/st/tmengui'
+	find	.	-path ./var				-prune	\
+		-o	-type f \(	-name \*.h	-o		\
+					-name \*.c	-o		\
+					-name tmeng	-o		\
+					-name tmengui	-o		\
+					-name teng	\)	-print	\
 	>/tmp/tag_files.$$
 
-	$ctags --format=1 `cat /tmp/tag_files.$$`
+	(
+	$ctags	-h .h. -f -		\
+		--language-force=C	\
+		--format=1		\
+		`cat /tmp/tag_files.$$`	\
+	|	sed '/^fnx*[0-9]\>/d'
+
+	for p in $tmfiles; do
+		sed '
+			/^fn[0-9](\([^,)]*\).*/bt
+			/^fnx[0-9]([^,]*, *\([^,]*\).*/bt
+			d
+		:t
+			s,,\1\t'$p',
+			p; =; d
+		' $p 
+	done | sed '
+		s,$,\t'$p',
+		N
+		s/\n/\t/
+	')		\
+	| LC_ALL=C sort \
+	>| tags
 fi
 
 echo 'running tests...' >&2
 for tfn in 'run test' testtm; do
-	./$tfn || echo "TEST '$tfn' TERMINATED WITH ERROR !!1!"
+	WERM_TESTABORTS=1 ./$tfn || echo "TEST '$tfn' TERMINATED WITH ERROR !!!"
 done >/tmp/testout.$$ 2>&1
 
 err=

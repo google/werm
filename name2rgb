@@ -1,0 +1,2063 @@
+/* name2rgb function generated with this perl script - it does a binary search
+   in the list of X11 color names to match it to the RGB. Returns -1 for no
+   match. Ignores casing and spaces in names.
+
+open my $rgbf, '<', '/etc/X11/rgb.txt'
+	or die "open rgb.txt: $!";
+
+my @pl;
+
+while (my $ln = <$rgbf>) {
+	chomp $ln;
+	$ln =~ /^!/ and next;
+	my ($r, $g, $b) = ($ln =~ /^ *([0-9]+)[ \t]+([0-9]+)[ \t]+([0-9]+)/)
+		or die "unmatching line: $ln";
+	my $rgb = sprintf("0x%06x", $r << 16  | $g << 8 | $b);
+	my $name = lc $ln;
+	$name =~ s:^[0-9 \t]*::g;
+	$name =~ s/ //g;
+	push @pl, "$name $rgb";
+}
+
+my @spl = reverse(sort @pl);
+@pl = (pop @spl);
+while (@spl) {
+	my $e = pop @spl;
+	if ($pl[@pl - 1] ne $e) { push @pl, $e }
+}
+
+sub generate {
+	my ($s, $e, $in) = @_;
+	if ($s >= $e	) { print " return -1;\n";		return }
+	my $m = ($s + $e) >> 1;
+	my $p = $pl[$m];
+	my ($n, $rgb) = $p =~ /(.*) (.*)/ or die "bad line $p";
+	my $me = qq[cmpdeqstr(dq, of, sz, "$n")];
+	if ($s == $e-1	) { print " return $me ? -1 : $rgb;\n";	return }
+	print "\n";
+	print qq[${in}switch ($me) {\n];
+	print qq[${in}case  0: return $rgb;\n];
+	print qq[${in}case -1:];
+	generate($s, $m, "$in  ");
+	print qq[${in}case +1:];
+	generate($m+1, $e, "$in  ");
+	print qq[${in}}\n];
+}
+
+generate 0, scalar(@pl), "\t";
+*/
+
+fn3(name2rgb, dq, of, sz)
+{
+
+	switch (cmpdeqstr(dq, of, sz, "grey70")) {
+	case  0: return 0xb3b3b3;
+	case -1:
+	  switch (cmpdeqstr(dq, of, sz, "gray19")) {
+	  case  0: return 0x303030;
+	  case -1:
+	    switch (cmpdeqstr(dq, of, sz, "darkmagenta")) {
+	    case  0: return 0x8b008b;
+	    case -1:
+	      switch (cmpdeqstr(dq, of, sz, "cadetblue1")) {
+	      case  0: return 0x98f5ff;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "bisque3")) {
+	        case  0: return 0xcdb79e;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "aquamarine4")) {
+	          case  0: return 0x458b74;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "antiquewhite4")) {
+	            case  0: return 0x8b8378;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "antiquewhite1")) {
+	              case  0: return 0xffefdb;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "antiquewhite")) {
+	                case  0: return 0xfaebd7;
+	                case -1: return cmpdeqstr(dq, of, sz, "aliceblue") ? -1 : 0xf0f8ff;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "antiquewhite3")) {
+	                case  0: return 0xcdc0b0;
+	                case -1: return cmpdeqstr(dq, of, sz, "antiquewhite2") ? -1 : 0xeedfcc;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "aquamarine2")) {
+	              case  0: return 0x76eec6;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "aquamarine1")) {
+	                case  0: return 0x7fffd4;
+	                case -1: return cmpdeqstr(dq, of, sz, "aquamarine") ? -1 : 0x7fffd4;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "aquamarine3") ? -1 : 0x66cdaa;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "azure4")) {
+	            case  0: return 0x838b8b;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "azure2")) {
+	              case  0: return 0xe0eeee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "azure1")) {
+	                case  0: return 0xf0ffff;
+	                case -1: return cmpdeqstr(dq, of, sz, "azure") ? -1 : 0xf0ffff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "azure3") ? -1 : 0xc1cdcd;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "bisque1")) {
+	              case  0: return 0xffe4c4;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "bisque")) {
+	                case  0: return 0xffe4c4;
+	                case -1: return cmpdeqstr(dq, of, sz, "beige") ? -1 : 0xf5f5dc;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "bisque2") ? -1 : 0xeed5b7;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "brown1")) {
+	          case  0: return 0xff4040;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "blue2")) {
+	            case  0: return 0x0000ee;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "blanchedalmond")) {
+	              case  0: return 0xffebcd;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "black")) {
+	                case  0: return 0x000000;
+	                case -1: return cmpdeqstr(dq, of, sz, "bisque4") ? -1 : 0x8b7d6b;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "blue1")) {
+	                case  0: return 0x0000ff;
+	                case -1: return cmpdeqstr(dq, of, sz, "blue") ? -1 : 0x0000ff;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "blueviolet")) {
+	              case  0: return 0x8a2be2;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "blue4")) {
+	                case  0: return 0x00008b;
+	                case -1: return cmpdeqstr(dq, of, sz, "blue3") ? -1 : 0x0000cd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "brown") ? -1 : 0xa52a2a;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "burlywood1")) {
+	            case  0: return 0xffd39b;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "brown4")) {
+	              case  0: return 0x8b2323;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "brown3")) {
+	                case  0: return 0xcd3333;
+	                case -1: return cmpdeqstr(dq, of, sz, "brown2") ? -1 : 0xee3b3b;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "burlywood") ? -1 : 0xdeb887;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "burlywood4")) {
+	              case  0: return 0x8b7355;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "burlywood3")) {
+	                case  0: return 0xcdaa7d;
+	                case -1: return cmpdeqstr(dq, of, sz, "burlywood2") ? -1 : 0xeec591;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "cadetblue") ? -1 : 0x5f9ea0;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "cornsilk1")) {
+	        case  0: return 0xfff8dc;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "chocolate2")) {
+	          case  0: return 0xee7621;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "chartreuse2")) {
+	            case  0: return 0x76ee00;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "cadetblue4")) {
+	              case  0: return 0x53868b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "cadetblue3")) {
+	                case  0: return 0x7ac5cd;
+	                case -1: return cmpdeqstr(dq, of, sz, "cadetblue2") ? -1 : 0x8ee5ee;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "chartreuse1")) {
+	                case  0: return 0x7fff00;
+	                case -1: return cmpdeqstr(dq, of, sz, "chartreuse") ? -1 : 0x7fff00;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "chocolate")) {
+	              case  0: return 0xd2691e;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "chartreuse4")) {
+	                case  0: return 0x458b00;
+	                case -1: return cmpdeqstr(dq, of, sz, "chartreuse3") ? -1 : 0x66cd00;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "chocolate1") ? -1 : 0xff7f24;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "coral2")) {
+	            case  0: return 0xee6a50;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "coral")) {
+	              case  0: return 0xff7f50;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "chocolate4")) {
+	                case  0: return 0x8b4513;
+	                case -1: return cmpdeqstr(dq, of, sz, "chocolate3") ? -1 : 0xcd661d;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "coral1") ? -1 : 0xff7256;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "cornflowerblue")) {
+	              case  0: return 0x6495ed;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "coral4")) {
+	                case  0: return 0x8b3e2f;
+	                case -1: return cmpdeqstr(dq, of, sz, "coral3") ? -1 : 0xcd5b45;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "cornsilk") ? -1 : 0xfff8dc;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "darkcyan")) {
+	          case  0: return 0x008b8b;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "cyan1")) {
+	            case  0: return 0x00ffff;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "cornsilk4")) {
+	              case  0: return 0x8b8878;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "cornsilk3")) {
+	                case  0: return 0xcdc8b1;
+	                case -1: return cmpdeqstr(dq, of, sz, "cornsilk2") ? -1 : 0xeee8cd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "cyan") ? -1 : 0x00ffff;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "cyan4")) {
+	              case  0: return 0x008b8b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "cyan3")) {
+	                case  0: return 0x00cdcd;
+	                case -1: return cmpdeqstr(dq, of, sz, "cyan2") ? -1 : 0x00eeee;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkblue") ? -1 : 0x00008b;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "darkgoldenrod4")) {
+	            case  0: return 0x8b6508;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "darkgoldenrod2")) {
+	              case  0: return 0xeead0e;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkgoldenrod1")) {
+	                case  0: return 0xffb90f;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkgoldenrod") ? -1 : 0xb8860b;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkgoldenrod3") ? -1 : 0xcd950c;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "darkgrey")) {
+	              case  0: return 0xa9a9a9;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkgreen")) {
+	                case  0: return 0x006400;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkgray") ? -1 : 0xa9a9a9;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkkhaki") ? -1 : 0xbdb76b;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    case +1:
+	      switch (cmpdeqstr(dq, of, sz, "deepskyblue3")) {
+	      case  0: return 0x009acd;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "darkseagreen3")) {
+	        case  0: return 0x9bcd9b;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "darkorchid")) {
+	          case  0: return 0x9932cc;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "darkorange")) {
+	            case  0: return 0xff8c00;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "darkolivegreen2")) {
+	              case  0: return 0xbcee68;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkolivegreen1")) {
+	                case  0: return 0xcaff70;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkolivegreen") ? -1 : 0x556b2f;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "darkolivegreen4")) {
+	                case  0: return 0x6e8b3d;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkolivegreen3") ? -1 : 0xa2cd5a;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "darkorange3")) {
+	              case  0: return 0xcd6600;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkorange2")) {
+	                case  0: return 0xee7600;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkorange1") ? -1 : 0xff7f00;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkorange4") ? -1 : 0x8b4500;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "darkred")) {
+	            case  0: return 0x8b0000;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "darkorchid3")) {
+	              case  0: return 0x9a32cd;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkorchid2")) {
+	                case  0: return 0xb23aee;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkorchid1") ? -1 : 0xbf3eff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkorchid4") ? -1 : 0x68228b;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "darkseagreen1")) {
+	              case  0: return 0xc1ffc1;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkseagreen")) {
+	                case  0: return 0x8fbc8f;
+	                case -1: return cmpdeqstr(dq, of, sz, "darksalmon") ? -1 : 0xe9967a;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkseagreen2") ? -1 : 0xb4eeb4;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "darkviolet")) {
+	          case  0: return 0x9400d3;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "darkslategray2")) {
+	            case  0: return 0x8deeee;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "darkslategray")) {
+	              case  0: return 0x2f4f4f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkslateblue")) {
+	                case  0: return 0x483d8b;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkseagreen4") ? -1 : 0x698b69;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkslategray1") ? -1 : 0x97ffff;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "darkslategrey")) {
+	              case  0: return 0x2f4f4f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "darkslategray4")) {
+	                case  0: return 0x528b8b;
+	                case -1: return cmpdeqstr(dq, of, sz, "darkslategray3") ? -1 : 0x79cdcd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "darkturquoise") ? -1 : 0x00ced1;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "deeppink3")) {
+	            case  0: return 0xcd1076;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "deeppink1")) {
+	              case  0: return 0xff1493;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "deeppink")) {
+	                case  0: return 0xff1493;
+	                case -1: return cmpdeqstr(dq, of, sz, "debianred") ? -1 : 0xd70751;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "deeppink2") ? -1 : 0xee1289;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "deepskyblue1")) {
+	              case  0: return 0x00bfff;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "deepskyblue")) {
+	                case  0: return 0x00bfff;
+	                case -1: return cmpdeqstr(dq, of, sz, "deeppink4") ? -1 : 0x8b0a50;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "deepskyblue2") ? -1 : 0x00b2ee;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "gold3")) {
+	        case  0: return 0xcdad00;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "firebrick2")) {
+	          case  0: return 0xee2c2c;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "dodgerblue2")) {
+	            case  0: return 0x1c86ee;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "dimgrey")) {
+	              case  0: return 0x696969;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "dimgray")) {
+	                case  0: return 0x696969;
+	                case -1: return cmpdeqstr(dq, of, sz, "deepskyblue4") ? -1 : 0x00688b;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "dodgerblue1")) {
+	                case  0: return 0x1e90ff;
+	                case -1: return cmpdeqstr(dq, of, sz, "dodgerblue") ? -1 : 0x1e90ff;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "firebrick")) {
+	              case  0: return 0xb22222;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "dodgerblue4")) {
+	                case  0: return 0x104e8b;
+	                case -1: return cmpdeqstr(dq, of, sz, "dodgerblue3") ? -1 : 0x1874cd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "firebrick1") ? -1 : 0xff3030;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "gainsboro")) {
+	            case  0: return 0xdcdcdc;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "floralwhite")) {
+	              case  0: return 0xfffaf0;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "firebrick4")) {
+	                case  0: return 0x8b1a1a;
+	                case -1: return cmpdeqstr(dq, of, sz, "firebrick3") ? -1 : 0xcd2626;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "forestgreen") ? -1 : 0x228b22;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gold1")) {
+	              case  0: return 0xffd700;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gold")) {
+	                case  0: return 0xffd700;
+	                case -1: return cmpdeqstr(dq, of, sz, "ghostwhite") ? -1 : 0xf8f8ff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gold2") ? -1 : 0xeec900;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "gray10")) {
+	          case  0: return 0x1a1a1a;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "goldenrod3")) {
+	            case  0: return 0xcd9b1d;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "goldenrod1")) {
+	              case  0: return 0xffc125;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "goldenrod")) {
+	                case  0: return 0xdaa520;
+	                case -1: return cmpdeqstr(dq, of, sz, "gold4") ? -1 : 0x8b7500;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "goldenrod2") ? -1 : 0xeeb422;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray0")) {
+	              case  0: return 0x000000;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray")) {
+	                case  0: return 0xbebebe;
+	                case -1: return cmpdeqstr(dq, of, sz, "goldenrod4") ? -1 : 0x8b6914;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray1") ? -1 : 0x030303;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "gray14")) {
+	            case  0: return 0x242424;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray12")) {
+	              case  0: return 0x1f1f1f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray11")) {
+	                case  0: return 0x1c1c1c;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray100") ? -1 : 0xffffff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray13") ? -1 : 0x212121;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray17")) {
+	              case  0: return 0x2b2b2b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray16")) {
+	                case  0: return 0x292929;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray15") ? -1 : 0x262626;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray18") ? -1 : 0x2e2e2e;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    }
+	  case +1:
+	    switch (cmpdeqstr(dq, of, sz, "gray94")) {
+	    case  0: return 0xf0f0f0;
+	    case -1:
+	      switch (cmpdeqstr(dq, of, sz, "gray57")) {
+	      case  0: return 0x919191;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "gray38")) {
+	        case  0: return 0x616161;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "gray29")) {
+	          case  0: return 0x4a4a4a;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "gray24")) {
+	            case  0: return 0x3d3d3d;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray21")) {
+	              case  0: return 0x363636;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray20")) {
+	                case  0: return 0x333333;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray2") ? -1 : 0x050505;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "gray23")) {
+	                case  0: return 0x3b3b3b;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray22") ? -1 : 0x383838;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray27")) {
+	              case  0: return 0x454545;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray26")) {
+	                case  0: return 0x424242;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray25") ? -1 : 0x404040;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray28") ? -1 : 0x474747;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "gray33")) {
+	            case  0: return 0x545454;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray31")) {
+	              case  0: return 0x4f4f4f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray30")) {
+	                case  0: return 0x4d4d4d;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray3") ? -1 : 0x080808;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray32") ? -1 : 0x525252;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray36")) {
+	              case  0: return 0x5c5c5c;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray35")) {
+	                case  0: return 0x595959;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray34") ? -1 : 0x575757;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray37") ? -1 : 0x5e5e5e;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "gray48")) {
+	          case  0: return 0x7a7a7a;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "gray43")) {
+	            case  0: return 0x6e6e6e;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray40")) {
+	              case  0: return 0x666666;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray4")) {
+	                case  0: return 0x0a0a0a;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray39") ? -1 : 0x636363;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "gray42")) {
+	                case  0: return 0x6b6b6b;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray41") ? -1 : 0x696969;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray46")) {
+	              case  0: return 0x757575;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray45")) {
+	                case  0: return 0x737373;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray44") ? -1 : 0x707070;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray47") ? -1 : 0x787878;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "gray52")) {
+	            case  0: return 0x858585;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray50")) {
+	              case  0: return 0x7f7f7f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray5")) {
+	                case  0: return 0x0d0d0d;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray49") ? -1 : 0x7d7d7d;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray51") ? -1 : 0x828282;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray55")) {
+	              case  0: return 0x8c8c8c;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray54")) {
+	                case  0: return 0x8a8a8a;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray53") ? -1 : 0x878787;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray56") ? -1 : 0x8f8f8f;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "gray76")) {
+	        case  0: return 0xc2c2c2;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "gray67")) {
+	          case  0: return 0xababab;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "gray62")) {
+	            case  0: return 0x9e9e9e;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray6")) {
+	              case  0: return 0x0f0f0f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray59")) {
+	                case  0: return 0x969696;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray58") ? -1 : 0x949494;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "gray61")) {
+	                case  0: return 0x9c9c9c;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray60") ? -1 : 0x999999;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray65")) {
+	              case  0: return 0xa6a6a6;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray64")) {
+	                case  0: return 0xa3a3a3;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray63") ? -1 : 0xa1a1a1;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray66") ? -1 : 0xa8a8a8;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "gray71")) {
+	            case  0: return 0xb5b5b5;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray7")) {
+	              case  0: return 0x121212;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray69")) {
+	                case  0: return 0xb0b0b0;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray68") ? -1 : 0xadadad;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray70") ? -1 : 0xb3b3b3;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray74")) {
+	              case  0: return 0xbdbdbd;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray73")) {
+	                case  0: return 0xbababa;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray72") ? -1 : 0xb8b8b8;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray75") ? -1 : 0xbfbfbf;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "gray85")) {
+	          case  0: return 0xd9d9d9;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "gray80")) {
+	            case  0: return 0xcccccc;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray79")) {
+	              case  0: return 0xc9c9c9;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray78")) {
+	                case  0: return 0xc7c7c7;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray77") ? -1 : 0xc4c4c4;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray8") ? -1 : 0x141414;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray83")) {
+	              case  0: return 0xd4d4d4;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray82")) {
+	                case  0: return 0xd1d1d1;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray81") ? -1 : 0xcfcfcf;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray84") ? -1 : 0xd6d6d6;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "gray9")) {
+	            case  0: return 0x171717;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray88")) {
+	              case  0: return 0xe0e0e0;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray87")) {
+	                case  0: return 0xdedede;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray86") ? -1 : 0xdbdbdb;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray89") ? -1 : 0xe3e3e3;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "gray92")) {
+	              case  0: return 0xebebeb;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray91")) {
+	                case  0: return 0xe8e8e8;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray90") ? -1 : 0xe5e5e5;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "gray93") ? -1 : 0xededed;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    case +1:
+	      switch (cmpdeqstr(dq, of, sz, "grey33")) {
+	      case  0: return 0x545454;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "grey15")) {
+	        case  0: return 0x262626;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "greenyellow")) {
+	          case  0: return 0xadff2f;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "green")) {
+	            case  0: return 0x00ff00;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "gray97")) {
+	              case  0: return 0xf7f7f7;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "gray96")) {
+	                case  0: return 0xf5f5f5;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray95") ? -1 : 0xf2f2f2;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "gray99")) {
+	                case  0: return 0xfcfcfc;
+	                case -1: return cmpdeqstr(dq, of, sz, "gray98") ? -1 : 0xfafafa;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "green3")) {
+	              case  0: return 0x00cd00;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "green2")) {
+	                case  0: return 0x00ee00;
+	                case -1: return cmpdeqstr(dq, of, sz, "green1") ? -1 : 0x00ff00;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "green4") ? -1 : 0x008b00;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "grey100")) {
+	            case  0: return 0xffffff;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey1")) {
+	              case  0: return 0x030303;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey0")) {
+	                case  0: return 0x000000;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey") ? -1 : 0xbebebe;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey10") ? -1 : 0x1a1a1a;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey13")) {
+	              case  0: return 0x212121;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey12")) {
+	                case  0: return 0x1f1f1f;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey11") ? -1 : 0x1c1c1c;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey14") ? -1 : 0x242424;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "grey24")) {
+	          case  0: return 0x3d3d3d;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "grey2")) {
+	            case  0: return 0x050505;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey18")) {
+	              case  0: return 0x2e2e2e;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey17")) {
+	                case  0: return 0x2b2b2b;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey16") ? -1 : 0x292929;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey19") ? -1 : 0x303030;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey22")) {
+	              case  0: return 0x383838;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey21")) {
+	                case  0: return 0x363636;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey20") ? -1 : 0x333333;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey23") ? -1 : 0x3b3b3b;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "grey29")) {
+	            case  0: return 0x4a4a4a;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey27")) {
+	              case  0: return 0x454545;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey26")) {
+	                case  0: return 0x424242;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey25") ? -1 : 0x404040;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey28") ? -1 : 0x474747;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey31")) {
+	              case  0: return 0x4f4f4f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey30")) {
+	                case  0: return 0x4d4d4d;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey3") ? -1 : 0x080808;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey32") ? -1 : 0x525252;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "grey52")) {
+	        case  0: return 0x858585;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "grey43")) {
+	          case  0: return 0x6e6e6e;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "grey39")) {
+	            case  0: return 0x636363;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey36")) {
+	              case  0: return 0x5c5c5c;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey35")) {
+	                case  0: return 0x595959;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey34") ? -1 : 0x575757;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "grey38")) {
+	                case  0: return 0x616161;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey37") ? -1 : 0x5e5e5e;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey41")) {
+	              case  0: return 0x696969;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey40")) {
+	                case  0: return 0x666666;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey4") ? -1 : 0x0a0a0a;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey42") ? -1 : 0x6b6b6b;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "grey48")) {
+	            case  0: return 0x7a7a7a;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey46")) {
+	              case  0: return 0x757575;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey45")) {
+	                case  0: return 0x737373;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey44") ? -1 : 0x707070;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey47") ? -1 : 0x787878;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey50")) {
+	              case  0: return 0x7f7f7f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey5")) {
+	                case  0: return 0x0d0d0d;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey49") ? -1 : 0x7d7d7d;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey51") ? -1 : 0x828282;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "grey61")) {
+	          case  0: return 0x9c9c9c;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "grey57")) {
+	            case  0: return 0x919191;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey55")) {
+	              case  0: return 0x8c8c8c;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey54")) {
+	                case  0: return 0x8a8a8a;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey53") ? -1 : 0x878787;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey56") ? -1 : 0x8f8f8f;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey6")) {
+	              case  0: return 0x0f0f0f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey59")) {
+	                case  0: return 0x969696;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey58") ? -1 : 0x949494;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey60") ? -1 : 0x999999;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "grey66")) {
+	            case  0: return 0xa8a8a8;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey64")) {
+	              case  0: return 0xa3a3a3;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey63")) {
+	                case  0: return 0xa1a1a1;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey62") ? -1 : 0x9e9e9e;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey65") ? -1 : 0xa6a6a6;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey69")) {
+	              case  0: return 0xb0b0b0;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey68")) {
+	                case  0: return 0xadadad;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey67") ? -1 : 0xababab;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey7") ? -1 : 0x121212;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    }
+	  }
+	case +1:
+	  switch (cmpdeqstr(dq, of, sz, "olivedrab2")) {
+	  case  0: return 0xb3ee3a;
+	  case -1:
+	    switch (cmpdeqstr(dq, of, sz, "lightgoldenrod3")) {
+	    case  0: return 0xcdbe70;
+	    case -1:
+	      switch (cmpdeqstr(dq, of, sz, "indianred")) {
+	      case  0: return 0xcd5c5c;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "grey9")) {
+	        case  0: return 0x171717;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "grey80")) {
+	          case  0: return 0xcccccc;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "grey76")) {
+	            case  0: return 0xc2c2c2;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey73")) {
+	              case  0: return 0xbababa;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey72")) {
+	                case  0: return 0xb8b8b8;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey71") ? -1 : 0xb5b5b5;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "grey75")) {
+	                case  0: return 0xbfbfbf;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey74") ? -1 : 0xbdbdbd;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey79")) {
+	              case  0: return 0xc9c9c9;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey78")) {
+	                case  0: return 0xc7c7c7;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey77") ? -1 : 0xc4c4c4;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey8") ? -1 : 0x141414;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "grey85")) {
+	            case  0: return 0xd9d9d9;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey83")) {
+	              case  0: return 0xd4d4d4;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey82")) {
+	                case  0: return 0xd1d1d1;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey81") ? -1 : 0xcfcfcf;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey84") ? -1 : 0xd6d6d6;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey88")) {
+	              case  0: return 0xe0e0e0;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey87")) {
+	                case  0: return 0xdedede;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey86") ? -1 : 0xdbdbdb;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey89") ? -1 : 0xe3e3e3;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "honeydew")) {
+	          case  0: return 0xf0fff0;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "grey95")) {
+	            case  0: return 0xf2f2f2;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "grey92")) {
+	              case  0: return 0xebebeb;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey91")) {
+	                case  0: return 0xe8e8e8;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey90") ? -1 : 0xe5e5e5;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "grey94")) {
+	                case  0: return 0xf0f0f0;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey93") ? -1 : 0xededed;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "grey98")) {
+	              case  0: return 0xfafafa;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "grey97")) {
+	                case  0: return 0xf7f7f7;
+	                case -1: return cmpdeqstr(dq, of, sz, "grey96") ? -1 : 0xf5f5f5;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "grey99") ? -1 : 0xfcfcfc;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "hotpink")) {
+	            case  0: return 0xff69b4;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "honeydew3")) {
+	              case  0: return 0xc1cdc1;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "honeydew2")) {
+	                case  0: return 0xe0eee0;
+	                case -1: return cmpdeqstr(dq, of, sz, "honeydew1") ? -1 : 0xf0fff0;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "honeydew4") ? -1 : 0x838b83;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "hotpink3")) {
+	              case  0: return 0xcd6090;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "hotpink2")) {
+	                case  0: return 0xee6aa7;
+	                case -1: return cmpdeqstr(dq, of, sz, "hotpink1") ? -1 : 0xff6eb4;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "hotpink4") ? -1 : 0x8b3a62;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "lawngreen")) {
+	        case  0: return 0x7cfc00;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "khaki1")) {
+	          case  0: return 0xfff68f;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "ivory1")) {
+	            case  0: return 0xfffff0;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "indianred3")) {
+	              case  0: return 0xcd5555;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "indianred2")) {
+	                case  0: return 0xee6363;
+	                case -1: return cmpdeqstr(dq, of, sz, "indianred1") ? -1 : 0xff6a6a;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "ivory")) {
+	                case  0: return 0xfffff0;
+	                case -1: return cmpdeqstr(dq, of, sz, "indianred4") ? -1 : 0x8b3a3a;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "ivory4")) {
+	              case  0: return 0x8b8b83;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "ivory3")) {
+	                case  0: return 0xcdcdc1;
+	                case -1: return cmpdeqstr(dq, of, sz, "ivory2") ? -1 : 0xeeeee0;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "khaki") ? -1 : 0xf0e68c;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "lavenderblush")) {
+	            case  0: return 0xfff0f5;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "khaki4")) {
+	              case  0: return 0x8b864e;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "khaki3")) {
+	                case  0: return 0xcdc673;
+	                case -1: return cmpdeqstr(dq, of, sz, "khaki2") ? -1 : 0xeee685;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lavender") ? -1 : 0xe6e6fa;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "lavenderblush3")) {
+	              case  0: return 0xcdc1c5;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lavenderblush2")) {
+	                case  0: return 0xeee0e5;
+	                case -1: return cmpdeqstr(dq, of, sz, "lavenderblush1") ? -1 : 0xfff0f5;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lavenderblush4") ? -1 : 0x8b8386;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "lightblue4")) {
+	          case  0: return 0x68838b;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "lemonchiffon4")) {
+	            case  0: return 0x8b8970;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "lemonchiffon2")) {
+	              case  0: return 0xeee9bf;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lemonchiffon1")) {
+	                case  0: return 0xfffacd;
+	                case -1: return cmpdeqstr(dq, of, sz, "lemonchiffon") ? -1 : 0xfffacd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lemonchiffon3") ? -1 : 0xcdc9a5;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "lightblue2")) {
+	              case  0: return 0xb2dfee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightblue1")) {
+	                case  0: return 0xbfefff;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightblue") ? -1 : 0xadd8e6;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightblue3") ? -1 : 0x9ac0cd;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "lightcyan3")) {
+	            case  0: return 0xb4cdcd;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "lightcyan1")) {
+	              case  0: return 0xe0ffff;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightcyan")) {
+	                case  0: return 0xe0ffff;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightcoral") ? -1 : 0xf08080;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightcyan2") ? -1 : 0xd1eeee;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "lightgoldenrod1")) {
+	              case  0: return 0xffec8b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightgoldenrod")) {
+	                case  0: return 0xeedd82;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightcyan4") ? -1 : 0x7a8b8b;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightgoldenrod2") ? -1 : 0xeedc82;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    case +1:
+	      switch (cmpdeqstr(dq, of, sz, "magenta4")) {
+	      case  0: return 0x8b008b;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "lightskyblue4")) {
+	        case  0: return 0x607b8b;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "lightsalmon")) {
+	          case  0: return 0xffa07a;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "lightpink")) {
+	            case  0: return 0xffb6c1;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "lightgray")) {
+	              case  0: return 0xd3d3d3;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightgoldenrodyellow")) {
+	                case  0: return 0xfafad2;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightgoldenrod4") ? -1 : 0x8b814c;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "lightgrey")) {
+	                case  0: return 0xd3d3d3;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightgreen") ? -1 : 0x90ee90;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "lightpink3")) {
+	              case  0: return 0xcd8c95;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightpink2")) {
+	                case  0: return 0xeea2ad;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightpink1") ? -1 : 0xffaeb9;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightpink4") ? -1 : 0x8b5f65;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "lightseagreen")) {
+	            case  0: return 0x20b2aa;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "lightsalmon3")) {
+	              case  0: return 0xcd8162;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightsalmon2")) {
+	                case  0: return 0xee9572;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightsalmon1") ? -1 : 0xffa07a;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightsalmon4") ? -1 : 0x8b5742;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "lightskyblue2")) {
+	              case  0: return 0xa4d3ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightskyblue1")) {
+	                case  0: return 0xb0e2ff;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightskyblue") ? -1 : 0x87cefa;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightskyblue3") ? -1 : 0x8db6cd;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "lightyellow1")) {
+	          case  0: return 0xffffe0;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "lightsteelblue1")) {
+	            case  0: return 0xcae1ff;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "lightslategrey")) {
+	              case  0: return 0x778899;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightslategray")) {
+	                case  0: return 0x778899;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightslateblue") ? -1 : 0x8470ff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightsteelblue") ? -1 : 0xb0c4de;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "lightsteelblue4")) {
+	              case  0: return 0x6e7b8b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightsteelblue3")) {
+	                case  0: return 0xa2b5cd;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightsteelblue2") ? -1 : 0xbcd2ee;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "lightyellow") ? -1 : 0xffffe0;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "linen")) {
+	            case  0: return 0xfaf0e6;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "lightyellow4")) {
+	              case  0: return 0x8b8b7a;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "lightyellow3")) {
+	                case  0: return 0xcdcdb4;
+	                case -1: return cmpdeqstr(dq, of, sz, "lightyellow2") ? -1 : 0xeeeed1;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "limegreen") ? -1 : 0x32cd32;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "magenta2")) {
+	              case  0: return 0xee00ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "magenta1")) {
+	                case  0: return 0xff00ff;
+	                case -1: return cmpdeqstr(dq, of, sz, "magenta") ? -1 : 0xff00ff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "magenta3") ? -1 : 0xcd00cd;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "mediumturquoise")) {
+	        case  0: return 0x48d1cc;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "mediumorchid3")) {
+	          case  0: return 0xb452cd;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "mediumaquamarine")) {
+	            case  0: return 0x66cdaa;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "maroon2")) {
+	              case  0: return 0xee30a7;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "maroon1")) {
+	                case  0: return 0xff34b3;
+	                case -1: return cmpdeqstr(dq, of, sz, "maroon") ? -1 : 0xb03060;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "maroon4")) {
+	                case  0: return 0x8b1c62;
+	                case -1: return cmpdeqstr(dq, of, sz, "maroon3") ? -1 : 0xcd2990;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "mediumorchid1")) {
+	              case  0: return 0xe066ff;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "mediumorchid")) {
+	                case  0: return 0xba55d3;
+	                case -1: return cmpdeqstr(dq, of, sz, "mediumblue") ? -1 : 0x0000cd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "mediumorchid2") ? -1 : 0xd15fee;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "mediumpurple3")) {
+	            case  0: return 0x8968cd;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "mediumpurple1")) {
+	              case  0: return 0xab82ff;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "mediumpurple")) {
+	                case  0: return 0x9370db;
+	                case -1: return cmpdeqstr(dq, of, sz, "mediumorchid4") ? -1 : 0x7a378b;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "mediumpurple2") ? -1 : 0x9f79ee;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "mediumslateblue")) {
+	              case  0: return 0x7b68ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "mediumseagreen")) {
+	                case  0: return 0x3cb371;
+	                case -1: return cmpdeqstr(dq, of, sz, "mediumpurple4") ? -1 : 0x5d478b;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "mediumspringgreen") ? -1 : 0x00fa9a;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "navajowhite")) {
+	          case  0: return 0xffdead;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "mistyrose1")) {
+	            case  0: return 0xffe4e1;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "mintcream")) {
+	              case  0: return 0xf5fffa;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "midnightblue")) {
+	                case  0: return 0x191970;
+	                case -1: return cmpdeqstr(dq, of, sz, "mediumvioletred") ? -1 : 0xc71585;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "mistyrose") ? -1 : 0xffe4e1;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "mistyrose4")) {
+	              case  0: return 0x8b7d7b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "mistyrose3")) {
+	                case  0: return 0xcdb7b5;
+	                case -1: return cmpdeqstr(dq, of, sz, "mistyrose2") ? -1 : 0xeed5d2;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "moccasin") ? -1 : 0xffe4b5;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "navy")) {
+	            case  0: return 0x000080;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "navajowhite3")) {
+	              case  0: return 0xcdb38b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "navajowhite2")) {
+	                case  0: return 0xeecfa1;
+	                case -1: return cmpdeqstr(dq, of, sz, "navajowhite1") ? -1 : 0xffdead;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "navajowhite4") ? -1 : 0x8b795e;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "olivedrab")) {
+	              case  0: return 0x6b8e23;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "oldlace")) {
+	                case  0: return 0xfdf5e6;
+	                case -1: return cmpdeqstr(dq, of, sz, "navyblue") ? -1 : 0x000080;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "olivedrab1") ? -1 : 0xc0ff3e;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    }
+	  case +1:
+	    switch (cmpdeqstr(dq, of, sz, "seagreen3")) {
+	    case  0: return 0x43cd80;
+	    case -1:
+	      switch (cmpdeqstr(dq, of, sz, "pink")) {
+	      case  0: return 0xffc0cb;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "palegreen2")) {
+	        case  0: return 0x90ee90;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "orangered3")) {
+	          case  0: return 0xcd3700;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "orange3")) {
+	            case  0: return 0xcd8500;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "orange")) {
+	              case  0: return 0xffa500;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "olivedrab4")) {
+	                case  0: return 0x698b22;
+	                case -1: return cmpdeqstr(dq, of, sz, "olivedrab3") ? -1 : 0x9acd32;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "orange2")) {
+	                case  0: return 0xee9a00;
+	                case -1: return cmpdeqstr(dq, of, sz, "orange1") ? -1 : 0xffa500;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "orangered1")) {
+	              case  0: return 0xff4500;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "orangered")) {
+	                case  0: return 0xff4500;
+	                case -1: return cmpdeqstr(dq, of, sz, "orange4") ? -1 : 0x8b5a00;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "orangered2") ? -1 : 0xee4000;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "orchid3")) {
+	            case  0: return 0xcd69c9;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "orchid1")) {
+	              case  0: return 0xff83fa;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "orchid")) {
+	                case  0: return 0xda70d6;
+	                case -1: return cmpdeqstr(dq, of, sz, "orangered4") ? -1 : 0x8b2500;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "orchid2") ? -1 : 0xee7ae9;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "palegreen")) {
+	              case  0: return 0x98fb98;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "palegoldenrod")) {
+	                case  0: return 0xeee8aa;
+	                case -1: return cmpdeqstr(dq, of, sz, "orchid4") ? -1 : 0x8b4789;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "palegreen1") ? -1 : 0x9aff9a;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "palevioletred2")) {
+	          case  0: return 0xee799f;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "paleturquoise2")) {
+	            case  0: return 0xaeeeee;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "paleturquoise")) {
+	              case  0: return 0xafeeee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "palegreen4")) {
+	                case  0: return 0x548b54;
+	                case -1: return cmpdeqstr(dq, of, sz, "palegreen3") ? -1 : 0x7ccd7c;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "paleturquoise1") ? -1 : 0xbbffff;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "palevioletred")) {
+	              case  0: return 0xdb7093;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "paleturquoise4")) {
+	                case  0: return 0x668b8b;
+	                case -1: return cmpdeqstr(dq, of, sz, "paleturquoise3") ? -1 : 0x96cdcd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "palevioletred1") ? -1 : 0xff82ab;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "peachpuff1")) {
+	            case  0: return 0xffdab9;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "papayawhip")) {
+	              case  0: return 0xffefd5;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "palevioletred4")) {
+	                case  0: return 0x8b475d;
+	                case -1: return cmpdeqstr(dq, of, sz, "palevioletred3") ? -1 : 0xcd6889;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "peachpuff") ? -1 : 0xffdab9;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "peachpuff4")) {
+	              case  0: return 0x8b7765;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "peachpuff3")) {
+	                case  0: return 0xcdaf95;
+	                case -1: return cmpdeqstr(dq, of, sz, "peachpuff2") ? -1 : 0xeecbad;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "peru") ? -1 : 0xcd853f;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "rosybrown")) {
+	        case  0: return 0xbc8f8f;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "purple")) {
+	          case  0: return 0xa020f0;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "plum1")) {
+	            case  0: return 0xffbbff;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "pink3")) {
+	              case  0: return 0xcd919e;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "pink2")) {
+	                case  0: return 0xeea9b8;
+	                case -1: return cmpdeqstr(dq, of, sz, "pink1") ? -1 : 0xffb5c5;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "plum")) {
+	                case  0: return 0xdda0dd;
+	                case -1: return cmpdeqstr(dq, of, sz, "pink4") ? -1 : 0x8b636c;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "plum4")) {
+	              case  0: return 0x8b668b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "plum3")) {
+	                case  0: return 0xcd96cd;
+	                case -1: return cmpdeqstr(dq, of, sz, "plum2") ? -1 : 0xeeaeee;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "powderblue") ? -1 : 0xb0e0e6;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "red")) {
+	            case  0: return 0xff0000;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "purple3")) {
+	              case  0: return 0x7d26cd;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "purple2")) {
+	                case  0: return 0x912cee;
+	                case -1: return cmpdeqstr(dq, of, sz, "purple1") ? -1 : 0x9b30ff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "purple4") ? -1 : 0x551a8b;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "red3")) {
+	              case  0: return 0xcd0000;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "red2")) {
+	                case  0: return 0xee0000;
+	                case -1: return cmpdeqstr(dq, of, sz, "red1") ? -1 : 0xff0000;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "red4") ? -1 : 0x8b0000;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "saddlebrown")) {
+	          case  0: return 0x8b4513;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "royalblue")) {
+	            case  0: return 0x4169e1;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "rosybrown3")) {
+	              case  0: return 0xcd9b9b;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "rosybrown2")) {
+	                case  0: return 0xeeb4b4;
+	                case -1: return cmpdeqstr(dq, of, sz, "rosybrown1") ? -1 : 0xffc1c1;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "rosybrown4") ? -1 : 0x8b6969;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "royalblue3")) {
+	              case  0: return 0x3a5fcd;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "royalblue2")) {
+	                case  0: return 0x436eee;
+	                case -1: return cmpdeqstr(dq, of, sz, "royalblue1") ? -1 : 0x4876ff;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "royalblue4") ? -1 : 0x27408b;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "salmon4")) {
+	            case  0: return 0x8b4c39;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "salmon2")) {
+	              case  0: return 0xee8262;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "salmon1")) {
+	                case  0: return 0xff8c69;
+	                case -1: return cmpdeqstr(dq, of, sz, "salmon") ? -1 : 0xfa8072;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "salmon3") ? -1 : 0xcd7054;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "seagreen1")) {
+	              case  0: return 0x54ff9f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "seagreen")) {
+	                case  0: return 0x2e8b57;
+	                case -1: return cmpdeqstr(dq, of, sz, "sandybrown") ? -1 : 0xf4a460;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "seagreen2") ? -1 : 0x4eee94;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    case +1:
+	      switch (cmpdeqstr(dq, of, sz, "steelblue3")) {
+	      case  0: return 0x4f94cd;
+	      case -1:
+	        switch (cmpdeqstr(dq, of, sz, "slateblue4")) {
+	        case  0: return 0x473c8b;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "sienna4")) {
+	          case  0: return 0x8b4726;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "seashell4")) {
+	            case  0: return 0x8b8682;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "seashell1")) {
+	              case  0: return 0xfff5ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "seashell")) {
+	                case  0: return 0xfff5ee;
+	                case -1: return cmpdeqstr(dq, of, sz, "seagreen4") ? -1 : 0x2e8b57;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "seashell3")) {
+	                case  0: return 0xcdc5bf;
+	                case -1: return cmpdeqstr(dq, of, sz, "seashell2") ? -1 : 0xeee5de;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "sienna2")) {
+	              case  0: return 0xee7942;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "sienna1")) {
+	                case  0: return 0xff8247;
+	                case -1: return cmpdeqstr(dq, of, sz, "sienna") ? -1 : 0xa0522d;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "sienna3") ? -1 : 0xcd6839;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "skyblue4")) {
+	            case  0: return 0x4a708b;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "skyblue2")) {
+	              case  0: return 0x7ec0ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "skyblue1")) {
+	                case  0: return 0x87ceff;
+	                case -1: return cmpdeqstr(dq, of, sz, "skyblue") ? -1 : 0x87ceeb;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "skyblue3") ? -1 : 0x6ca6cd;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "slateblue2")) {
+	              case  0: return 0x7a67ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "slateblue1")) {
+	                case  0: return 0x836fff;
+	                case -1: return cmpdeqstr(dq, of, sz, "slateblue") ? -1 : 0x6a5acd;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "slateblue3") ? -1 : 0x6959cd;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "snow3")) {
+	          case  0: return 0xcdc9c9;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "slategray4")) {
+	            case  0: return 0x6c7b8b;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "slategray2")) {
+	              case  0: return 0xb9d3ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "slategray1")) {
+	                case  0: return 0xc6e2ff;
+	                case -1: return cmpdeqstr(dq, of, sz, "slategray") ? -1 : 0x708090;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "slategray3") ? -1 : 0x9fb6cd;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "snow1")) {
+	              case  0: return 0xfffafa;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "snow")) {
+	                case  0: return 0xfffafa;
+	                case -1: return cmpdeqstr(dq, of, sz, "slategrey") ? -1 : 0x708090;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "snow2") ? -1 : 0xeee9e9;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "springgreen3")) {
+	            case  0: return 0x00cd66;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "springgreen1")) {
+	              case  0: return 0x00ff7f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "springgreen")) {
+	                case  0: return 0x00ff7f;
+	                case -1: return cmpdeqstr(dq, of, sz, "snow4") ? -1 : 0x8b8989;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "springgreen2") ? -1 : 0x00ee76;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "steelblue1")) {
+	              case  0: return 0x63b8ff;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "steelblue")) {
+	                case  0: return 0x4682b4;
+	                case -1: return cmpdeqstr(dq, of, sz, "springgreen4") ? -1 : 0x008b45;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "steelblue2") ? -1 : 0x5cacee;
+	              }
+	            }
+	          }
+	        }
+	      case +1:
+	        switch (cmpdeqstr(dq, of, sz, "turquoise4")) {
+	        case  0: return 0x00868b;
+	        case -1:
+	          switch (cmpdeqstr(dq, of, sz, "thistle4")) {
+	          case  0: return 0x8b7b8b;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "tan4")) {
+	            case  0: return 0x8b5a2b;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "tan1")) {
+	              case  0: return 0xffa54f;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "tan")) {
+	                case  0: return 0xd2b48c;
+	                case -1: return cmpdeqstr(dq, of, sz, "steelblue4") ? -1 : 0x36648b;
+	                case +1: return -1;
+	                }
+	              case +1:
+	                switch (cmpdeqstr(dq, of, sz, "tan3")) {
+	                case  0: return 0xcd853f;
+	                case -1: return cmpdeqstr(dq, of, sz, "tan2") ? -1 : 0xee9a49;
+	                case +1: return -1;
+	                }
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "thistle2")) {
+	              case  0: return 0xeed2ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "thistle1")) {
+	                case  0: return 0xffe1ff;
+	                case -1: return cmpdeqstr(dq, of, sz, "thistle") ? -1 : 0xd8bfd8;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "thistle3") ? -1 : 0xcdb5cd;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "tomato4")) {
+	            case  0: return 0x8b3626;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "tomato2")) {
+	              case  0: return 0xee5c42;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "tomato1")) {
+	                case  0: return 0xff6347;
+	                case -1: return cmpdeqstr(dq, of, sz, "tomato") ? -1 : 0xff6347;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "tomato3") ? -1 : 0xcd4f39;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "turquoise2")) {
+	              case  0: return 0x00e5ee;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "turquoise1")) {
+	                case  0: return 0x00f5ff;
+	                case -1: return cmpdeqstr(dq, of, sz, "turquoise") ? -1 : 0x40e0d0;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "turquoise3") ? -1 : 0x00c5cd;
+	              }
+	            }
+	          }
+	        case +1:
+	          switch (cmpdeqstr(dq, of, sz, "wheat3")) {
+	          case  0: return 0xcdba96;
+	          case -1:
+	            switch (cmpdeqstr(dq, of, sz, "violetred3")) {
+	            case  0: return 0xcd3278;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "violetred1")) {
+	              case  0: return 0xff3e96;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "violetred")) {
+	                case  0: return 0xd02090;
+	                case -1: return cmpdeqstr(dq, of, sz, "violet") ? -1 : 0xee82ee;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "violetred2") ? -1 : 0xee3a8c;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "wheat1")) {
+	              case  0: return 0xffe7ba;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "wheat")) {
+	                case  0: return 0xf5deb3;
+	                case -1: return cmpdeqstr(dq, of, sz, "violetred4") ? -1 : 0x8b2252;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "wheat2") ? -1 : 0xeed8ae;
+	              }
+	            }
+	          case +1:
+	            switch (cmpdeqstr(dq, of, sz, "yellow1")) {
+	            case  0: return 0xffff00;
+	            case -1:
+	              switch (cmpdeqstr(dq, of, sz, "whitesmoke")) {
+	              case  0: return 0xf5f5f5;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "white")) {
+	                case  0: return 0xffffff;
+	                case -1: return cmpdeqstr(dq, of, sz, "wheat4") ? -1 : 0x8b7e66;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "yellow") ? -1 : 0xffff00;
+	              }
+	            case +1:
+	              switch (cmpdeqstr(dq, of, sz, "yellow4")) {
+	              case  0: return 0x8b8b00;
+	              case -1:
+	                switch (cmpdeqstr(dq, of, sz, "yellow3")) {
+	                case  0: return 0xcdcd00;
+	                case -1: return cmpdeqstr(dq, of, sz, "yellow2") ? -1 : 0xeeee00;
+	                case +1: return -1;
+	                }
+	              case +1: return cmpdeqstr(dq, of, sz, "yellowgreen") ? -1 : 0x9acd32;
+	              }
+	            }
+	          }
+	        }
+	      }
+	    }
+	  }
+	}
+}

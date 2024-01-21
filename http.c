@@ -304,7 +304,7 @@ static void resphdr(struct wrides *de, int code, char hdr, size_t contlength)
 	break;	case 'h': utf8=1; contype="text/html";
 	break;	case 'c': utf8=1; contype="text/css";
 	break;	case 'j': utf8=1; contype="application/javascript";
-	break;	case 'f': utf8=0; contype="font/ttf";
+	break;	case 'f': utf8=0; contype="application/x-wermfont";
 	}
 
 	fdb_apnd(&b, "HTTP/1.1 ", -1);

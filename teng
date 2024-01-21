@@ -7,8 +7,18 @@
 /* Code in this file is first-party code (i.e. non-hterm) to implement the
  * terminal engine. */
 
-/* Pull in terminal engine code translated from hterm-licensed code */
-#include "third_party/hterm/teng"
+fn2(tmrealloc, oldo, newsz)
+{
+	TMint newo = tmalloc(newsz), olsz = tmlen(oldo);
+
+	fldcpy(	newo, 0,
+		oldo, 0,
+		olsz < newsz ?
+		olsz : newsz);
+
+	tmfree(oldo);
+	return newo;
+}
 
 fn0(deqmk)
 {
@@ -24,7 +34,8 @@ fn0(deqmk)
 	#define deqcap(d)	fld(d, 0)
 	#define deqhd(d)	fld(d, 1)
 	#define deqtl(d)	fld(d, 2)
-	#define deqbasicflds	3
+	#define deqtlbytes(d)	fld(d, 3) /* used by deqpushtlbyt */
+	#define deqbasicflds	4
 
 	TMint dcp = 16;
 	TMint deq = tmalloc(dcp);
@@ -103,4 +114,223 @@ fn2(deqpushtl, dq, val)
 	fld(dq, ++deqtl(dq)) = val;
 
 	return dq;
+}
+
+/* Pushes byte onto tail in little endian order. Cannot be used in conjuction
+   with other deqpush* deqpop* functions. */
+fn2(deqpushbyt, dq, val)
+{
+	TMint tlb = deqtlbytes(dq), shf;
+
+	val &= 0xff;
+	if (!tlb) {
+		dq = deqpushtl(dq, val);
+		tlb = 3;
+	}
+	else {
+		shf = (4 - tlb--) * 8;
+		fld(dq, deqtl(dq)) |= (val << shf);
+	}
+
+	/* For C, we need an extra 0 dword at the end of the string for safe use
+	   of deqtostring */
+	if (!tlb && deqtl(dq) == deqcap(dq)-1) dq = deqgrowtl(dq);
+	deqtlbytes(dq) = tlb;
+
+	return dq;
+}
+
+/* Pushes the given codepoint as utf8 bytes, using deqpushbyt. */
+fn2(deqpushcop, dq, cop)
+{
+	if		(cop < (1<<7))	{
+		dq = deqpushbyt(dq, cop);
+
+	} else if	(cop < (1<<11))	{
+		dq = deqpushbyt(dq, 0xc0 | cop >> 6);	cop &= 0x0003f;
+		dq = deqpushbyt(dq, 0x80 | cop);
+	} else if	(cop < (1<<16))	{
+		dq = deqpushbyt(dq, 0xe0 | cop >> 12);	cop &= 0x00fff;
+		dq = deqpushbyt(dq, 0x80 | cop >> 6);	cop &= 0x0003f;
+		dq = deqpushbyt(dq, 0x80 | cop);
+	} else if	(cop < 0x110000) {
+		dq = deqpushbyt(dq, 0xf0 | cop >> 18);	cop &= 0x2ffff;
+		dq = deqpushbyt(dq, 0x80 | cop >> 12);	cop &= 0x00fff;
+		dq = deqpushbyt(dq, 0x80 | cop >> 6);	cop &= 0x0003f;
+		dq = deqpushbyt(dq, 0x80 | cop);
+	}
+
+	return dq;
+}
+
+fn1(deqsiz, dq)
+{
+	TMint h = deqhd(dq), t;
+
+	if (!h) return 0;
+	t = deqtl(dq);
+
+	if (t >= h)	return t - h + 1;
+	else		return t - h + 1 + deqcap(dq) - deqbasicflds;
+}
+
+fn1(deqbytsiz, dq)
+{
+	TMint h = deqhd(dq), qworsz;
+
+	if (!h) return 0;
+	qworsz = deqtl(dq) - h + 1;
+
+	if (qworsz < 0) sriously("deque not fit for byte ops: %d", qworsz);
+
+	return qworsz * 4 - deqtlbytes(dq);
+}
+
+/* return byte at given index, and replace with `val` if it is non-negative */
+fn3(deqbytat, dq, i, val)
+{
+	TMint max = deqbytsiz(dq), qwi, bi, oldqw, newqw;
+
+	if (i == max) return 0;
+	if (i < 0 || i > max) sriously("byte # out-of-range: %d, %d", i, max);
+
+	bi = 8 * (i % 4);
+	qwi = deqhd(dq) + ~~(i / 4);
+
+	oldqw = fld(dq, qwi);
+
+	if (val >= 0) {
+		val &= 0xff;
+		newqw = oldqw & ~(0xff << bi);
+		newqw |= val << bi;
+		fld(dq, qwi) = newqw;
+	}
+
+	return 0xff & (oldqw >> bi);
+}
+
+/* removes all elements without constructing a new deque. compatible with byte
+   operations. */
+fn1(deqclear, dq)
+{
+	deqtl(dq) = deqhd(dq) = 0;
+	deqtlbytes(dq) = 0;
+	return dq;
+}
+
+/* Parses integer in bytes of deq. byti is the starting byte index. fin is an
+   optional object id whose field 0 is set to the first non-digit character. */
+fn3(deqatoi, deq, byti, fin)
+{
+	TMint sign = 1, acc = 0, acn, c, digs = 0, er = 0;
+
+	switch (deqbytat(deq, byti, -1)) {
+	case ORD('-'): sign = -1;
+	case ORD('+'): byti++;
+	}
+
+	for (;;) {
+		c = deqbytat(deq, byti, -1);
+		c -= ORD('0');
+		if (c < 0 || c > 9) break;
+		digs++;
+		byti++;
+		acn =	~~(acc * 10);
+		if (	~~(acn / 10) != acc) er = 1;
+		acc =	~~(acn + c);
+		if (acn > acc) er = 1;
+	}
+
+	if (fin) fld(fin, 0) = byti;
+	if (er || !digs) return 0x80000000;
+
+	return acc * sign;
+}
+
+fn2(deqcellat, deq, ci)
+{
+	TMint fi = deqhd(deq) + ci, cap = deqcap(deq);
+
+	if (fi >= cap) fi += deqbasicflds - cap;
+	return fld(deq, fi);
+}
+
+fn2(deqcatbyt, deq, eeq)
+{
+	TMint b, cnt = deqbytsiz(eeq);
+
+	for (b = 0; b < cnt; b++) deq = deqpushbyt(deq, deqbytat(eeq, b, -1));
+	return deq;
+}
+
+fn2(deqpushhex, deq, val)
+{
+	val &= 0xf;
+	if (val <= 9)	val += ORD('0');
+	else		val += ORD('a');
+	return deqpushbyt(deq, val);
+}
+
+fn2(deqpshhex8, deq, by)
+{
+	deq = deqpushhex(deq, by >> 4);
+	deq = deqpushhex(deq, by);
+	return deq;
+}
+
+fnx3(TMint, deqpshutf8, (TMint, deq), (TMutf8, str), (TMint, len))
+{
+	TMint bi = 0;
+	TMutf8 u8 = tmutf8(str);
+
+	for (;;) {
+		if (bi == len)		break;
+		if (len < 0 && !u8[bi])	break;
+		deq = deqpushbyt(deq, u8[bi++]);
+	}
+
+	return deq;
+}
+
+fnx3(TMint, deqsetutf8, (TMint, deq), (TMany, str), (TMint, len))
+{
+	if (deq)	deqclear(deq);
+	else		deq = deqmk();
+
+	return deqpshutf8(deq, str, len);
+}
+
+fnx4(TMint, cmpdeqstr, (TMint, deq), (TMint, of), (TMint, sz), (TMany, str))
+{
+	TMint so = 0, sb, db;
+
+	for (;;) {
+		sb = ORDAT(str, so++);
+		do	db = deqbytat(deq, of++, -1);
+		while	(db == ORD(' '));
+		if (db > sb)	return 1;
+		if (db < sb)	return -1;
+		if (!db) 	return 0;
+	}
+}
+
+#include "name2rgb"
+
+fn2(deqpshitoa, deq, i)
+{
+	TMint fac = 1000000000, dig;
+
+	if (i == 0x80000000) {
+		deq = deqpshutf8(deq, "-", -1);
+		deq = deqpshitoa(deq, -~~(i/10));
+		i = -(i%10);
+	}
+	if (i == 0) return deqpushhex(deq, 0);
+	do {
+		dig = ~~(i / fac);
+		if (dig) deq = deqpushhex(deq, dig % 10);
+		fac = ~~(fac / 10);
+	} while (fac);
+
+	return deq;
 }

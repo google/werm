@@ -8,7 +8,7 @@ function endptid()
 {
 	var bi, bs, id = localStorage['endptid'];
 
-	if (id && id.match(/^[\u0000-~]{8}$/)) return id;
+	if (id && id.match(/^[\000-~]{8}$/)) return id;
 
 	bs = new Uint8Array(8);
 	crypto.getRandomValues(bs);

@@ -35,9 +35,10 @@ int dtach_logging(void);
 
 void _Noreturn subproc_main(Dtachctx dc);
 
-/* Processes output from the subprocess and writes the client output into rout.
- * "client output" should be sent to each attach process. */
-void process_tty_out(struct fdbuf *rout, const void *buf, ssize_t len);
+/* Processes output from the subprocess and writes the client output into
+   therout. "client output" should be sent to each attach process. */
+extern struct fdbuf therout;
+void process_tty_out(void *buf, ssize_t len);
 
 /* ptyfd is the pseudo-terminal that controls the terminal-enabled process.
  * There is only one per master. vt100 keyboard input data is sent to this fd.

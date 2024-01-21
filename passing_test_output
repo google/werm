@@ -4,11 +4,9 @@ pty[hello how are you]
 TEST: empty string:
 TEST: no-op escape \N:
 wantsoutput=0
-cli[\\s1]
 wantsoutput=1
 TEST: change window size after \N:
 wantsoutput=0
-cli[\\s1]
 sigwin r=99 c=11
 wantsoutput=1
 TEST: missing newline:
@@ -27,8 +25,19 @@ TEST: TEE_TTY_CONTENT
 TEST: pending line
 sblog[hello\012]
 TEST: finished line
-sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
-sblog[[exceeded]\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\012]
+sblog[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[exceeded]\012]
 sblog[abcxyz\012]
 sblog[abcdef\012]
 TEST: move back x2 and delete to eol
@@ -60,8 +69,7 @@ sblog[first ;; second\012]
 TEST: \r to move to start of line
 sblog[XYZ123\012]
 TEST: something makes the logs stop
-sblog[[0]~$ seq 1 | less\012]
-sblog[[0]~$ # asdf\012]
+sblog[[0]~$ seq 1 | less\012[0]~$ # asdf\012]
 TEST: \r then delete line
 sblog[foo\012]
 TEST: arrow keys are translated to escape sequences
@@ -82,7 +90,7 @@ putrwout[abcd\\0d\\0a\012xyz\\08\\09\\0d\\0a\012]
 TEST: pass OS escape to client
 putrwout[\\1b]0;asdf\\07xyz\\0d\\0a\012]
 TEST: simplify alternate mode signal
-putrwout[\\1b[?47\\s2hhello\\0d\\0a\\1b[?47\\s1l\012\\1b[\012?47\\s2hhello\\0d\\0a\\1b\012[?47\\s1l\012\\1b[?1047\\s2hhello\\0d\\0a\\1b[?1047\\s1l\012]
+putrwout[\\1b[?47hhello\\0d\\0a\\1b[?47l\012\\1b[\012?47hhello\\0d\\0a\\1b\012[?47l\012\\1b[?1047hhello\\0d\\0a\\1b[?1047l\012]
 TEST: regression
 putrwout[\\1b[?2004h\\1b]0;matvore@penguin: ~\\07\\1b[01;32mmatvore@penguin\\1b[00m:\\1b[01;34m~\\1b[00m$ \\0d\\1b[K\\1b]0;matvore@penguin: ~\\07\\1b[01;32mmatvore@penguin\\1b[00m:\\1b[01;34m~\\1b[00m$ \012]
 TEST: passthrough escape \033[1P from subproc to client
@@ -101,27 +109,27 @@ putrwout[abc\\1b]0;new-t\012]
 TEST: <between calls>
 putrwout[itle\\07xyz\\0d\\0a\012]
 TEST: 1049h/l code for switching to/from alternate screen + other ops
-putrwout[abc \\1b[?1049\\ss\\s2\\clh\012-in-\\1b[?1049\\s1\\rslout\012]
+putrwout[abc \\1b[?1049h\012-in-\\1b[?1049lout\012]
 TEST: dump of state
+putrwout[\\1b[?47h\012]
+cli[\\s2]
+cli[\\s2]
+putrwout[\\1b[?47l\012]
 cli[\\s1]
-putrwout[\\1b[?47\\s2h\012]
+putrwout[\\1b[?1049h\012]
 cli[\\s2]
-cli[\\s2]
-putrwout[\\1b[?47\\s1l\012]
-cli[\\s1]
-putrwout[\\1b[?1049\\ss\\s2\\clh\012]
-cli[\\s2]
-putrwout[\\1b[?1049\\s1\\rsl\012]
+putrwout[\\1b[?1049l\012]
 cli[\\s1]
 TEST: do not save bell character in plain text log
 sblog[ready... D I N G!\012]
 TEST: editing a long line
 sigwin r=30 c=104
-sblog[cd platform2\012]
-sblog[[0]platform2$ git log --graph --format="%ct %h %s" |perl -pE'/^(.*[^0-9])?(\\d{8,10})\\b(.*)/ and $_=$1.`d\\n//'|less \012]
+sblog[cd platform2\012[0]platform2$ |perl -pE'/^(.*[^0-9])?(\\d{8,10})\\b(.*)/ and $_=$1.`date -d\\@$2 +"\012[0]platform2$ |perl -pE'/^(.*[^0-9])?(git log --graph --format="%ct %h %s" |perl\012]
+sblog[ -pE'/^(.*[^0-9])?(\\d{8,10})\\b(.*)/ and $_=$1.`d\012]
 TEST: editing a long line in a narrower window
 sigwin r=80 c=61
-sblog[matvore@penguin:~$ echo a --------------------------------------------------------------------------------\012]
+sblog[matvore@penguin:~$ echo --------------------------------------------------------\012matvore@penguin:~$ echo  ----------------------------------a -------------------\012]
+sblog[matvore@penguin:~$ echo  ----------------------------------a -------------------\012]
 TEST: go up more rows than exist in the linebuf
 sigwin r=80 c=60
 TEST: set long then shorter title
@@ -129,13 +137,11 @@ cli[\\@title:longtitle\012]
 cli[\\@title:1+1++1\012]
 TEST: title in recounted state
 cli[\\@title:sometitle\012]
-cli[\\s1]
 cli[\\@title:sometitle\012]
 TEST: ... continued: unset title, respond with empty title
 cli[\\@title:\012]
 pty[thisisnormalkeybinput]
-(should not include title here): cli[\\s1]
-TEST: title is too long
+(should not include title here): TEST: title is too long
 cli[\\@title:abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab]
 cli[cabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc]
 cli[abcabcab\012]
@@ -159,8 +165,7 @@ TEST: do not include altscreen content in scrollback log
 sblog[xyz\012]
 sblog[abcrest\012]
 TEST: move to col
-sblog[] \012]
-sblog[cts-tf > run cts -m CtsInitTestCases -t keychords#init_inotify\012]
+sblog[]\012cts-tf > run cts -m CtsInitTestCases -t keychords#init_inotify\012]
 TEST: move to col 2
 sblog[axyz\012]
 TEST: shift rest of line then overwrite
@@ -168,16 +173,35 @@ sblog[xyz234\012]
 TEST: shift remaining characters right
 sblog[xyz       asdf\012]
 TEST: shift remaining characters right more
-sblog[xyz \012]
+sblog[xyz\012]
 sblog[xyz            asdf\012]
 sblog[:)xyz  ..more\012]
 sblog[:)xyzmore\012]
-sblog[12345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345612345..more:)  6123456123456123456123456123456123456123456123456\012]
+sblog[12345612345612345612345612345612345612345612345612345612345612345612345612345612\012]
+sblog[34561234561234561234561234561234561234561234561234561234561234561234561234561234\012]
+sblog[56123456123456123456123456123456123456123456123456123456123456123456123456123456\012]
+sblog[12345612345612345612345612345612345612345612345612345612345612345612345612345612\012]
+sblog[34561234561234561234561234561234561234561234561234561234561234561234561234561234\012]
+sblog[56123456123456123456123456123456123456123456123456123456123456123456123456123456\012]
+sblog[12345612345612345612345612345612345612345612345612345612345612345612345612345612\012]
+sblog[3456123456123456123456123456123456123456                                       .\012.more:)\012]
 TEST: move more characters right than are in the line
-sblog[!!!!                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    abcd\012]
+sblog[!!!!\012]
 sblog[!!!!                                              abcd\012]
 TEST: make long line too big to fit into buffer
-sblog[!!!                             *******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[********************************************************************************\012]
+sblog[!!!                             ************************************************\012]
 TEST: text from current line in \A output
 cli[[[],"statejsontest","bar?"]\012]
 TEST: ... text from prior line
@@ -187,8 +211,15 @@ cli[\\@title:my ttl 42\012]
 cli[[[],"statejsontest","my ttl 42"]\012]
 cli[[[],"statejsontest","my ttl 42"]\012]
 cli[\\@title:\012]
-cli[[[],"statejsontest",""]\012]
+cli[[[],"statejsontest","another line"]\012]
 cli[[[],"statejsontest","again, ttl from line"]\012]
+TEST: tab backwards
+sblog[xyz\012]
+sblog[xyz\012]
+sblog[abc     xyz\012]
+sblog[xyz\012]
+sblog[a       xyz     c\012]
+sblog[xyz     b       c\012]
 TEST: empty WERMPROFPATH
 TEST: non-existent and empty dirs in WERMPROFPATH
 reading profile dir at: test/profilesnoent
@@ -341,17 +372,20 @@ httpresp[HTTP/1.1 400 Bad Request\015\012Connection: keep-alive\015\012Content-T
 httpresp[bad request\012websocket upgrade conditions: 13\012]
 rq.error is yes
 access obj with bad ID
-[binary_name]: bad id: -2
+./tm.c: sriously: bad id: -2
+
 valid use of new obj, then access invalid fld
-[binary_name]: fld 6 out of range for obj -1
 0,0,0,0,0,42,99,100,-5,1048575,
+./tm.c: sriously: fld 6 out of range id=-1
+
 multiple IDs
 allocate 100 fresh id's
 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,
 re-use 3 and allocate 7 fresh id's
 42,75,50,100,101,102,103,104,105,106,
 freed an ID, now use it [crash]
-[binary_name]: unallocated id: -42
+./tm.c: sriously: unallocated id: -42
+
 dequeue test
 pop only value: 42
 is empty, so should have 0, 0: 0, 0
@@ -359,6 +393,24 @@ pop one of two values: 44
 about to pop 21 values to make it empty again
 46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,
 push 100 values onto freshly-made dequeue
-9,10,13,18,25,34,45,58,73,90,109,130,153,178,205,234,265,298,333,370,409,450,493,538,585,634,685,738,793,850,909,970,1033,1098,1165,1234,1305,1378,1453,1530,1609,1690,1773,1858,1945,2034,2125,2218,2313,2410,2509,2610,2713,2818,2925,3034,3145,3258,3373,3490,3609,3730,3853,3978,4105,4234,4365,4498,4633,4770,4909,5050,5193,5338,5485,5634,5785,5938,6093,6250,6409,6570,6733,6898,7065,7234,7405,7578,7753,7930,8109,8290,8473,8658,8845,9034,9225,9418,9613,9810,
+9,634,2509
+9,10,13,18,25,34,45,58,73,90,109,130,153,178,205,234,265,298,333,370,409,450,493,538,585,634,685,738,793,850,909,970,1033,1098,1165,1234,1305,1378,1453,1530,1609,1690,1773,1858,1945,2034,2125,2218,2313,2410,
+2509,5634,9810
+2509,2610,2713,2818,2925,3034,3145,3258,3373,3490,3609,3730,3853,3978,4105,4234,4365,4498,4633,4770,4909,5050,5193,5338,5485,5634,5785,5938,6093,6250,6409,6570,6733,6898,7065,7234,7405,7578,7753,7930,8109,8290,8473,8658,8845,9034,9225,9418,9613,9810,
 about to pop one too many
-[binary_name]: dequeue -1 is already empty; cannot pop
+./teng: sriously: dequeue -2 is already empty; cannot pop
+deq wrap-around test
+3 6 9 12 15 18 21 24 27 30 33 36 39 42 45 
+tl is less than hd? 1
+17 48 51 54 57 60 65 70 75 80 85 90 95 100 105 110 115 120
+deqpushbyt test
+byte count: 4
+byte count: 5
+20661005 00000030
+abCXyz
+byte size after creation: 0
+13 e3a681e3 81e39981 aea0f0a8 0000009f
+byte size after deqclear: 0
+6 49 e8 f0 dd 0c 99 00
+dd
+6 49 e8 f0 77 0c 99 00

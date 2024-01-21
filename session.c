@@ -4,7 +4,9 @@
  * license that can be found in the LICENSE file or at
  * https://developers.google.com/open-source/licenses/bsd */
 
+#include "third_party/st/wcwidth.h"
 #include "shared.h"
+#include "font.h"
 #include "outstreams.h"
 #include "test/raw/data.h"
 #include <md4c-html.h>
@@ -12,6 +14,9 @@
 #include "http.h"
 #include "spawner.h"
 #include "dtachctx.h"
+#include "tm.c"
+#include "third_party/st/plat.h"
+#include "third_party/st/tmeng"
 
 #include <sys/wait.h>
 #include <libgen.h>
@@ -37,21 +42,6 @@ static const char *qs;
 
 static size_t argv0sz;
 
-static _Bool consumeesc(const char *pref, size_t preflen)
-{
-	if (preflen > sizeof(wts.escbuf))
-		errx(1, "preflen too long: %zu", preflen);
-	if (wts.escsz != preflen) return 0;
-	if (memcmp(pref, wts.escbuf, preflen)) return 0;
-	wts.escsz = 0;
-	return 1;
-}
-
-/* app cursor on: \x1b[?1h
- * app cursor off: \x1b[?1l
- */
-#define CONSUMEESC(pref) consumeesc(pref, sizeof(pref)-1)
-
 /* Terminal Machine (TM...) functions are implemented in both Javascript and C.
  * They consider arguments to be untrusted - memory access must be guarded.
  * This means out-of-bounds checking to prevent an uncaught exception in
@@ -61,201 +51,71 @@ static _Bool consumeesc(const char *pref, size_t preflen)
  * Javascript. IOW, code that calls it will be executed in Javascript on the
  * client and in C on the server.
  */
-#define TMpeek(buf, i) ((buf)[(i) % sizeof(buf)])
-#define TMpoke(buf, i, val) do { (buf)[(i) % sizeof(buf)] = (val); } while (0)
 
 static void TMpokettl(int toff, int b)
 {
 	if (toff >= 0 && toff < sizeof(wts.ttl)) wts.ttl[toff] = b;
 }
 
-static void TMlineresize(int sz)
-{
-	if (sz < 0 || sz > sizeof(wts.linebuf)) return;
+void Xsetcolor(int trm, int pi, int rgb) {/* no-op */}
 
-	while (wts.linesz < sz) wts.linebuf[wts.linesz++] = ' ';
-	wts.linesz = sz;
-	if (wts.linepos > sz) wts.linepos = sz;
+/* No-ops because server is headless */
+void Xicontitl(TMint deq, TMint off)					{}
+void Xsettitle(TMint deq, TMint off)					{}
+void Xbell(int trm)							{}
+void Xsetpointermotion(int set)						{}
+void Xdrawglyph(int trm, int gf, int x, int y)				{}
+void Xosc52copy(TMint trm, TMint deq, TMint byti)			{}
+void Xdrawrect(TMint clor, TMint x0, TMint y0, TMint w, TMint h)	{}
+void Xdrawline(TMint trm, int x1, int y1, int x2)			{}
+void Xfinishdraw(TMint trm)						{}
+void Xximspot(TMint trm, int cx, int cy)				{}
+
+void Now(int ms) { fld(ms,0) = 0; fld(ms,1) = 0; }
+
+void Xprint(TMint deq)
+{
+	full_write(&(struct wrides){2,"Xprint"},	deqtostring(deq, 0),
+							deqsiz(deq));
 }
 
-static void TMlinepos(long pos)
+void Ttywriteraw(int trm, int dq, int of, int sz)
 {
-	if (pos < 0 || pos > wts.linesz) return;
-	wts.linepos = pos;
+	fdb_routs(&therout, deqtostring(dq, of), sz);
 }
 
-static void linemov(int to, int fr, int step, unsigned sz)
+struct fdbuf therout;
+void process_tty_out(void *buf, ssize_t len)
 {
-	to += wts.linepos;
-	fr += wts.linepos;
-	while (sz--) {
-		TMpoke(wts.linebuf, to, TMpeek(wts.linebuf, fr));
-		TMpoke(wts.linebuf, fr, ' ');
-		to += step;
-		fr += step;
-	}
-}
+	static int d;
+	int sbbuf;
 
-static void deletechrahead(void)
-{
-	char *endptr;
-	const char *lesc;
-	unsigned long cnt;
-	unsigned mvsz;
-
-	lesc = (char *)wts.escbuf + wts.escsz - 1;
-	if (wts.escsz < 4 || wts.escbuf[1] != '[') return;
-
-	cnt = strtoul((char *)wts.escbuf+2, &endptr, 10);
-
-	if (endptr != lesc) return;
-
-	mvsz = wts.linesz - wts.linepos;
-	switch (*lesc) {
-	case 'P':
-		linemov(0, cnt, 1, mvsz);
-		TMlineresize(wts.linesz - cnt);
-		break;
-	case 'G':
-		TMlinepos(cnt - 1);
-		break;
-	case '@':
-		TMlineresize(wts.linesz + cnt);
-		linemov(cnt + mvsz - 1, mvsz - 1, -1, mvsz);
-		break;
-
-	default:
-		return;
-	}
-
-	wts.escsz = 0;
-}
-
-/* Obviously this function is a mess. But I'm still planning how to clean it up.
- */
-void process_tty_out(struct fdbuf *rout, const void *buf_, ssize_t len)
-{
-	const unsigned char *buf = buf_;
-
-	if (len < 0) len = strlen(buf_);
+	if (len < 0) len = strlen(buf);
 
 	if (wts.writerawlg) full_write(&wts.rawlogde, buf, len);
 
-	while (len) {
-		if (buf[0] == '\r') {
-			wts.escsz = 0;
-			/* A previous version would move linepos to the start of
-			 * a wrapped line rather than the position of the most
-			 * recent \n.
-			 * That was almost correct, but the boundary condition
-			 * was not handled right. When the cursor is at the end
-			 * of the line but has not written any char to the next
-			 * line yet, it should move to the start of the full
-			 * line, not remain stationary.
-			 *
-			 * TODO make that work correct when I have time to write
-			 * tests.
-			 */
-			wts.linepos = 0;
-			goto eol;
-		}
-
-		if (buf[0] == '\b') {
-			/* move left */
-			TMlinepos(wts.linepos-1);
-			goto eol;
-		}
-
-		/* The bell character (7) is the correct way to
-		 * terminate escapes that start with \033] */
-		if (*buf == 7) wts.escsz = 0;
-
-		if (*buf >= 'A' && *buf <= 'Z' && CONSUMEESC("\033[")) {
-			switch (*buf) {
-			/* delete to EOL */
-			case 'J':
-				/* This clears the screen, either below (0J or
-				 * J) above (1J) or all (2J). We just assume 0J
-				 * and only change the current line. Some day we
-				 * may keep the whole screen in the buffer
-				 * rather than the current line, in which case
-				 * this has to change. Also, once we see 1J or
-				 * 2J in the wild we will implement it.
-				 */
-			case 'K': TMlineresize(wts.linepos);		break;
-
-			case 'A': TMlinepos(wts.linepos - wts.swcol);	break;
-
-			case 'C': TMlinepos(wts.linepos+1); 		break;
-			}
-			goto eol;
-		}
-		if (*buf >= 'a' && *buf <= 'z') {
-			if (CONSUMEESC("\033[?1")) {
-				wts.appcursor = *buf == 'h';
-				goto eol;
-			}
-			if (CONSUMEESC("\033[?47")
-			    || CONSUMEESC("\033[?1047")) {
-				wts.altscren = *buf=='h';
-				fdb_apnd(rout, *buf == 'h' ? "\\s2" : "\\s1", -1);
-				goto eol;
-			}
-			if (CONSUMEESC("\033[?1049")) {
-				wts.altscren = *buf=='h';
-				/* on: save cursor+state, set alternate screen,
-				 * clear
-				 * off: set primary screen, restore
-				 * cursor+state
-				 */
-				fdb_apnd(rout, *buf == 'h' ? "\\ss\\s2\\cl"
-							   : "\\s1\\rs",
-					 -1);
-				goto eol;
-			}
-
-			if (wts.escsz > 1 && wts.escbuf[1] == '[') {
-				wts.escsz = 0;
-				goto eol;
-			}
-		}
-		if (buf[0] == '\033' || wts.escsz) {
-			if (buf[0] == '\033') wts.escsz = 0;
-			TMpoke(wts.escbuf, wts.escsz, *buf);
-			wts.escsz++;
-			goto eol;
-		}
-
-		if (*buf == 7) goto eol;
-		if (wts.altscren) goto eol;
-
-		if (*buf == '\n') TMlinepos(wts.linesz);
-
-		if (wts.linesz == wts.linepos) TMlineresize(wts.linepos+1);
-		TMpoke(wts.linebuf, wts.linepos, *buf);
-		TMlinepos(wts.linepos+1);
-		if (!wts.clnttl && *buf != '\n') {
-			TMpokettl(wts.linesz-1,	*buf);
-			TMpokettl(wts.linesz,	0);
-		}
-
-		if (*buf != '\n' && wts.linesz < sizeof(wts.linebuf)) goto eol;
-
-		if (wts.writelg)
-			full_write(&wts.logde, wts.linebuf, wts.linesz);
-		TMlineresize(0);
-
-	eol:
-		deletechrahead();
-
-		fdb_routc(rout, *buf++);
-		len--;
+	if (!wts.t) {
+		wts.t = term_new();
+		tnew(wts.t, 80, 25);
+		if (wts.writelg) term(wts.t,sbbuf) = deqmk();
 	}
+	d = deqsetutf8(d ? d:deqmk(), buf, len);
+	twrite(wts.t, d, -1, 0);
 
-	fdb_apnc(rout, '\n');
+	fdb_routs(&therout, buf, len);
+	fdb_apnc(&therout, '\n');
+
+	if (wts.writelg) {
+		sbbuf = term(wts.t,sbbuf);
+		if (deqsiz(sbbuf)) {
+			full_write(&wts.logde,	deqtostring(sbbuf, 0),
+						deqbytsiz(sbbuf));
+			deqclear(sbbuf);
+		}
+	}
 }
 
-static void recountttl(struct wrides *de)
+static void recounttitl(struct wrides *de)
 {
 	struct fdbuf b = {.de = de};
 
@@ -710,12 +570,56 @@ static const char *profpath(void)
 	return profpathsavd=p;
 }
 
-static void recountstate(struct wrides *de)
+static void tmstate4cli(struct wrides *de)
+{
+	struct tmobj *o0, *o1;
+	int *f0, *f1;
+	struct fdbuf sigb = {de, .cap = 1024};
+
+	if (!wts.t) return;
+
+	fdb_apnd(&sigb, "\\@state:{\"bs\":[", -1);
+	o0 = tmobjs.objel;
+	o1 = tmobjs.objel+tmobjs.capac;
+	for (;;) {
+		if (o0==o1) break;
+		if (o0!=tmobjs.objel) fdb_apnc(&sigb, ',');
+		if (!o0->fs) { fdb_itoa(&sigb, o0->fct); goto nexo; }
+
+		f0 = o0->fs;
+		f1 = o0->fs + o0->fct;
+		fdb_apnc(&sigb, '[');
+		for (;;) {
+			if (f0==f1) break;
+			if (f0!=o0->fs) fdb_apnc(&sigb, ',');
+			fdb_itoa(&sigb, *f0++);
+		}
+		fdb_apnc(&sigb, ']');
+
+	nexo:
+		o0++;
+	}
+
+	fdb_apnd(&sigb, "],\"fh\":", -1);
+	fdb_itoa(&sigb, tmobjs.bufsfreehead);
+	fdb_apnd(&sigb, ",\"t\":", -1);
+	fdb_itoa(&sigb, wts.t);
+	fdb_apnd(&sigb, "}\n", -1);
+
+	fdb_finsh(&sigb);
+}
+
+static void simpdump4cl(struct wrides *de)
 {
 	struct fdbuf sigb = {de};
-	full_write(de, wts.altscren ? "\\s2" : "\\s1", -1);
-	if (wts.ttl[0]) recountttl(de);
+	if (!wts.t) return;
+	fdb_apnd(&sigb, MODE_ALTSCREEN & term(wts.t,mode) ? "\\s2":"\\s1", -1);
+	fdb_finsh(&sigb);
+}
 
+static void profinfo4cli(struct wrides *de)
+{
+	struct fdbuf sigb = {de};
 	iterprofs(profpath(), &((struct iterprofspec){
 		.sigb = &sigb,
 		.sendauxjs = 1,
@@ -744,6 +648,18 @@ void send_pream(int fd)
 	fdb_finsh(&ob);
 }
 
+static void linetitl(struct fdbuf *o)
+{
+	int td = deqmk(), y = curs_y(term(wts.t,curs));
+
+	for (;;) {
+		td = tpushlinestr(wts.t, td, y);
+		if (--y < 0 || deqbytsiz(td)) break;
+	}
+	fdb_json(o, deqtostring(td, 0), deqbytsiz(td));
+	tmfree(td);
+}
+
 /* Array with elements:
 	0: print_atch_clis() array
 	1: termid string
@@ -758,7 +674,8 @@ static void atchstatejson(Dtachctx dc, struct wrides *cliutd)
 	fdb_apnc(&hbuf, ',');
 	fdb_json(&hbuf, termid ? termid : "", -1);
 	fdb_apnc(&hbuf, ',');
-	fdb_json(&hbuf, wts.ttl, ttl_len());
+	if (wts.clnttl)	fdb_json(&hbuf, wts.ttl, ttl_len());
+	else		linetitl(&hbuf);
 
 	fdb_apnd(&hbuf, "]\n", -1);
 	fdb_finsh(&hbuf);
@@ -885,6 +802,7 @@ static void writetosubproccore(
 				break;
 
 			case 'd':
+				/* TODO: dump tmeng state */
 				dump_wts();
 				break;
 
@@ -894,7 +812,10 @@ static void writetosubproccore(
 			   the output. */
 			case 'N':
 				cls->wantsoutput=1;
-				recountstate(clioutde);
+				if (wts.ttl[0])		recounttitl(clioutde);
+				if (wts.allowtmstate)	tmstate4cli(clioutde);
+				else			simpdump4cl(clioutde);
+				profinfo4cli(clioutde);
 				break;
 
 			case 'A':	atchstatejson(dc, clioutde); break;
@@ -914,7 +835,9 @@ static void writetosubproccore(
 			if (!cursmvbyte) break;
 			fdb_apnc(&kbdb, 033);
 			/* application cursor mode does O rather than [ */
-			fdb_apnc(&kbdb, wts.appcursor ? 'O' : '[');
+			fdb_apnc(&kbdb,	wts.t &&
+					MODE_APPCURSOR & term(wts.t,mode)
+					? 'O' : '[');
 			fdb_apnc(&kbdb, cursmvbyte);
 			break;
 
@@ -938,7 +861,7 @@ static void writetosubproccore(
 				wts.clnttl = !!wts.altbufsz;
 			}
 			TMpokettl(wts.altbufsz++, byte);
-			if (!byte) recountttl(clioutde);
+			if (!byte) recounttitl(clioutde);
 
 			break;
 
@@ -955,6 +878,8 @@ static void writetosubproccore(
 	}
 
 	fdb_finsh(&kbdb);
+
+	if (wts.t && wts.sendsigwin) tresize(wts.t, wts.swcol, wts.swrow);
 }
 
 void process_kbd(int clioutfd, Dtachctx dc, struct clistate *cls,
@@ -974,13 +899,11 @@ void process_kbd(int clioutfd, Dtachctx dc, struct clistate *cls,
 		warn("setting window size");
 }
 
-static struct fdbuf tsrout;
-
 static void putrwout(void)
 {
 	struct wrides de = {1, "putrwout"};
-	full_write(&de, tsrout.bf, tsrout.len);
-	tsrout.len = 0;
+	full_write(&de, therout.bf, therout.len);
+	therout.len = 0;
 }
 
 static Dtachctx testdc(char op)
@@ -1026,9 +949,10 @@ static struct clistate *testclistate(char op)
 
 static void testreset(void)
 {
+	term_fre(wts.t);
 	memset(&wts, 0, sizeof(wts));
 
-	tsrout.len = 0;
+	therout.len = 0;
 
 	free(termid);	termid = 0;
 	free(logview);	logview = 0;
@@ -1314,102 +1238,116 @@ static void _Noreturn testmain(void)
 
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "hello", -1);
+	process_tty_out("hello", -1);
 	tstdesc("pending line");
-	process_tty_out(&tsrout, "\r\n", -1);
+	process_tty_out("\r\n", -1);
 	tstdesc("finished line");
 
 	do {
 		int i = 0;
-		while (i++ < sizeof(wts.linebuf)) process_tty_out(&tsrout, "x", -1);
-		process_tty_out(&tsrout, "[exceeded]", -1);
-		process_tty_out(&tsrout, "\r\n", -1);
+		while (i++ < 1024) process_tty_out("x", -1);
+		process_tty_out("[exceeded]", -1);
+		process_tty_out("\r\n", -1);
 	} while (0);
 
-	process_tty_out(&tsrout, "abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
-	process_tty_out(&tsrout, "abcdef\b\r\n", -1);
+	process_tty_out("abcdef\b\033[K\b\033[K\b\033[Kxyz\r\n", -1);
+	process_tty_out("abcdef\b\r\n", -1);
 
 	tstdesc("move back x2 and delete to eol");
-	process_tty_out(&tsrout, "abcdef\b\b\033[K\r\n", -1);
+	process_tty_out("abcdef\b\b\033[K\r\n", -1);
 
 	tstdesc("move back x1 and insert");
-	process_tty_out(&tsrout, "asdf\bxy\r\n", -1);
+	process_tty_out("asdf\bxy\r\n", -1);
 
 	tstdesc("move back and forward");
-	process_tty_out(&tsrout, "asdf\b\033[C\r\n", -1);
+	process_tty_out("asdf\b\033[C\r\n", -1);
 
 	tstdesc("move back x2 and forward x1, then del to EOL");
-	process_tty_out(&tsrout, "asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
+	process_tty_out("asdf\b\b" "\033[C" "\033[K" "\r\n", -1);
 
 	tstdesc("as above, but in separate calls");
-	process_tty_out(&tsrout, "asdf\b\b", -1);
-	process_tty_out(&tsrout, "\033[C", -1);
-	process_tty_out(&tsrout, "\033[K", -1);
-	process_tty_out(&tsrout, "\r\n", -1);
+	process_tty_out("asdf\b\b", -1);
+	process_tty_out("\033[C", -1);
+	process_tty_out("\033[K", -1);
+	process_tty_out("\r\n", -1);
 
 	tstdesc("move left x3, move right x2, del EOL; 'right' seq in sep calls");
-	process_tty_out(&tsrout, "123 UIO\b\b\b" "\033[", -1);
-	process_tty_out(&tsrout, "C" "\033", -1);
-	process_tty_out(&tsrout, "[C", -1);
-	process_tty_out(&tsrout, "\033[K", -1);
-	process_tty_out(&tsrout, "\r\n", -1);
+	process_tty_out("123 UIO\b\b\b" "\033[", -1);
+	process_tty_out("C" "\033", -1);
+	process_tty_out("[C", -1);
+	process_tty_out("\033[K", -1);
+	process_tty_out("\r\n", -1);
 
 	tstdesc("drop console title escape seq");
 	/* https://tldp.org/HOWTO/Xterm-Title-3.html */
-	process_tty_out(&tsrout, "abc\033]0;title\007xyz\r\n", -1);
-	process_tty_out(&tsrout, "abc\033]1;title\007xyz\r\n", -1);
-	process_tty_out(&tsrout, "123\033]2;title\007" "456\r\n", -1);
+	process_tty_out("abc\033]0;title\007xyz\r\n", -1);
+	process_tty_out("abc\033]1;title\007xyz\r\n", -1);
+	process_tty_out("123\033]2;title\007" "456\r\n", -1);
 
 	tstdesc("drop console title escape seq; separate calls");
-	process_tty_out(&tsrout, "abc\033]0;ti", -1);
-	process_tty_out(&tsrout, "tle\007xyz\r\n", -1);
+	process_tty_out("abc\033]0;ti", -1);
+	process_tty_out("tle\007xyz\r\n", -1);
 
 	tstdesc("bracketed paste mode");
 	/* https://github.com/pexpect/pexpect/issues/669 */
 
 	/* \r after paste mode off */
-	process_tty_out(&tsrout, "before (", -1);
-	process_tty_out(&tsrout, "\033[?2004l\rhello\033[?2004h", -1);
-	process_tty_out(&tsrout, ") after\r\n", -1);
+	process_tty_out("before (", -1);
+	process_tty_out("\033[?2004l\rhello\033[?2004h", -1);
+	process_tty_out(") after\r\n", -1);
 
 	/* no \r after paste mode off */
-	process_tty_out(&tsrout, "before (", -1);
-	process_tty_out(&tsrout, "\033[?2004lhello\033[?2004h", -1);
-	process_tty_out(&tsrout, ") after\r\n", -1);
+	process_tty_out("before (", -1);
+	process_tty_out("\033[?2004lhello\033[?2004h", -1);
+	process_tty_out(") after\r\n", -1);
 
 	tstdesc("drop color and font");
-	process_tty_out(&tsrout, "before : ", -1);
-	process_tty_out(&tsrout, "\033[1;35mafter\r\n", -1);
+	process_tty_out("before : ", -1);
+	process_tty_out("\033[1;35mafter\r\n", -1);
 
 	/* split between calls */
-	process_tty_out(&tsrout, "before : ", -1);
-	process_tty_out(&tsrout, "\033[1;", -1);
-	process_tty_out(&tsrout, "35mafter\r\n", -1);
+	process_tty_out("before : ", -1);
+	process_tty_out("\033[1;", -1);
+	process_tty_out("35mafter\r\n", -1);
 
-	process_tty_out(&tsrout, "before : \033[36mAfter\r\n", -1);
+	process_tty_out("before : \033[36mAfter\r\n", -1);
 
-	process_tty_out(&tsrout, "first ;; \033[1;31msecond\r\n", -1);
+	process_tty_out("first ;; \033[1;31msecond\r\n", -1);
 
 	tstdesc("\\r to move to start of line");
-	process_tty_out(&tsrout, "xyz123\rXYZ\r\n", -1);
+	process_tty_out("xyz123\rXYZ\r\n", -1);
 
 	tstdesc("something makes the logs stop");
-	process_tty_out(&tsrout, 
-		"\033[?2004h[0]~$ l\b"
-		"\033[Kseq 1 | less\r"
-		"\n\033[?2004l\r\033[?104"
-		"9h\033[22;0;0t\033[?1h"
-		"\033=\r1\r\n\033[7m(END)\033"
-		"[27m\033[K\r\033[K\033[?1l"
-		"\033>\033[?1049l\033[23;0"
-		";0t\033[?2004h[0]~$"
+	term(wts.t,mode) &= ~MODE_LOGBADESC;
+	process_tty_out(
+		"\033[?2004h"
+		"[0]~$ l\b"
+		"\033[K"
+		"seq 1 | less\r"
+		"\n"
+		"\033[?2004l"
+		"\r"
+		"\033[?1049h"
+		"\033[22;0;0t"
+		"\033[?1h"
+		"\033=\r1\r\n"
+		"\033[7m(END)"
+		"\033[27m"
+		"\033[K"
+		"\r"
+		"\033[K"
+		"\033[?1l"
+		"\033>"
+		"\033[?1049l"
+		"\033[23;0;0t"
+		"\033[?2004h[0]~$"
 		" # asdf\r\n\033[?2004"
 		"l\r\033[?2004h[0]~$ "
 		, -1
 	);
 
 	tstdesc("\\r then delete line");
-	process_tty_out(&tsrout, "abc\r\033[Kfoo\r\n", -1);
+	process_tty_out("abc\r\033[Kfoo\r\n", -1);
 
 	tstdesc("arrow keys are translated to escape sequences");
 	testreset();
@@ -1421,125 +1359,128 @@ static void _Noreturn testmain(void)
 	writetosp0term("right (\\>)\r");
 
 	tstdesc("app cursor on: same codes as when off but O instead of [");
-	process_tty_out(&tsrout, "\033[?1h", -1);
+	process_tty_out("\033[?1h", -1);
 	writetosp0term("left (\\< \\<)\r");
 	writetosp0term("up down up (\\^ \\v \\^)\r");
 	writetosp0term("right (\\>)\r");
 
 	tstdesc("bad input tolerance: terminate OS cmd without char 7");
-	process_tty_out(&tsrout, "\033]0;foobar\rdon't hide me\r\n", -1);
+	process_tty_out("\033]0;foobar\rdon't hide me\r\n", -1);
 
 	tstdesc("backward to negative linepos, then dump line to log");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "\r\010\010\010x\n", -1);
+	process_tty_out("\r\010\010\010x\n", -1);
 
 	tstdesc("escape before sending to attached clients");
 	testreset();
-	process_tty_out(&tsrout, "abcd\r\n", -1);
-	process_tty_out(&tsrout, "xyz\b\t\r\n", -1);
+	process_tty_out("abcd\r\n", -1);
+	process_tty_out("xyz\b\t\r\n", -1);
 	putrwout();
 
 	tstdesc("pass OS escape to client");
 	testreset();
-	process_tty_out(&tsrout, "\033]0;asdf\007xyz\r\n", -1);
+	process_tty_out("\033]0;asdf\007xyz\r\n", -1);
 	putrwout();
 
 	tstdesc("simplify alternate mode signal");
 	testreset();
-	process_tty_out(&tsrout, "\033[?47h" "hello\r\n" "\033[?47l", -1);
+	process_tty_out("\033[?47h" "hello\r\n" "\033[?47l", -1);
 
-	process_tty_out(&tsrout, "\033[", -1);
-	process_tty_out(&tsrout, "?47h" "hello\r\n" "\033", -1);
-	process_tty_out(&tsrout, "[?47l", -1);
+	process_tty_out("\033[", -1);
+	process_tty_out("?47h" "hello\r\n" "\033", -1);
+	process_tty_out("[?47l", -1);
 
-	process_tty_out(&tsrout, "\033[?1047h" "hello\r\n" "\033[?1047l", -1);
+	process_tty_out("\033[?1047h" "hello\r\n" "\033[?1047l", -1);
 	putrwout();
 
 	tstdesc("regression");
 	testreset();
-	process_tty_out(&tsrout, "\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040", -1);
+	process_tty_out("\033\133\077\062\060\060\064\150\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040\015\033\133\113\033\135\060\073\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\072\040\176\007\033\133\060\061\073\063\062\155\155\141\164\166\157\162\145\100\160\145\156\147\165\151\156\033\133\060\060\155\072\033\133\060\061\073\063\064\155\176\033\133\060\060\155\044\040", -1);
 	putrwout();
 
 	tstdesc("passthrough escape \\033[1P from subproc to client");
 	testreset();
-	process_tty_out(&tsrout, "\033[1P", -1);
+	process_tty_out("\033[1P", -1);
 	putrwout();
 	testreset();
-	process_tty_out(&tsrout, "\033[4P", -1);
+	process_tty_out("\033[4P", -1);
 	putrwout();
 	testreset();
-	process_tty_out(&tsrout, "\033[5P", -1);
+	process_tty_out("\033[5P", -1);
 	putrwout();
 	testreset();
-	process_tty_out(&tsrout, "\033[16P", -1);
+	process_tty_out("\033[16P", -1);
 	putrwout();
 
 	tstdesc("delete 5 characters ahead");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n", -1);
+	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[5P\r\n", -1);
 
 	tstdesc("delete 12 characters ahead");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n", -1);
+	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[12P\r\n", -1);
 
 	tstdesc("delete 16 characters ahead");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n", -1);
+	process_tty_out("$ asdfasdfasdf # asdfasdfasdf\r\033[C\033[C\033[16P\r\n", -1);
 
 	tstdesc("save rawout from before OS escape");
 	testreset();
-	process_tty_out(&tsrout, "abc\033]0;new-t", -1);
+	process_tty_out("abc\033]0;new-t", -1);
 	putrwout();
 	tstdesc("<between calls>");
-	process_tty_out(&tsrout, "itle\007xyz\r\n", -1);
+	process_tty_out("itle\007xyz\r\n", -1);
 	putrwout();
 
 	tstdesc("1049h/l code for switching to/from alternate screen + other ops");
 	testreset();
-	process_tty_out(&tsrout, "abc \033[?1049h", -1);
-	process_tty_out(&tsrout, "-in-\033[?1049lout", -1);
+	process_tty_out("abc \033[?1049h", -1);
+	process_tty_out("-in-\033[?1049lout", -1);
 	putrwout();
 
 	tstdesc("dump of state");
 	testreset();
 	writetosp0term("\\N");
-	process_tty_out(&tsrout, "\033[?47h", -1); putrwout();
+	process_tty_out("\033[?47h", -1); putrwout();
 	writetosp0term("\\N");
 	writetosp0term("\\N");
-	process_tty_out(&tsrout, "\033[?47l", -1); putrwout();
+	process_tty_out("\033[?47l", -1); putrwout();
 	writetosp0term("\\N");
-	process_tty_out(&tsrout, "\033[?1049h", -1); putrwout();
+	process_tty_out("\033[?1049h", -1); putrwout();
 	writetosp0term("\\N");
-	process_tty_out(&tsrout, "\033[?1049l", -1); putrwout();
+	process_tty_out("\033[?1049l", -1); putrwout();
 	writetosp0term("\\N");
 
 	tstdesc("do not save bell character in plain text log");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "ready...\007 D I N G!\r\n", -1);
+	process_tty_out("ready...\007 D I N G!\r\n", -1);
 
 	tstdesc("editing a long line");
 	testreset();
 	writelgon();
 	writetosp0term("\\w00300104");
-	process_tty_out(&tsrout, test_lineed_in, 0xf8);
-	process_tty_out(&tsrout, "\n", -1);
+	process_tty_out(test_lineed_in, 0xf8);
+	process_tty_out("\n", -1);
 
+	/* The expected output is garbly after the st migration. I suspect the
+	   purpose here is to make sure there is no crash or crater. But maybe
+	   I have actually introduced a bug with a bad st/tm rewrite. */
 	tstdesc("editing a long line in a narrower window");
 	testreset();
 	writelgon();
 	writetosp0term("\\w00800061");
-	process_tty_out(&tsrout, test_lineednar_in, -1);
-	process_tty_out(&tsrout, "\n", -1);
+	process_tty_out(test_lineednar_in, -1);
+	process_tty_out("\n", -1);
 
 	tstdesc("go up more rows than exist in the linebuf");
 	testreset();
 	writetosp0term("\\w00800060");
-	process_tty_out(&tsrout, "\033[Axyz\r\n", -1);
+	process_tty_out("\033[Axyz\r\n", -1);
 
 	tstdesc("set long then shorter title");
 	testreset();
@@ -1564,13 +1505,13 @@ static void _Noreturn testmain(void)
 
 	tstdesc("title is too long");
 	writelgon();
-	process_tty_out(&tsrout, "this is plain terminal text", -1);
+	process_tty_out("this is plain terminal text", -1);
 	writetosp0term("\\t");
 	for (i = 0; i < sizeof(wts); i++) writetosp0term("abc");
 	writetosp0term("\n");
 	putrwout();
 	/* line buffer should not be clobbered by overflowing ttl buffer. */
-	process_tty_out(&tsrout, "\r\n", -1);
+	process_tty_out("\r\n", -1);
 	printf("stored title length: %zu\n", strnlen(wts.ttl, sizeof wts.ttl));
 
 	tstdesc("set endpoint ID");
@@ -1598,71 +1539,80 @@ static void _Noreturn testmain(void)
 
 	tstdesc("do not include altscreen content in scrollback log");
 	writelgon();
-	process_tty_out(&tsrout, "xyz\r\nabc\033[?1049h", -1);
-	process_tty_out(&tsrout, "defg", -1);
-	process_tty_out(&tsrout, "hijk\033[?1049lrest\r\n", -1);
+	process_tty_out("xyz\r\nabc\033[?1049h", -1);
+	process_tty_out("defg", -1);
+	process_tty_out("hijk\033[?1049lrest\r\n", -1);
 
 	tstdesc("move to col");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, test_jumptocol_in, test_jumptocol_in_size);
+	process_tty_out(test_jumptocol_in, test_jumptocol_in_size);
 
 	tstdesc("move to col 2");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "asdf\033[2Gxyz\r\n", -1);
+	process_tty_out("asdf\033[2Gxyz\r\n", -1);
 
 	tstdesc("shift rest of line then overwrite");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "asdf 01234\r\033[4Pxyz\n", -1);
+	process_tty_out("asdf 01234\r\033[4Pxyz\n", -1);
 
 	tstdesc("shift remaining characters right");
 	testreset();
 	writelgon();
-	process_tty_out(&tsrout, "asdf\r\033[10@xyz\n", -1);
+	process_tty_out("asdf\r\033[10@xyz\n", -1);
 
 	tstdesc("shift remaining characters right more");
 	testreset();
 	writelgon();
 	/* 10000 is too large; it should be ignored */
-	process_tty_out(&tsrout, "asdf\r\033[10000@xyz\r\n", -1);
-	process_tty_out(&tsrout, "asdf\r\033[15@xyz\r\n", -1);
-	process_tty_out(&tsrout, ":(..more\r:)\033[5@xyz\r\n", -1);
-	process_tty_out(&tsrout, ":(..more\r:)\033[1@xyz\r\n", -1);
+	process_tty_out("asdf\r\033[10000@xyz\r\n", -1);
+	process_tty_out("asdf\r\033[15@xyz\r\n", -1);
+	process_tty_out(":(..more\r:)\033[5@xyz\r\n", -1);
+	process_tty_out(":(..more\r:)\033[1@xyz\r\n", -1);
 
 	/* Make sure we only copy the amount of characters needed. */
-	for (i = 0; i < 100; i++) process_tty_out(&tsrout, "123456", -1);
-	process_tty_out(&tsrout, "\r\033[552G", -1);
-	process_tty_out(&tsrout, "\033[10@", -1);
-	process_tty_out(&tsrout, "..more:)\r\n", -1);
+	for (i = 0; i < 100; i++) process_tty_out("123456", -1);
+	process_tty_out("\r\033[552G", -1);
+	process_tty_out("\033[10@", -1);
+	process_tty_out("..more:)\r\n", -1);
 
 	tstdesc("move more characters right than are in the line");
-	process_tty_out(&tsrout, "abcd\r\033[1000@!!!!\r\n", -1);
-	process_tty_out(&tsrout, "abcd\r\033[50@!!!!\r\n", -1); 
+	process_tty_out("abcd\r\033[1000@!!!!\r\n", -1);
+	process_tty_out("abcd\r\033[50@!!!!\r\n", -1); 
 
 	tstdesc("make long line too big to fit into buffer");
-	for (i = 0; i < sizeof(wts.linebuf) - 1; i++)
-		process_tty_out(&tsrout, "*", -1);
-	process_tty_out(&tsrout, "\r\033[32@!!!\r\n", -1);
+	for (i = 0; i < 1023; i++) process_tty_out("*", -1);
+	process_tty_out("\r\033[32@!!!\r\n", -1);
 
 	tstdesc("text from current line in \\A output");
 	testreset();
 	termid = strdup("statejsontest");
-	process_tty_out(&tsrout, "foo!\r\nbar?", -1);
+	process_tty_out("foo!\r\nbar?", -1);
 	writetosp0term("\\A");
 	tstdesc("... text from prior line");
-	process_tty_out(&tsrout, "\r\n\r\n", -1);
+	process_tty_out("\r\n\r\n", -1);
 	writetosp0term("\\A");
 	tstdesc("... override with client-set title");
 	writetosp0term("\\tmy ttl 42\n");
 	writetosp0term("\\A");
-	process_tty_out(&tsrout, "another line\r\n", -1);
+	process_tty_out("another line\r\n", -1);
 	writetosp0term("\\A");
 	writetosp0term("\\t\n");
 	writetosp0term("\\A");
-	process_tty_out(&tsrout, "again, ttl from line\r\n", -1);
+	process_tty_out("again, ttl from line\r\n", -1);
 	writetosp0term("\\A");
+
+	tstdesc("tab backwards");
+	testreset();
+	writelgon();
+	process_tty_out("abc\033[1Zxyz\r\n", -1);
+	process_tty_out("\033[1Zxyz\r\n", -1);
+	process_tty_out("abc\tb\033[1Zxyz\r\n", -1);
+	process_tty_out("abc\t\033[1Zxyz\r\n", -1);
+	process_tty_out("a\tb\tc\033[2Zxyz\r\n", -1);
+	process_tty_out("a\tb\tc\033[3Zxyz\r\n", -1);
 
 	testiterprofs();
 	testqrystring();
@@ -1747,29 +1697,12 @@ static void servereadme(struct wrides *de)
 static int maybeservefont(struct wrides *de, const char *resource)
 {
 	int fni, scann;
-	const char *p;
-	char *qualp;
 
 	scann = -1;
-	sscanf(resource, "/fn%d.ttf%n", &fni, &scann);
-	if (strlen(resource) != scann) return 0;
-
-	switch (fni) {
-	default: return 0;
-	break; case 0: p = "oldschool-pc-fonts/ibm_ega_8x8";
-	break; case 1: p = "oldschool-pc-fonts/hp_100lx_10x11";
-	break; case 2: p = "shinonome/jfdot_7x14";
-	break; case 3: p = "oldschool-pc-fonts/ibm_vga_8x16";
-	break; case 4: p = "oldschool-pc-fonts/ibm_vga_9x16";
-	break; case 5: p = "oldschool-pc-fonts/dos_v_ibm_8x19";
-	break; case 6: p = "oldschool-pc-fonts/cl_stringray_8x19";
-	break; case 7: p = "oldschool-pc-fonts/ibm_xga_ai_12x20";
-	break; case 8: p = "oldschool-pc-fonts/ibm_xga_ai_12x23";
-	break; case 9: p = "oldschool-pc-fonts/dos_v_re_12x30";
-	}
-
-	xasprintf(&qualp, "/third_party/%s.ttf", p);
-	resp_static(de, 'f', qualp);
+	sscanf(resource, "/%d.wermfont%n", &fni, &scann);
+	if (strlen(resource) != scann)		return 0;
+	if (fni < 0 || fni >= fontcnt())	return 0;
+	servefnt(de, fni);
 	return 1;
 }
 
@@ -1853,6 +1786,7 @@ static void httphandlers(struct wrides *out, Httpreq *rq)
 {
 	const char *rs = rq->resource;
 
+	fprintf(stderr, "serving: %s\n", rs);
 	if (maybeservefont(out, rs))	return;
 
 	if (!strcmp(rs, "/"))		{ resp_static(out, 'h', "/index.html");
@@ -1863,7 +1797,7 @@ static void httphandlers(struct wrides *out, Httpreq *rq)
 	if (!strcmp(rs, "/endptid.js"))	{ resp_static(out, 'j', rs);	return;}
 	if (!strcmp(rs, "/aux.js"))	{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/scrollback"))	{ externalcgi(out, 'h', rq);	return;}
-	if (!strcmp(rs, "/hterm"))	{ externalcgi(out, 'j', rq);	return;}
+	if (!strcmp(rs, "/st"))		{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/showenv"))	{ externalcgi(out, 't', rq);	return;}
 	if (!strcmp(rs, "/atchses"))	{ atchsesnlis(out);		return;}
 	if (!strcmp(rs, "/readme"))	{ servereadme(out);		return;}
@@ -1942,6 +1876,8 @@ int main(int argc, char **argv)
 	argc--;
 	argv++;
 	if (1 == argc && !strcmp(*argv, "test"))	testmain();
+
+	wts.allowtmstate = 1;
 
 	if (argc >= 1 && !strcmp(*argv, "spawner")) {
 		processquerystr(getenv("WERMFLAGS"));

@@ -1,0 +1,2609 @@
+/* term_mode */
+#define MODE_WRAP		(1 << 0)
+#define MODE_INSERT		(1 << 1)
+#define MODE_ALTSCREEN		(1 << 2)
+#define MODE_CRLF		(1 << 3)
+#define MODE_ECHO		(1 << 4)
+#define MODE_PRINT		(1 << 5)
+#define MODE_UTF8		(1 << 6)
+#define MODE_INVISIBLE		(1 << 7)
+#define MODE_FOCUSED		(1 << 8)
+#define MODE_APPKEYPAD		(1 << 9)
+#define MODE_MOUSEBTN		(1 << 10)
+#define MODE_MOUSEMOTION	(1 << 11)
+#define MODE_REVERSE		(1 << 12)
+#define MODE_KBDLOCK		(1 << 13)
+#define MODE_HIDE		(1 << 14)
+#define MODE_APPCURSOR		(1 << 15)
+#define MODE_MOUSESGR		(1 << 16)
+#define MODE_8BIT		(1 << 17)
+#define MODE_BLINK		(1 << 18)
+#define MODE_FBLINK		(1 << 19)
+#define MODE_FOCUS		(1 << 20)
+#define MODE_MOUSEX10		(1 << 21)
+#define MODE_MOUSEMANY		(1 << 22)
+#define MODE_BRCKTPASTE		(1 << 23)
+#define MODE_NUMLOCK		(1 << 24)
+#define MODE_LOGBADESC		(1 << 25)
+#define MODE_MOUSE		( MODE_MOUSEBTN		\
+				| MODE_MOUSEMOTION	\
+				| MODE_MOUSEX10		\
+				| MODE_MOUSEMANY	)
+
+/* selection timeouts (in milliseconds) */
+#define DOUBLECLICKTIMEOUT 300
+#define TRIPLECLICKTIMEOUT 600
+
+/* cursor_movement */
+#define CURSOR_SAVE	0
+#define CURSOR_LOAD	1
+
+/* cursor_state */
+#define CURSOR_DEFAULT  0
+#define CURSOR_WRAPNEXT 1
+#define CURSOR_ORIGIN   2
+
+/* charset */
+#define CS_GRAPHIC0	0
+#define CS_GRAPHIC1	1
+#define CS_UK		2
+#define CS_USA		3
+#define CS_MULTI	4
+#define CS_GER		5
+#define CS_FIN		6
+
+/* escape_state */
+#define ESC_START      1
+#define ESC_CSI        2
+#define ESC_STR        4	/* DCS, OSC, PM, APC */
+#define ESC_ALTCHARSET 8
+#define ESC_STR_END    16	/* a final string was encountered */
+#define ESC_TEST       32	/* Enter in test mode */
+#define ESC_UTF8       64
+
+/* Arbitrary sizes */
+#define UTF_INVALID   0xFFFD
+#define UTF_SIZ       4
+#define ESC_BUF_SIZ   (128*UTF_SIZ)
+#define ESC_ARG_SIZ   16
+#define STR_BUF_SIZ   ESC_BUF_SIZ
+#define STR_ARG_SIZ   ESC_ARG_SIZ
+
+/* macros */
+#define IS_SET(trm, flag)       ((term(trm,mode) & (flag)) != 0)
+#define ISCONTROLC0(c)		(BETWEEN(c, 0, 0x1f) || (c) == 0x7f)
+#define ISCONTROLC1(c)		(BETWEEN(c, 0x80, 0x9f))
+#define ISCONTROL(c)		(ISCONTROLC0(c) || ISCONTROLC1(c))
+
+#define MIN(a, b)		((a) < (b) ? (a) : (b))
+#define MAX(a, b)		((a) < (b) ? (b) : (a))
+#define BETWEEN(x, a, b)	((a) <= (x) && (x) <= (b))
+#define LIMIT(x, a, b)		(x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x)
+#define MODBIT(x, set, bit)	((set) ? ((x) |= (bit)) : ((x) &= ~(bit)))
+#define TRUECOLOR(r,g,b)	(1 << 24 | (r) << 16 | (g) << 8 | (b))
+#define IS_TRUECOL(x)		(1 << 24 & (x))
+
+/* glyph_attribute */
+#define ATTR_NULL       0
+#define ATTR_BOLD       1
+#define ATTR_FAINT      2
+#define ATTR_ITALIC     4
+#define ATTR_UNDERLINE  8
+#define ATTR_BLINK      16
+#define ATTR_REVERSE    32
+#define ATTR_INVISIBLE  64
+#define ATTR_STRUCK     128
+#define ATTR_WRAP       256
+#define ATTR_WIDE       512
+#define ATTR_WDUMMY     1024
+
+/* selection_mode */
+#define SEL_IDLE	0
+#define SEL_EMPTY	1
+#define SEL_READY	2
+
+/* selection_type */
+#define SEL_REGULAR	1
+#define SEL_RECTANGULAR	2
+
+/* selection_snap */
+#define SNAP_WORD 1
+#define SNAP_LINE 2
+
+#define GLYPH_RUNE	0 /* character code */
+#define GLYPH_MODE	1 /* attribute flags */
+#define GLYPH_FG	2 /* foreground */
+#define GLYPH_BG	3 /* background */
+#define GLYPH_ELCNT	4
+
+#define DEFAULTCS	256
+#define DEFAULTRCS	257	/* default color of reverse cursor */
+#define DEFAULTFG	258
+#define DEFAULTBG	259
+
+FN3PROTO(tsetdirt)
+FN1PROTO(selnormalize)
+FN1PROTO(selclear)
+FN4PROTO(twrite)
+FN1PROTO(tdumpsel)
+FN3PROTO(tresize)
+FN1PROTO(csireset)
+FN1PROTO(csiparse)
+FN2PROTO(eschandle)
+FN1PROTO(csihandle)
+FN1PROTO(strhandle)
+FN1PROTO(strparse)
+FN3PROTO(setmode)
+FN2PROTO(tdumpline)
+FN5PROTO(tclearregion)
+FN2PROTO(tcursor)
+FN2PROTO(tdeletechar)
+FN2PROTO(tdeleteline)
+FN2PROTO(tinsertblank)
+FN2PROTO(tinsertblankline)
+FN3PROTO(tmoveto)
+FN3PROTO(tmoveato)
+FN2PROTO(tnewline)
+FN2PROTO(tputc)
+FN3PROTO(tputcnotesc)
+FN1PROTO(treset)
+FN3PROTO(tscrollup)
+FN3PROTO(tscrolldown)
+FN1PROTO(tsetattr)
+FN4PROTO(tsetchar)
+FN1PROTO(tswapscreen)
+FN2PROTO(tsetmode)
+FN1PROTO(tfulldirt)
+FN2PROTO(tdectest)
+FN2PROTO(tdefutf8)
+FN3PROTO(tdefcolor)
+FN2PROTO(tdeftran)
+FN2PROTO(tstrsequence)
+FN5PROTO(drawregion)
+FN3PROTO(selscroll)
+FN1PROTO(tdump)
+FN2PROTO(termresetpalt)
+
+fn0(curs_new)
+{
+	#define curs_x(c)	fld(c	, 0 + GLYPH_ELCNT)
+	#define curs_y(c)	fld(c	, 1 + GLYPH_ELCNT)
+	#define curs_state(c)	fld(c	, 2 + GLYPH_ELCNT)
+	#define CURS_ELCNT 		( 3 + GLYPH_ELCNT)
+
+	TMint c = tmalloc(CURS_ELCNT);
+
+	return c;
+}
+
+fn2(curs_cp, dst, src)
+{
+	TMint fi;
+
+	for (fi = 0; fi < CURS_ELCNT; fi++) fld(dst, fi) = fld(src, fi);
+
+	return 0;
+}
+
+fn0(term_new)
+{
+	#define term_allowaltscr	0x00
+	#define term_tclick1		0x01
+	#define term_tclick2		0x02
+	#define term_tclickx		0x03
+	#define term_tabspaces		0x04
+	#define term_row		0x05 /* nb row */
+	#define term_col		0x06 /* nb col */
+	#define term_ocx		0x07 /* old cursor col */
+	#define term_ocy		0x08 /* old cursor row */
+	#define term_top		0x09 /* top    scroll limit */
+	#define term_bot		0x0a /* bottom scroll limit */
+	#define term_mode		0x0b /* terminal mode flags */
+	#define term_esc		0x0c /* escape state flags */
+	#define term_charset		0x0d /* current charset */
+	/* selected charset for sequence */
+	#define term_icharset		0x0e
+	/* last printed char outside of sequence; 0 if control */
+	#define term_lastc		0x0f
+	#define term_curs		0x10
+	#define term_cursbakup		0x11 /* 2 slots */
+	#define term_stresctyp		0x13
+	#define term_strescbuf		0x14
+	#define term_strescdxs		0x15
+	#define term_allowwindowops	0x16
+	#define term_cursor		0x17 /* cursor style */
+	#define term_trantbl		0x18 /* 4 slots */
+	#define term_scr		0x1c
+	#define term_alt		0x1d
+	#define term_palt		0x1e
+	#define term_noresponse		0x1f /* ignore sideband tty requests */
+	#define term_cw	      		0x20 /* cell/char width */
+	#define term_ch	      		0x21 /* cell/char height */
+	#define term_cursthick		0x22
+	#define term_selmode		0x23
+	#define term_seltype		0x24
+	#define term_selsnap		0x25
+	#define term_selnbx		0x26
+	#define term_selnby		0x27
+	#define term_selnex		0x28
+	#define term_selney		0x29
+	#define term_selobx		0x2a
+	#define term_seloby		0x2b
+	#define term_seloex		0x2c
+	#define term_seloey		0x2d
+	#define term_selalt		0x2e
+	#define term_strlit		0x2f
+	#define term_csiescmd0		0x30
+	#define term_csiescmd1		0x31
+	#define term_csiescprv		0x32
+	#define term_csiescbuf		0x33
+	#define term_csiescdxs		0x34
+	#define term_dirty		0x35
+	#define term_tabs		0x36
+	#define term_putcbuf		0x37
+	#define term_sbbuf		0x38
+	TMint t =	tmalloc(	0x39);
+	#define term(o,f)		(fld(o,term_##f))
+
+	term(t,mode)		|= MODE_LOGBADESC;
+
+	term(t,allowaltscr)	= 1;
+	term(t,tclick1) = tmalloc(2);
+	term(t,tclick2) = tmalloc(2);
+	term(t,tclickx) = tmalloc(2);
+	Now(term(t,tclick1));
+	Now(term(t,tclick2));
+
+	/* Changing tab size may require using a customized terminfo entry, and
+	   telling the kernel to not expand tabs. */
+	term(t,tabspaces)	= 8;
+	term(t,curs)		= curs_new();
+
+	/* main screen, alt screen saved cursors */
+	term(t,cursbakup+0)	= curs_new();
+	term(t,cursbakup+1)	= curs_new();
+
+	/* ESC type [[ [<priv>] <arg> [;]] <mode>] ESC '\' */
+	term(t,strescbuf)	= deqmk();
+	/* ESC '[' [[ [<priv>] <arg> [;]] <mode> [<mode>]] */
+	term(t,csiescbuf)	= deqmk();
+
+	/* byte indices into str/csiescbuf indicating where each arg starts */
+	term(t,strescdxs)	= deqmk();
+	term(t,csiescdxs)	= deqmk();
+
+	/* allow certain non-interactive (insecure) window operations such as:
+	   setting the clipboard text */
+	term(t,allowwindowops)	= 1;
+
+	/*
+	 * Default shape of cursor
+	 * 2: Block ("█")
+	 * 4: Underline ("_")
+	 * 6: Bar ("|")
+	 */
+	term(t,cursor) = 2;
+
+	/* thickness of underline and bar cursors */
+	term(t,cursthick) = 2;
+
+	/*
+	 * Selection variables:
+	 * nb - normalized coordinates of the beginning of the selection
+	 * ne - normalized coordinates of the end of the selection
+	 * ob - original coordinates of the beginning of the selection
+	 * oe - original coordinates of the end of the selection
+	 */
+	term(t,selmode) = SEL_IDLE;
+	term(t,selsnap) = 0;
+	term(t,selobx) = -1;
+	term(t,putcbuf) = deqmk();
+
+	termresetpalt(t, 0);
+
+	return t;
+}
+
+fn1(term_fre, t)
+{
+	if (!t) return;
+
+	tmfree(term(t,alt));
+	tmfree(term(t,scr));
+	tmfree(term(t,curs));
+	tmfree(term(t,cursbakup+0));
+	tmfree(term(t,cursbakup+1));
+	tmfree(term(t,csiescbuf));
+	tmfree(term(t,strescbuf));
+	tmfree(term(t,strescdxs));
+	tmfree(term(t,csiescdxs));
+	tmfree(term(t,putcbuf));
+
+	/* Gets scrollback appended to it as a deq, if not 0. */
+	tmfree(term(t,sbbuf));
+}
+
+/* identification sequence returned in DA and DECID */
+fn1(vtiden, trm)
+{
+	return term(trm,strlit)=deqsetutf8(term(trm,strlit), "\033[?6c", -1);
+}
+
+/* Status Report "OK" `0n` */
+fn1(statusok, trm)
+{
+	return term(trm,strlit)=deqsetutf8(term(trm,strlit), "\033[0n", -1);
+}
+
+fn1(rn, trm)
+{
+	return term(trm,strlit)=deqsetutf8(term(trm,strlit), "\r\n", -1);
+}
+
+fn3(term_cellf, trm, row, col)
+{
+	TMint coln = term(trm,col), fldi;
+
+	if (col < 0 || col > coln)
+		sriously(	"col out of range: r,c=%d,%d in width=%d",
+				row, col, coln);
+
+	fldi = row * coln + col;
+	fldi *= GLYPH_ELCNT;
+
+	return fldi;
+}
+
+fn5(term_glyph, trm, row, col, gfld, newval)
+{
+	TMint	fldi = term_cellf(trm, row, col) + gfld,
+		scr = term(trm,scr),
+		old = fld(scr, fldi);
+	if (newval != -1) fld(scr, fldi) = newval;
+	return old;
+}
+
+fn1(codpntfor_vt100_0, v)
+{
+	switch (v) {
+	default		: return 0x0000;
+	case 0x41    	: return 0x2191;
+	case 0x42    	: return 0x2193;
+	case 0x43    	: return 0x2192;
+	case 0x44    	: return 0x2190;
+	case 0x45    	: return 0x2588;
+	case 0x46    	: return 0x259a;
+	case 0x47    	: return 0x2603;
+	case 0x5f    	: return 0x0020;
+	case 0x60    	: return 0x25c6;
+	case 0x61    	: return 0x2592;
+	case 0x62    	: return 0x2409;
+	case 0x63    	: return 0x240c;
+	case 0x64	: return 0x240d;
+	case 0x65	: return 0x240a;
+	case 0x66	: return 0x00b0;
+	case 0x67	: return 0x00b1;
+	case 0x68	: return 0x2424;
+	case 0x69	: return 0x240b;
+	case 0x6a	: return 0x2518;
+	case 0x6b	: return 0x2510;
+	case 0x6c	: return 0x250c;
+	case 0x6d	: return 0x2514;
+	case 0x6e	: return 0x253c;
+	case 0x6f	: return 0x23ba;
+	case 0x70	: return 0x23bb;
+	case 0x71	: return 0x2500;
+	case 0x72	: return 0x23bc;
+	case 0x73	: return 0x23bd;
+	case 0x74	: return 0x251c;
+	case 0x75	: return 0x2524;
+	case 0x76	: return 0x2534;
+	case 0x77	: return 0x252c;
+	case 0x78	: return 0x2502;
+	case 0x79	: return 0x2264;
+	case 0x7a	: return 0x2265;
+	case 0x7b	: return 0x03c0;
+	case 0x7c	: return 0x2260;
+	case 0x7d	: return 0x00a3;
+	case 0x7e	: return 0x00b7;
+	}
+}
+
+fn2(tlinelen, trm, y)
+{
+	TMint scr = term(trm,scr);
+	TMint i = term(trm,col), cellf = term_cellf(trm, y, i - 1);
+
+	if (ATTR_WRAP & fld(scr, cellf+GLYPH_MODE)) return i;
+
+	for (;;) {
+		if (0x20 != fld(scr, cellf+GLYPH_RUNE)) return i;
+
+		if (!--i) return 0;
+		cellf -= GLYPH_ELCNT;
+	}
+}
+
+fn2(term_setrowfrombuf, trm, rowi)
+{
+	TMint rown = term(trm,row);
+	fldcpy(	term(trm,scr), term_cellf(trm, rowi, 0),
+		term(trm,scr), term_cellf(trm, rown, 0),
+		term(trm,col) * GLYPH_ELCNT);
+}
+
+fn2(term_setbuffromrow, trm, rowi)
+{
+	TMint rown = term(trm,row);
+	fldcpy(	term(trm,scr), term_cellf(trm, rown, 0),
+		term(trm,scr), term_cellf(trm, rowi, 0),
+		term(trm,col) * GLYPH_ELCNT);
+}
+
+fn3(term_setrowfromrow, trm, rowi, rowj)
+{
+	TMint scr = term(trm,scr);
+
+	fldcpy(	scr, term_cellf(trm, rowi, 0),
+		scr, term_cellf(trm, rowj, 0),
+		term(trm,col) * GLYPH_ELCNT);
+}
+
+/* Fits the oldscr buffer (either term_alt or term_scr) into a new screen
+   buffer of the new row/col dimensions. Frees the old buffer. */
+fn4(term_refitscreen, trm, oldscr, newr, newc)
+{
+	/* Allocate an extra row at the end for scratch space. */
+	TMint newscr = tmalloc((1+newr) * newc * GLYPH_ELCNT);
+	TMint cpdsti = 0, cpsrci, cprown, scuprown, cpfperrow;
+
+	if (!term(trm,col) || !term(trm,row)) return newscr;
+
+	/* Fields to copy per row. */
+	cpfperrow = (newc > term(trm,col)) ? term(trm,col) : newc;
+	cpfperrow *= GLYPH_ELCNT;
+
+	/* rows to scroll up to prevent cursor from being below the visible
+	   area */
+	scuprown = curs_y(term(trm,curs)) - newr;
+	if (scuprown <= 0) scuprown = 0;
+
+	/* Number of rows to copy. */
+	cprown = term(trm,row);
+	if (newr < cprown) cprown = newr;
+
+	cpdsti = 0;
+	cpsrci = scuprown * term(trm,col) * GLYPH_ELCNT;
+
+	while (cprown--) {
+		fldcpy(newscr, cpdsti, oldscr, cpsrci, cpfperrow);
+		cpdsti += GLYPH_ELCNT * newc;
+		cpsrci += GLYPH_ELCNT * term(trm,col);
+	}
+
+	tmfree(oldscr);
+	return newscr;
+}
+
+fn2(sixd_to_chan, i, div)
+{
+	if (!i) return 0;
+	i = ~~(i / div) % 6;
+	return 0x37 + 0x28 * i;
+}
+
+fn1(defaultpalette, i)
+{
+	if (i < 0) return -1;
+
+	switch (i) {
+	/* ANSI 16 taken from hterm, rather than translated from st */
+	case 0x000: return 0x000000;
+	case 0x001: return 0xcc0000;
+	case 0x002: return 0x4e9a06;
+	case 0x003: return 0xc4a000;
+	case 0x004: return 0x3465a4;
+	case 0x005: return 0x75507b;
+	case 0x006: return 0x06989a;
+	case 0x007: return 0xd3d7cf;
+	case 0x008: return 0x555753;
+	case 0x009: return 0xef2929;
+	case 0x00a: return 0x00ba13;
+	case 0x00b: return 0xfce94f;
+	case 0x00c: return 0x729fcf;
+	case 0x00d: return 0xf200cb;
+	case 0x00e: return 0x00b5bd;
+	case 0x00f: return 0xeeeeec;
+	/* more colors can be added after 255 to use with DefaultXX */
+	case 0x100: return 0xcccccc;
+	case 0x101: return 0x555555;
+	case 0x102: return 0xe5e5e5;
+	case 0x103: return 0x000000;
+	#define PALETTESIZ 0x104
+	}
+
+	if (i > 0xff) return -1;
+
+	i -= 16;
+	if (i < 6*6*6) {
+		return	sixd_to_chan(i, 36)	<< 16	|
+			sixd_to_chan(i, 6)	<< 8	|
+			sixd_to_chan(i, 1)		;
+	}
+
+	i -= 6*6*6;
+	return 0x080808 + 0x0a0a0a * i;
+}
+
+fn2(termresetpalt, t, notify)
+{
+	TMint i = 0, p = term(t,palt), c;
+
+	if (!p) p = term(t,palt) = tmalloc(PALETTESIZ);
+
+	for (;;) {
+		fld(p,i) = c = defaultpalette(i);
+		if (notify) Xsetcolor(t, i, c);
+		if (++i == PALETTESIZ) break;
+	}
+}
+
+fn1(isdelim, u)
+{
+	switch (u) {
+	default:	return 0;
+	case ORD(' '):	return 1;
+	}
+}
+
+fn3(tsetscroll, trm, t, b)
+{
+	TMint temp;
+
+	LIMIT(t, 0, term(trm,row)-1);
+	LIMIT(b, 0, term(trm,row)-1);
+	if (t > b) {
+		temp = t;
+		t = b;
+		b = temp;
+	}
+	term(trm,top) = t;
+	term(trm,bot) = b;
+
+	return 0;
+}
+
+fn2(pshreadabl, d, c)
+{
+	if (c >= ORD(' ') && c <= ORD('~')) {
+		d = deqpushbyt(d, c);
+	} else if (c == ORD('\n')) {
+		d = deqpshutf8(d, "(\\n)", -1);
+	} else if (c == ORD('\r')) {
+		d = deqpshutf8(d, "(\\r)", -1);
+	} else if (c == 0x1b) {
+		d = deqpshutf8(d, "(\\e)", -1);
+	} else {
+		d = deqpushbyt(d, ORD('('));
+		d = deqpshhex8(d, c);
+		d = deqpushbyt(d, ORD(')'));
+	}
+
+	return d;
+}
+
+fn2(csidump, trm, md)
+{
+	TMint i, ebf = term(trm,csiescbuf), dxs = term(trm,csiescdxs);
+
+	md = deqpshutf8(md, "mode0=", -1);
+	md = deqpshhex8(md, term(trm,csiescmd0));
+	md = deqpshutf8(md, ",mode1=", -1);
+	md = deqpshhex8(md, term(trm,csiescmd1));
+	md = deqpshutf8(md, " ESC[", -1);
+	for (i = 0; i < deqbytsiz(ebf); i++)
+		md = pshreadabl(md, deqbytat(ebf, i, -1));
+	md = deqpshutf8(md, "\ncsiescdxs=", -1);
+	for (i = 0; i < deqsiz(dxs); i++) {
+		md = deqpshitoa(md, deqcellat(dxs, i));
+		md = deqpushbyt(md, ORD(','));
+	}
+	md = deqpushbyt(md, ORD('\n'));
+
+	tmlog("%s", deqtostring(md, 0));
+	tmfree(md);
+
+	return 0;
+}
+
+fn3(tsetdirt, trm, top, bot)
+{
+	TMint i;
+
+	LIMIT(top, 0, term(trm,row)-1);
+	LIMIT(bot, 0, term(trm,row)-1);
+
+	for (i = top; i <= bot; i++) fld(term(trm,dirty), i) = 1;
+}
+
+fn1(selclear, trm)
+{
+	if (term(trm,selobx) == -1)
+		return 0;
+	term(trm,selmode) = SEL_IDLE;
+	term(trm,selobx) = -1;
+	tsetdirt(trm, term(trm,selnby), term(trm,selney));
+}
+
+fn3(selsnap, trm, coorfld, direction)
+{
+	TMint newx, newy, xt, yt, delim, prevdelim, gp, prevgp,
+		scr = term(trm,scr);
+
+	switch (term(trm,selsnap)) {
+	case SNAP_WORD:
+		/*
+		 * Snap around if the word wraps around at the end or
+		 * beginning of a line.
+		 */
+		prevgp = term_cellf(trm,	fld(trm,coorfld+1),
+						fld(trm,coorfld+0));
+		prevdelim = isdelim(fld(scr, prevgp+GLYPH_RUNE));
+		for (;;) {
+			newx = fld(trm,coorfld+0) + direction;
+			newy = fld(trm,coorfld+1);
+			if (!BETWEEN(newx, 0, term(trm,col) - 1)) {
+				newy += direction;
+				newx = (newx + term(trm,col)) % term(trm,col);
+				if (!BETWEEN(newy, 0, term(trm,row) - 1))
+					break;
+
+				if (direction > 0)
+					yt = fld(trm,coorfld+1), xt = fld(trm,coorfld+0);
+				else
+					yt = newy, xt = newx;
+				if (ATTR_WRAP &
+				    ~term_glyph(trm, yt, xt, GLYPH_MODE, -1))
+					break;
+			}
+
+			if (newx >= tlinelen(trm, newy))
+				break;
+
+			gp = term_cellf(trm, newy, newx);
+			delim = isdelim(fld(scr, gp+GLYPH_RUNE));
+			if (!(fld(scr, gp+GLYPH_MODE) & ATTR_WDUMMY)) {
+				if (delim != prevdelim) break;
+				if (delim &&	fld(scr, GLYPH_RUNE+gp) !=
+						fld(scr, GLYPH_RUNE+prevgp))
+					break;
+			}
+
+			fld(trm,coorfld+0) = newx;
+			fld(trm,coorfld+1) = newy;
+			prevgp = gp;
+			prevdelim = delim;
+		}
+		break;
+	case SNAP_LINE:
+		/*
+		 * Snap around if the the previous line or the current one
+		 * has set ATTR_WRAP at its end. Then the whole next or
+		 * previous line will be selected.
+		 */
+		fld(trm,coorfld+0) = (direction < 0) ? 0 : term(trm,col) - 1;
+		for (	;	fld(trm,coorfld+1) > 0
+			&&	fld(trm,coorfld+1) < term(trm,row)-1
+			;	fld(trm,coorfld+1) += direction) {
+			if (ATTR_WRAP &
+			    ~term_glyph(trm,
+					fld(trm,coorfld+1)-(direction<0 ? 1:0),
+					term(trm,col)-1,
+					GLYPH_MODE, -1))
+				break;
+		}
+	}
+}
+
+fn1(selnormalize, trm)
+{
+	TMint i;
+
+	if (	term(trm,seltype) == SEL_REGULAR
+	&&	term(trm,seloby) != term(trm,seloey)) {
+		term(trm,selnbx)	= term(trm,seloby) < term(trm,seloey)
+					? term(trm,selobx) : term(trm,seloex);
+		term(trm,selnex)	= term(trm,seloby) < term(trm,seloey)
+					? term(trm,seloex) : term(trm,selobx);
+	} else {
+		term(trm,selnbx) = MIN(term(trm,selobx), term(trm,seloex));
+		term(trm,selnex) = MAX(term(trm,selobx), term(trm,seloex));
+	}
+	term(trm,selnby) = MIN(term(trm,seloby), term(trm,seloey));
+	term(trm,selney) = MAX(term(trm,seloby), term(trm,seloey));
+
+	selsnap(trm, term_selnbx, -1);
+	selsnap(trm, term_selnex, +1);
+
+	/* expand selection over line breaks */
+	if (term(trm,seltype) == SEL_RECTANGULAR)
+		return;
+	i = tlinelen(trm, term(trm,selnby));
+	if (i < term(trm,selnbx))
+		term(trm,selnbx) = i;
+	if (tlinelen(trm, term(trm,selney)) <= term(trm,selnex))
+		term(trm,selnex) = term(trm,col) - 1;
+}
+
+fn2(strdump, trm, md)
+{
+	TMint i=0, c, eb = term(trm,strescbuf), cnt=deqbytsiz(eb);
+
+	md = deqpshutf8(md, "ESC", -1);
+	md = pshreadabl(md, term(trm,stresctyp));
+	for (;;) {
+		if (i == cnt) 	{ md = deqpshutf8(md, "ESC\\", -1);	break; }
+		if (!(c = deqbytat(eb, i++, -1)))			break;
+		md = pshreadabl(md, c);
+	}
+	tmlog("%s", deqtostring(md, 0));
+	tmfree(md);
+}
+
+fn3(selected, trm, x, y)
+{
+	if (term(trm,selmode) == SEL_EMPTY || term(trm,selobx) == -1 ||
+			term(trm,selalt) != IS_SET(trm, MODE_ALTSCREEN))
+		return 0;
+
+	if (term(trm,seltype) == SEL_RECTANGULAR)
+		return BETWEEN(y, term(trm,selnby), term(trm,selney))
+		    && BETWEEN(x, term(trm,selnbx), term(trm,selnex));
+
+	return BETWEEN(y, term(trm,selnby), term(trm,selney))
+	    && (y != term(trm,selnby) || x >= term(trm,selnbx))
+	    && (y != term(trm,selney) || x <= term(trm,selnex));
+}
+
+/* Returns selection as a deq object with the UTF-8 bytes on it,
+   null-terminated. */
+fn1(getsel, trm)
+{
+	TMint y, lastx, linelen;
+	TMint str, scr = term(trm,scr), gp, last;
+
+	if (term(trm,selobx) == -1)
+		return 0;
+
+	str = deqmk();
+
+	/* append every set & selected glyph to the selection */
+	for (y = term(trm,selnby); y <= term(trm,selney); y++) {
+		if ((linelen = tlinelen(trm, y)) == 0) {
+			str = deqpushbyt(str, 0x0a);
+			continue;
+		}
+
+		if (term(trm,seltype) == SEL_RECTANGULAR) {
+			gp = term_cellf(trm, y, term(trm,selnbx));
+			lastx = term(trm,selnex);
+		} else {
+			gp = term_cellf(trm, y, term(trm,selnby) == y ? term(trm,selnbx) : 0);
+			lastx = (term(trm,selney) == y) ? term(trm,selnex) : term(trm,col)-1;
+		}
+		last = term_cellf(trm, y, MIN(lastx, linelen-1));
+		while (last >= gp && fld(scr, last+GLYPH_RUNE) == 0x20)
+			last -= GLYPH_ELCNT;
+
+		for ( ; gp <= last; gp += GLYPH_ELCNT) {
+			if (fld(scr, gp+GLYPH_MODE) & ATTR_WDUMMY)
+				continue;
+
+			str = deqpushcop(str, fld(scr, gp+GLYPH_RUNE));
+		}
+
+		/*
+		 * Copy and pasting of line endings is inconsistent
+		 * in the inconsistent terminal and GUI world.
+		 * The best solution seems like to produce '\n' when
+		 * something is copied from st and convert '\n' to
+		 * '\r', when something to be pasted is received by
+		 * st.
+		 * FIXME: Fix the computer world.
+		 */
+		if (y < term(trm,selney) || lastx >= linelen) {
+			if ((ATTR_WRAP & ~fld(scr, last+GLYPH_MODE)) ||
+			    term(trm,seltype) == SEL_RECTANGULAR)
+				str = deqpushcop(str, 0x0a);
+		}
+	}
+	return str;
+}
+
+fn2(tputtab, trm, n)
+{
+	TMint x = curs_x(term(trm,curs)), cn = term(trm,col);
+	TMint dir = n>0 ? 1 : -1;
+
+	for (;;) {
+		if (!n) break;
+		for (;;) {
+			x += dir;
+			if (x >= cn)			{x = cn-1;	break;}
+			if (x < 0)			{x = 0;		break;}
+			if (fld(term(trm,tabs), x))	break;
+		}
+		n -= dir;
+	}
+	curs_x(term(trm,curs)) = x;
+}
+
+fn4(ttywrite, trm, deq, siz, may_echo)
+{
+	TMint next, di;
+
+	if (siz < 0) siz = deqbytsiz(deq);
+	if (may_echo && IS_SET(trm, MODE_ECHO))
+		twrite(trm, deq, siz, 1);
+
+	if (!IS_SET(trm, MODE_CRLF)) {
+		Ttywriteraw(trm, deq, 0, siz);
+		return;
+	}
+
+	/* This is similar to how the kernel handles ONLCR for ttys */
+	for (di = 0; di < siz; ) {
+		if (deqbytat(deq, di, -1) == ORD('\r')) {
+			Ttywriteraw(trm, rn(trm), 0, 2);
+			di++;
+			continue;
+		}
+
+		for (	next = di;
+			next < siz && deqbytat(deq, next, -1) != ORD('\r');
+			next++) {}
+		Ttywriteraw(trm, deq, di, next - di);
+		di = next;
+	}
+}
+
+fn2(tcontrolcode, trm, ascii)
+{
+	switch (ascii) {
+	case ORD('\t'):   /* HT */
+		tputtab(trm, 1);
+		return;
+	case ORD('\b'):   /* BS */
+		tmoveto(trm, curs_x(term(trm,curs))-1, curs_y(term(trm,curs)));
+		return;
+	case ORD('\r'):   /* CR */
+		tmoveto(trm, 0, curs_y(term(trm,curs)));
+		return;
+	case ORD('\f'):   /* LF */
+	case ORD('\v'):   /* VT */
+	case ORD('\n'):   /* LF */
+		/* go to first col if the mode is set */
+		tnewline(trm, IS_SET(trm, MODE_CRLF));
+		return;
+	case 007: /* BEL */
+		if (term(trm,esc) & ESC_STR_END) {
+			/* backwards compatibility to xterm */
+			strhandle(trm);
+		} else {
+			Xbell(trm);
+		}
+		break;
+	case 033: /* ESC */
+		csireset(trm);
+		term(trm,esc) &= ~(ESC_CSI|ESC_ALTCHARSET|ESC_TEST);
+		term(trm,esc) |= ESC_START;
+		return;
+	case 016: /* SO (LS1 -- Locking shift 1) */
+	case 017: /* SI (LS0 -- Locking shift 0) */
+		term(trm,charset) = 1 - (ascii - '\016');
+		return;
+	case 032: /* SUB */
+		tsetchar(trm, ORD('?'),	curs_x(term(trm,curs)),
+					curs_y(term(trm,curs)));
+		/* FALLTHROUGH */
+	case 030: /* CAN */
+		csireset(trm);
+		break;
+	case 005: /* ENQ (IGNORED) */
+	case 000: /* NUL (IGNORED) */
+	case 021: /* XON (IGNORED) */
+	case 023: /* XOFF (IGNORED) */
+	case 0177:   /* DEL (IGNORED) */
+		return;
+	case 0x80:   /* TODO: PAD */
+	case 0x81:   /* TODO: HOP */
+	case 0x82:   /* TODO: BPH */
+	case 0x83:   /* TODO: NBH */
+	case 0x84:   /* TODO: IND */
+		break;
+	case 0x85:   /* NEL -- Next line */
+		tnewline(trm, 1); /* always go to first col */
+		break;
+	case 0x86:   /* TODO: SSA */
+	case 0x87:   /* TODO: ESA */
+		break;
+	case 0x88:   /* HTS -- Horizontal tab stop */
+		fld(term(trm,tabs), curs_x(term(trm,curs))) = 1;
+		break;
+	case 0x89:   /* TODO: HTJ */
+	case 0x8a:   /* TODO: VTS */
+	case 0x8b:   /* TODO: PLD */
+	case 0x8c:   /* TODO: PLU */
+	case 0x8d:   /* TODO: RI */
+	case 0x8e:   /* TODO: SS2 */
+	case 0x8f:   /* TODO: SS3 */
+	case 0x91:   /* TODO: PU1 */
+	case 0x92:   /* TODO: PU2 */
+	case 0x93:   /* TODO: STS */
+	case 0x94:   /* TODO: CCH */
+	case 0x95:   /* TODO: MW */
+	case 0x96:   /* TODO: SPA */
+	case 0x97:   /* TODO: EPA */
+	case 0x98:   /* TODO: SOS */
+	case 0x99:   /* TODO: SGCI */
+		break;
+	case 0x9a:   /* DECID -- Identify Terminal */
+		if (!term(trm,noresponse)) ttywrite(trm, vtiden(trm), -1, 0);
+		break;
+	case 0x9b:   /* TODO: CSI */
+	case 0x9c:   /* TODO: ST */
+		break;
+	case 0x90:   /* DCS -- Device Control String */
+	case 0x9d:   /* OSC -- Operating System Command */
+	case 0x9e:   /* PM -- Privacy Message */
+	case 0x9f:   /* APC -- Application Program Command */
+		tstrsequence(trm, ascii);
+		return;
+	}
+	/* only CAN, SUB, \a and C1 chars interrupt a sequence */
+	term(trm,esc) &= ~(ESC_STR_END|ESC_STR);
+}
+
+#include "charwi"
+
+fn2(tputc, trm, u)
+{
+	TMint c = term(trm,putcbuf), width;
+
+	deqclear(c);
+	if (u < 127 || !IS_SET(trm, MODE_UTF8)) {
+		c = deqpushbyt(c, u);
+		width = 1;
+	} else {
+		c = deqpushcop(c, u);
+		width = charwi(u);
+	}
+	term(trm,putcbuf) = c;
+
+	if (IS_SET(trm, MODE_PRINT)) Xprint(c);
+
+	/*
+	 * STR sequence must be checked before anything else
+	 * because it uses all following characters until it
+	 * receives a ESC, a SUB, a ST or any other C1 control
+	 * character.
+	 */
+	if (~term(trm,esc) & ESC_STR) {
+		tputcnotesc(trm, u, width);
+		return;
+	}
+	if (	u == 007
+	|| (	u == ORD('\r') && ORD(']') == term(trm,stresctyp))
+	||	u == 030
+	||	u == 032
+	||	u == 033
+	||	ISCONTROLC1(u)) {
+		term(trm,esc) &= ~(ESC_START|ESC_STR);
+		term(trm,esc) |= ESC_STR_END;
+		tputcnotesc(trm, u, width);
+		return;
+	}
+
+	/*
+	 * Here is a bug in terminals. If the user never sends
+	 * some code to stop the str or esc command, then st
+	 * will stop responding. But this is better than
+	 * silently failing with unknown characters. At least
+	 * then users will report back.
+	 *
+	 * In the case users ever get fixed, here is the code:
+	 */
+	/*
+	 * term(trm,esc) = 0;
+	 * strhandle(trm);
+	 */
+	if (deqbytsiz(term(trm,strescbuf)) >= 0x7fffffff) return;
+	term(trm,strescbuf) = deqcatbyt(term(trm,strescbuf), c);
+}
+
+fn3(tputcnotesc, trm, u, width)
+{
+	TMint gp, g1, g2, scr = term(trm,scr);
+
+	/*
+	 * Actions of control codes must be performed as soon they arrive
+	 * because they can be embedded inside a control sequence, and
+	 * they must not cause conflicts with sequences.
+	 */
+	if (ISCONTROL(u)) {
+		/* in UTF-8 mode ignore handling C1 control characters */
+		if (IS_SET(trm, MODE_UTF8) && ISCONTROLC1(u))
+			return;
+		tcontrolcode(trm, u);
+		/*
+		 * control codes are not shown ever
+		 */
+		if (!term(trm,esc))
+			term(trm,lastc) = 0;
+		return;
+	} else if (term(trm,esc) & ESC_START) {
+		if (term(trm,esc) & ESC_CSI) {
+			term(trm,csiescbuf) =
+				deqpushbyt(term(trm,csiescbuf), u);
+			if (BETWEEN(u, 0x40, 0x7E)
+					|| deqsiz(term(trm,csiescbuf)) >= \
+					ESC_BUF_SIZ-1) {
+				term(trm,esc) = 0;
+				csiparse(trm);
+				csihandle(trm);
+			}
+			return;
+		} else if (term(trm,esc) & ESC_UTF8) {
+			tdefutf8(trm, u);
+		} else if (term(trm,esc) & ESC_ALTCHARSET) {
+			tdeftran(trm, u);
+		} else if (term(trm,esc) & ESC_TEST) {
+			tdectest(trm, u);
+		} else {
+			if (!eschandle(trm, u))
+				return;
+			/* sequence already finished */
+		}
+		term(trm,esc) = 0;
+		/*
+		 * All characters which form part of a sequence are not
+		 * printed
+		 */
+		return;
+	}
+	if (selected(trm, curs_x(term(trm,curs)), curs_y(term(trm,curs))))
+		selclear(trm);
+
+	gp = term_cellf(trm, curs_y(term(trm,curs)), curs_x(term(trm,curs)));
+
+	if (	IS_SET(trm, MODE_WRAP) &&
+		(curs_state(term(trm,curs)) & CURSOR_WRAPNEXT)
+	) {
+		fld(scr, gp + GLYPH_MODE) |= ATTR_WRAP;
+		tnewline(trm, 1);
+		gp = term_cellf(trm,	curs_y(term(trm,curs)),
+					curs_x(term(trm,curs)));
+	}
+
+	if (	IS_SET(trm, MODE_INSERT) &&
+		curs_x(term(trm,curs))+width < term(trm,col)
+	) {
+		fldmov(	scr, gp + width * GLYPH_ELCNT,
+			scr, gp,
+			(term(trm,col) - curs_x(term(trm,curs)) - width)
+			* GLYPH_ELCNT);
+		fld(scr, gp + GLYPH_MODE) &= ~ATTR_WIDE;
+	}
+
+	if (curs_x(term(trm,curs))+width > term(trm,col)) {
+		if (IS_SET(trm, MODE_WRAP))
+			tnewline(trm, 1);
+		else
+			tmoveto(trm,	term(trm,col) - width,
+					curs_y(term(trm,curs)));
+		gp = term_cellf(trm,	curs_y(term(trm,curs)),
+					curs_x(term(trm,curs)));
+	}
+
+	tsetchar(trm, u, curs_x(term(trm,curs)), curs_y(term(trm,curs)));
+	term(trm,lastc) = u;
+
+	if (width == 2) {
+		fld(scr, gp + GLYPH_MODE) |= ATTR_WIDE;
+		g1 = gp+GLYPH_ELCNT;
+		g2 = g1+GLYPH_ELCNT;
+		if (curs_x(term(trm,curs))+1 < term(trm,col)) {
+			if (	fld(scr, g1+GLYPH_MODE) == ATTR_WIDE
+				&& curs_x(term(trm,curs))+2 < term(trm,col)
+			) {
+				fld(scr, g2+GLYPH_RUNE) = 0x20;
+				fld(scr, g2+GLYPH_MODE) &= ~ATTR_WDUMMY;
+			}
+			fld(scr, g1+GLYPH_RUNE) = 0;
+			fld(scr, g1+GLYPH_MODE) = ATTR_WDUMMY;
+		}
+	}
+	if (curs_x(term(trm,curs))+width < term(trm,col)) {
+		tmoveto(trm,	curs_x(term(trm,curs))+width,
+				curs_y(term(trm,curs)));
+	} else {
+		curs_state(term(trm,curs)) |= CURSOR_WRAPNEXT;
+	}
+}
+
+fn1(badu8, trm)
+{
+	tmlog("bad utf8 data");
+	tputc(trm, ORD('?'));
+}
+
+fn4(twrite, trm, deq, buflen, show_ctrl)
+{
+	TMint n = 0, isu8, u, u8left = 0, ubuf;
+
+	isu8 = IS_SET(trm, MODE_UTF8);
+	if (buflen < 0) buflen = deqbytsiz(deq);
+
+	for (;;) {
+		if (buflen==n)		break;
+		u = deqbytat(deq, n++, -1);
+
+		if (isu8) {
+			if 		(0x00 == (u & 0x80)) {
+				if (	u8left)			badu8(trm);
+				u8left = 0;
+			} else if	(0xf8 == (u & 0xf8)) {
+								badu8(trm);
+				u8left = 0;			continue;
+			} else if	(0xf0 == (u & 0xf8)) {
+				if (	u8left)			badu8(trm);
+				u8left = 3; ubuf = u & 0x07;	continue;
+			} else if	(0xe0 == (u & 0xf0)) {
+				if (	u8left)			badu8(trm);
+				u8left = 2; ubuf = u & 0x0f;	continue;
+			} else if	(0xc0 == (u & 0xe0)) {
+				if (	u8left)			badu8(trm);
+				u8left = 1; ubuf = u & 0x1f;	continue;
+			} else if	(0x80 == (u & 0xc0)) {
+				if (!	u8left)			badu8(trm);
+				else {
+					ubuf = u & 0x3f | ubuf<<6;
+					if (--u8left)		continue;
+				}
+				u = ubuf;
+			}
+		}
+
+		if (show_ctrl && ISCONTROL(u)) {
+			if (u & 0x80) {
+				u &= 0x7f;
+				tputc(trm, ORD('^'));
+				tputc(trm, ORD('['));
+			} else if (	u != ORD('\n') &&
+					u != ORD('\r') &&
+					u != ORD('\t')) {
+				u ^= 0x40;
+				tputc(trm, ORD('^'));
+			}
+		}
+		tputc(trm, u);
+	}
+
+	return n;
+}
+
+fn1(tfulldirt, trm)
+{
+	tsetdirt(trm, 0, term(trm,row)-1);
+}
+
+fn2(tcursor, trm, mode)
+{
+	TMint bakup = fld(trm, term_cursbakup+IS_SET(trm, MODE_ALTSCREEN));
+
+	if (mode == CURSOR_SAVE) {
+		curs_cp(bakup, term(trm,curs));
+	} else if (mode == CURSOR_LOAD) {
+		curs_cp(term(trm,curs), bakup);
+		tmoveto(trm, curs_x(bakup), curs_y(bakup));
+	}
+}
+
+fn1(treset, trm)
+{
+	TMint i, c = term(trm,curs);
+
+	fld(c, GLYPH_RUNE)	= 0;
+	fld(c, GLYPH_MODE)	= ATTR_NULL;
+	fld(c, GLYPH_FG)	= DEFAULTFG;
+	fld(c, GLYPH_BG)	= DEFAULTBG;
+	curs_x(c)		= 0;
+	curs_y(c)		= 0;
+	curs_state(c)		= CURSOR_DEFAULT;
+
+	for (i = 0; i < term(trm,col); i++)
+		fld(term(trm,tabs), i) = i && !(i % term(trm,tabspaces));
+	term(trm,top) = 0;
+	term(trm,bot) = term(trm,row) - 1;
+	term(trm,mode) |= MODE_WRAP|MODE_UTF8;
+	term(trm,mode) &=	~MODE_INSERT	&
+				~MODE_ALTSCREEN	&
+				~MODE_CRLF	&
+				~MODE_ECHO	&
+				~MODE_PRINT	;
+	term(trm, trantbl+0) = CS_USA;
+	term(trm, trantbl+1) = CS_USA;
+	term(trm, trantbl+2) = CS_USA;
+	term(trm, trantbl+3) = CS_USA;
+	term(trm,charset) = 0;
+
+	for (i = 0; i < 2; i++) {
+		tmoveto(trm, 0, 0);
+		tcursor(trm, CURSOR_SAVE);
+		tclearregion(trm, 0, 0, term(trm,col)-1, term(trm,row)-1);
+		tswapscreen(trm);
+	}
+}
+
+fn3(tnew, trm, col, row)
+{
+	tresize(trm, col, row);
+	treset(trm);
+}
+
+fn1(tswapscreen, trm)
+{
+	TMint tmp = term(trm,scr);
+
+	term(trm,scr) = term(trm,alt);
+	term(trm,alt) = tmp;
+	term(trm,mode) ^= MODE_ALTSCREEN;
+	tfulldirt(trm);
+}
+
+fn3(tscrolldown, trm, orig, n)
+{
+	TMint i;
+
+	LIMIT(n, 0, term(trm,bot)-orig+1);
+
+	tsetdirt(trm, orig, term(trm,bot)-n);
+	tclearregion(trm, 0, term(trm,bot)-n+1, term(trm,col)-1, term(trm,bot));
+
+	for (i = term(trm,bot); i >= orig+n; i--) {
+		term_setbuffromrow(trm,	i);
+		term_setrowfromrow(trm, i, i-n);
+		term_setrowfrombuf(trm, i-n);
+	}
+
+	selscroll(trm, orig, n);
+}
+
+fn3(tscrollup, trm, orig, n)
+{
+	TMint i;
+
+	LIMIT(n, 0, term(trm,bot)-orig+1);
+
+	tclearregion(trm, 0, orig, term(trm,col)-1, orig+n-1);
+	tsetdirt(trm, orig+n, term(trm,bot));
+
+	for (i = orig; i <= term(trm,bot)-n; i++) {
+		term_setbuffromrow(trm,	i);
+		term_setrowfromrow(trm, i, i+n);
+		term_setrowfrombuf(trm, i+n);
+	}
+
+	selscroll(trm, orig, -n);
+}
+
+fn3(selscroll, trm, orig, n)
+{
+	if (term(trm,selobx) == -1)				return;
+	if (term(trm,selalt) != IS_SET(trm, MODE_ALTSCREEN))	return;
+
+	if (	BETWEEN(term(trm,selnby), orig, term(trm,bot)) !=
+		BETWEEN(term(trm,selney), orig, term(trm,bot))
+	) {
+		selclear(trm);
+	} else if (BETWEEN(term(trm,selnby), orig, term(trm,bot))) {
+		term(trm,seloby) += n;
+		term(trm,seloey) += n;
+		if (	term(trm,seloby) < term(trm,top)
+		||	term(trm,seloby) > term(trm,bot)
+		||	term(trm,seloey) < term(trm,top)
+		||	term(trm,seloey) > term(trm,bot)) {
+			selclear(trm);
+		} else {
+			selnormalize(trm);
+		}
+	}
+}
+
+fn3(tpushlinestr, trm, dq, y)
+{
+	TMint	cf0 = term_cellf(trm, y,	0),
+		cf1 = term_cellf(trm, y+1,	0),
+		cop, scr = term(trm,scr);
+
+	for (;;) {
+		cf1 -= GLYPH_ELCNT;
+		if (cf1 < cf0) break;
+		cop = fld(scr, cf1 + GLYPH_RUNE);
+		if (cop && 0x20 != cop) break;
+	}
+
+	for (;;) {
+		if (cf0 > cf1) break;
+		cop = fld(scr, cf0+GLYPH_RUNE);
+		if (cop) dq = deqpushcop(dq, cop);
+		cf0+=GLYPH_ELCNT;
+	}
+
+	return dq;
+}
+
+fn2(tnewline, trm, first_col)
+{
+	TMint	crs = term(trm,curs), y = curs_y(crs),
+		sbb = term(trm,sbbuf);
+
+	if (sbb && ~term(trm,mode) & MODE_ALTSCREEN) {
+		sbb = tpushlinestr(trm, sbb, y);
+		term(trm,sbbuf)	= deqpushbyt(sbb, ORD('\n'));
+	}
+
+	if (y == term(trm,bot)) {
+		tscrollup(trm, term(trm,top), 1);
+	} else {
+		y++;
+	}
+	tmoveto(trm, first_col ? 0 : curs_x(crs), y);
+}
+
+fn1(csiparse, trm)
+{
+	TMint ebf = term(trm,csiescbuf), ebl = deqbytsiz(ebf);
+	TMint dxs = term(trm,csiescdxs), bi, v, atoix = tmalloc(1);
+
+	deqclear(dxs);
+	bi = 0;
+	if (deqbytat(ebf, 0, -1) == ORD('?')) {
+		term(trm,csiescprv) = 1;
+		bi = 1;
+	}
+
+	while (bi < ebl) {
+		v = deqatoi(ebf, bi, atoix);
+		if (bi == fld(atoix, 0))	v = 0;
+		if (v == 0x80000000)		v = -1;
+		if (v == 0x7fffffff)		v = -1;
+		dxs = deqpushtl(dxs, v);
+		bi = fld(atoix, 0);
+		if (deqbytat(ebf, bi, -1) != ORD(';'))	break;
+		if (deqsiz(dxs) == ESC_ARG_SIZ)		break;
+		bi++;
+	}
+
+	term(trm,csiescmd0) =			deqbytat(ebf, bi, -1);
+	term(trm,csiescmd1) = ++bi >= ebl ? 0 :	deqbytat(ebf, bi, -1);
+
+	term(trm,csiescdxs) = dxs;
+	tmfree(atoix);
+}
+
+/* for absolute user moves, when decom is set */
+fn3(tmoveato, trm, x, y)
+{
+	tmoveto(trm, x, y + ((curs_state(term(trm,curs)) & CURSOR_ORIGIN) ? term(trm,top): 0));
+}
+
+fn3(tmoveto, trm, x, y)
+{
+	TMint miny, maxy;
+
+	if (curs_state(term(trm,curs)) & CURSOR_ORIGIN) {
+		miny = term(trm,top);
+		maxy = term(trm,bot);
+	} else {
+		miny = 0;
+		maxy = term(trm,row) - 1;
+	}
+	curs_state(term(trm,curs)) &= ~CURSOR_WRAPNEXT;
+	curs_x(term(trm,curs)) = LIMIT(x, 0, term(trm,col)-1);
+	curs_y(term(trm,curs)) = LIMIT(y, miny, maxy);
+}
+
+fn4(tsetchar, trm, u, x, y)
+{
+	TMint u2, mode, gf, scr = term(trm,scr);
+
+	/* The table is proudly stolen from rxvt and converted with a script. */
+	if (fld(trm, term_trantbl+term(trm,charset)) == CS_GRAPHIC0) {
+		u2 = codpntfor_vt100_0(u);
+		if (u2) u = u2;
+	}
+
+	gf = term_cellf(trm, y, x);
+	mode = fld(scr, gf+GLYPH_MODE);
+	if (ATTR_WIDE & mode) {
+		if (x+1 < term(trm,col)) {
+			fld(scr, gf+GLYPH_ELCNT+GLYPH_RUNE) = 0x20;
+			fld(scr, gf+GLYPH_ELCNT+GLYPH_MODE) &= ~ATTR_WDUMMY;
+		}
+	} else {
+		if (ATTR_WDUMMY & mode) {
+			fld(scr, gf-GLYPH_ELCNT+GLYPH_RUNE) = 0x20;
+			fld(scr, gf-GLYPH_ELCNT+GLYPH_MODE) &= ~ATTR_WIDE;
+		}
+	}
+
+	fld(term(trm,dirty),y) = 1;
+	fld(scr, gf+GLYPH_MODE	) = fld(term(trm,curs), GLYPH_MODE);
+	fld(scr, gf+GLYPH_FG	) = fld(term(trm,curs), GLYPH_FG);
+	fld(scr, gf+GLYPH_BG	) = fld(term(trm,curs), GLYPH_BG);
+	fld(scr, gf+GLYPH_RUNE	) = u;
+}
+
+fn5(tclearregion, trm, x1, y1, x2, y2)
+{
+	TMint x, y, temp, gp, scr = term(trm,scr);
+
+	if (x1 > x2)
+		temp = x1, x1 = x2, x2 = temp;
+	if (y1 > y2)
+		temp = y1, y1 = y2, y2 = temp;
+
+	LIMIT(x1, 0, term(trm,col)-1);
+	LIMIT(x2, 0, term(trm,col)-1);
+	LIMIT(y1, 0, term(trm,row)-1);
+	LIMIT(y2, 0, term(trm,row)-1);
+
+	for (y = y1; y <= y2; y++) {
+		fld(term(trm,dirty), y) = 1;
+		for (x = x1; x <= x2; x++) {
+			gp = term_cellf(trm, y, x);
+			if (selected(trm, x, y))
+				selclear(trm);
+			fld(scr, gp+GLYPH_FG)	= fld(term(trm,curs), GLYPH_FG);
+			fld(scr, gp+GLYPH_BG)	= fld(term(trm,curs), GLYPH_BG);
+			fld(scr, gp+GLYPH_MODE)	= 0;
+			fld(scr, gp+GLYPH_RUNE) = 0x20;
+		}
+	}
+}
+
+fn2(tdeletechar, trm, n)
+{
+	TMint cursx = curs_x(term(trm,curs)), scr = term(trm,scr);
+	TMint cursy = curs_y(term(trm,curs)), src;
+
+	LIMIT(n, 0, term(trm,col) - cursx);
+	src = cursx + n;
+
+	fldmov(	scr, term_cellf(trm, cursy,	cursx),
+		scr, term_cellf(trm, cursy,	src),
+		GLYPH_ELCNT * (term(trm,col) -	src));
+
+	tclearregion(trm,	term(trm,col) - n, cursy,
+				term(trm,col) - 1, cursy);
+}
+
+fn2(tinsertblank, trm, n)
+{
+	TMint cursx = curs_x(term(trm,curs)), scr = term(trm,scr);
+	TMint cursy = curs_y(term(trm,curs)), dst;
+
+	LIMIT(n, 0, term(trm,col) - cursx);
+	dst = cursx + n;
+
+	fldmov(	scr, term_cellf(trm, cursy, 	dst),
+		scr, term_cellf(trm, cursy, 	cursx),
+		GLYPH_ELCNT * (term(trm,col) -	dst));
+
+	tclearregion(trm,	cursx,	cursy,
+				dst-1,	cursy);
+}
+
+fn2(tinsertblankline, trm, n)
+{
+	if (BETWEEN(curs_y(term(trm,curs)), term(trm,top), term(trm,bot)))
+		tscrolldown(trm, curs_y(term(trm,curs)), n);
+}
+
+fn2(tdeleteline, trm, n)
+{
+	if (BETWEEN(curs_y(term(trm,curs)), term(trm,top), term(trm,bot)))
+		tscrollup(trm, curs_y(term(trm,curs)), n);
+}
+
+/* Attempts to change fg or bg color based on csi argument at i. Returns the
+   new value of i. */
+fn3(tdefcolor, trm, i, forb)
+{
+	TMint dxs = term(trm,csiescdxs), l = deqsiz(dxs), idx = -1, r, g, b, dm;
+
+	if (i+1 >= l) return i;
+
+	switch (deqcellat(dxs, ++i)) {
+	case 2: /* direct color in RGB space */
+		if (i + 3 >= l) {
+			idx = -1;
+			i = l - 1;
+			break;
+		}
+		r = deqcellat(dxs, ++i);
+		g = deqcellat(dxs, ++i);
+		b = deqcellat(dxs, ++i);
+		idx = TRUECOLOR(r, g, b);
+		if (	!BETWEEN(r, 0, 255)
+		||	!BETWEEN(g, 0, 255)
+		||	!BETWEEN(b, 0, 255)) {
+			idx = -2;
+		}
+		break;
+	case 5: /* indexed color */
+		if (i + 1 >= l) {
+			idx = -3;
+			i = l - 1;
+			break;
+		}
+		idx = deqcellat(dxs, ++i);
+		if (!BETWEEN(idx, 0, 255))
+			idx = -4;
+		break;
+	case 0: /* implemented defined (only foreground) */
+	case 1: /* transparent */
+	case 3: /* direct color in CMY space */
+	case 4: /* direct color in CMYK space */
+	default:
+		idx = -4;
+		break;
+	}
+
+	if (idx < 0) {
+		dm = deqmk();
+		dm = deqpshutf8(dm, "bad csi color at ", -1);
+		dm = deqpshitoa(dm, i);
+		dm = deqpshutf8(dm, ", err=", -1);
+		dm = deqpshitoa(dm, idx);
+		dm = deqpshutf8(dm, ": ", -1);
+		csidump(trm, dm);
+	}
+
+	fld(term(trm,curs), forb) = idx;
+
+	return i;
+}
+
+fn1(tsetattr, trm)
+{
+	TMint dxs = term(trm,csiescdxs), l = deqsiz(dxs), i, attr, dm;
+
+	for (i = 0; i < l; i++) {
+		attr = deqcellat(dxs, i);
+		switch (attr) {
+		case 0:
+			fld(term(trm,curs), GLYPH_MODE) &= ~(
+				ATTR_BOLD       |
+				ATTR_FAINT      |
+				ATTR_ITALIC     |
+				ATTR_UNDERLINE  |
+				ATTR_BLINK      |
+				ATTR_REVERSE    |
+				ATTR_INVISIBLE  |
+				ATTR_STRUCK     );
+			fld(term(trm,curs), GLYPH_FG) = DEFAULTFG;
+			fld(term(trm,curs), GLYPH_BG) = DEFAULTBG;
+			break;
+		case 1:
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_BOLD;
+			break;
+		case 2:
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_FAINT;
+			break;
+		case 3:
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_ITALIC;
+			break;
+		case 4:
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_UNDERLINE;
+			break;
+		case 5: /* slow blink */
+			/* FALLTHROUGH */
+		case 6: /* rapid blink */
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_BLINK;
+			break;
+		case 7:
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_REVERSE;
+			break;
+		case 8:
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_INVISIBLE;
+			break;
+		case 9:
+			fld(term(trm,curs), GLYPH_MODE) |= ATTR_STRUCK;
+			break;
+		case 22:
+			fld(term(trm,curs), GLYPH_MODE) &= ~(ATTR_BOLD | ATTR_FAINT);
+			break;
+		case 23:
+			fld(term(trm,curs), GLYPH_MODE) &= ~ATTR_ITALIC;
+			break;
+		case 24:
+			fld(term(trm,curs), GLYPH_MODE) &= ~ATTR_UNDERLINE;
+			break;
+		case 25:
+			fld(term(trm,curs), GLYPH_MODE) &= ~ATTR_BLINK;
+			break;
+		case 27:
+			fld(term(trm,curs), GLYPH_MODE) &= ~ATTR_REVERSE;
+			break;
+		case 28:
+			fld(term(trm,curs), GLYPH_MODE) &= ~ATTR_INVISIBLE;
+			break;
+		case 29:
+			fld(term(trm,curs), GLYPH_MODE) &= ~ATTR_STRUCK;
+			break;
+		case 38: i = tdefcolor(trm, i, GLYPH_FG); break;
+		case 39:
+			fld(term(trm,curs), GLYPH_FG) = DEFAULTFG;
+			break;
+		case 48: i = tdefcolor(trm, i, GLYPH_BG); break;
+		case 49:
+			fld(term(trm,curs), GLYPH_BG) = DEFAULTBG;
+			break;
+		default:
+			if (BETWEEN(attr, 30, 37)) {
+				fld(term(trm,curs), GLYPH_FG) = attr - 30;
+			} else if (BETWEEN(attr, 40, 47)) {
+				fld(term(trm,curs), GLYPH_BG) = attr - 40;
+			} else if (BETWEEN(attr, 90, 97)) {
+				fld(term(trm,curs), GLYPH_FG) = attr - 90 + 8;
+			} else if (BETWEEN(attr, 100, 107)) {
+				fld(term(trm,curs), GLYPH_BG) = attr - 100 + 8;
+			} else if (MODE_LOGBADESC & term(trm,mode)) {
+				dm = deqmk();
+				dm = deqpshutf8(dm, "erresc(deflt): gfx attr ",
+						-1);
+				dm = deqpshitoa(dm, attr);
+				dm = deqpshutf8(dm, "unknown: ", -1);
+				csidump(trm, dm);
+			}
+			break;
+		}
+	}
+}
+
+fn2(tsetmode, trm, set)
+{
+	TMint dxs = term(trm,csiescdxs), alt, argi, argel;
+	TMint pri = term(trm,csiescprv);
+
+	for (argi = 0; argi < deqsiz(dxs); argi++) {
+		argel = deqcellat(dxs, argi);
+		if (pri) {
+			switch (argel) {
+			case 1: /* DECCKM -- Cursor key */
+				setmode(trm, set, MODE_APPCURSOR);
+				break;
+			case 5: /* DECSCNM -- Reverse video */
+				setmode(trm, set, MODE_REVERSE);
+				break;
+			case 6: /* DECOM -- Origin */
+				MODBIT(curs_state(term(trm,curs)), set, CURSOR_ORIGIN);
+				tmoveato(trm, 0, 0);
+				break;
+			case 7: /* DECAWM -- Auto wrap */
+				MODBIT(term(trm,mode), set, MODE_WRAP);
+				break;
+			case 0:  /* Error (IGNORED) */
+			case 2:  /* DECANM -- ANSI/VT52 (IGNORED) */
+			case 3:  /* DECCOLM -- Column  (IGNORED) */
+			case 4:  /* DECSCLM -- Scroll (IGNORED) */
+			case 8:  /* DECARM -- Auto repeat (IGNORED) */
+			case 18: /* DECPFF -- Printer feed (IGNORED) */
+			case 19: /* DECPEX -- Printer extent (IGNORED) */
+			case 42: /* DECNRCM -- National characters (IGNORED) */
+			case 12: /* att610 -- Start blinking cursor (IGNORED) */
+				break;
+			case 25: /* DECTCEM -- Text Cursor Enable Mode */
+				setmode(trm, !set, MODE_HIDE);
+				break;
+			case 9:    /* X10 mouse compatibility mode */
+				Xsetpointermotion(0);
+				setmode(trm, 0, MODE_MOUSE);
+				setmode(trm, set, MODE_MOUSEX10);
+				break;
+			case 1000: /* 1000: report button press */
+				Xsetpointermotion(0);
+				setmode(trm, 0, MODE_MOUSE);
+				setmode(trm, set, MODE_MOUSEBTN);
+				break;
+			case 1002: /* 1002: report motion on button press */
+				Xsetpointermotion(0);
+				setmode(trm, 0, MODE_MOUSE);
+				setmode(trm, set, MODE_MOUSEMOTION);
+				break;
+			case 1003: /* 1003: enable all mouse motions */
+				Xsetpointermotion(set);
+				setmode(trm, 0, MODE_MOUSE);
+				setmode(trm, set, MODE_MOUSEMANY);
+				break;
+			case 1004: /* 1004: send focus events to tty */
+				setmode(trm, set, MODE_FOCUS);
+				break;
+			case 1006: /* 1006: extended reporting mode */
+				setmode(trm, set, MODE_MOUSESGR);
+				break;
+			case 1034:
+				setmode(trm, set, MODE_8BIT);
+				break;
+			case 1049: /* swap screen & set/restore cursor as xterm */
+				if (!term(trm,allowaltscr))
+					break;
+				tcursor(trm, (set) ? CURSOR_SAVE : CURSOR_LOAD);
+				/* FALLTHROUGH */
+			case 47: /* swap screen */
+			case 1047:
+				if (!term(trm,allowaltscr))
+					break;
+				alt = IS_SET(trm, MODE_ALTSCREEN);
+				if (alt) {
+					tclearregion(trm, 0, 0, term(trm,col)-1,
+							term(trm,row)-1);
+				}
+				if (set ^ alt) /* set is always 1 or 0 */
+					tswapscreen(trm);
+				if (argel != 1049)
+					break;
+				/* FALLTHROUGH */
+			case 1048:
+				tcursor(trm, (set) ? CURSOR_SAVE : CURSOR_LOAD);
+				break;
+			case 2004: /* 2004: bracketed paste mode */
+				setmode(trm, set, MODE_BRCKTPASTE);
+				break;
+			/* Not implemented mouse modes. See comments there. */
+			case 1001: /* mouse highlight mode; can hang the
+				      terminal by design when implemented. */
+			case 1005: /* UTF-8 mouse mode; will confuse
+				      applications not supporting UTF-8
+				      and luit. */
+			case 1015: /* urxvt mangled mouse mode; incompatible
+				      and can be mistaken for other control
+				      codes. */
+				break;
+			default:
+				tmlog(	"erresc: bad private set/reset mode %d",
+					argel);
+				break;
+			}
+		} else {
+			switch (argel) {
+			case 0:  /* Error (IGNORED) */
+				break;
+			case 2:
+				setmode(trm, set, MODE_KBDLOCK);
+				break;
+			case 4:  /* IRM -- Insertion-replacement */
+				MODBIT(term(trm,mode), set, MODE_INSERT);
+				break;
+			case 12: /* SRM -- Send/Receive */
+				MODBIT(term(trm,mode), !set, MODE_ECHO);
+				break;
+			case 20: /* LNM -- Linefeed/new line */
+				MODBIT(term(trm,mode), set, MODE_CRLF);
+				break;
+			default:
+				tmlog(	"erresc: unknown set/reset mode %d",
+					argel);
+				break;
+			}
+		}
+	}
+}
+
+fn1(csihandle, trm)
+{
+	TMint crs = term(trm,curs), buf, dxs = term(trm,csiescdxs);
+	TMint arg0 = deqsiz(dxs) > 0 ? deqcellat(dxs, 0) : 0;
+	TMint arg1 = deqsiz(dxs) > 1 ? deqcellat(dxs, 1) : 0;
+	TMint unkcsi = 0, i, dm;
+
+	switch (term(trm,csiescmd0)) {
+	default: unkcsi = 1; break;
+	case ORD('@'): /* ICH -- Insert <n> blank char */
+		if (!arg0) arg0 = 1;
+		tinsertblank(trm, arg0);
+		break;
+	case ORD('A'): /* CUU -- Cursor <n> Up */
+		if (!arg0) arg0 = 1;
+		tmoveto(trm,	curs_x(crs),
+				curs_y(crs)-arg0);
+		break;
+	case ORD('B'): /* CUD -- Cursor <n> Down */
+	case ORD('e'): /* VPR --Cursor <n> Down */
+		if (!arg0) arg0 = 1;
+		tmoveto(trm,	curs_x(crs),
+				curs_y(crs)+arg0);
+		break;
+	case ORD('i'): /* MC -- Media Copy */
+		switch (arg0) {
+		case 0:
+			tdump(trm);
+			break;
+		case 1:
+			tdumpline(trm, curs_y(crs));
+			break;
+		case 2:
+			tdumpsel(trm);
+			break;
+		case 4:
+			term(trm,mode) &= ~MODE_PRINT;
+			break;
+		case 5:
+			term(trm,mode) |= MODE_PRINT;
+			break;
+		}
+		break;
+	case ORD('c'): /* DA -- Device Attributes */
+		if (!arg0 && !term(trm,noresponse))
+			ttywrite(trm, vtiden(trm), -1, 0);
+		break;
+	case ORD('b'): /* REP -- if last char is printable print it <n> more times */
+		if (!arg0) arg0 = 1;
+		if (term(trm,lastc))
+			while (arg0-- > 0)
+				tputc(trm, term(trm,lastc));
+		break;
+	case ORD('C'): /* CUF -- Cursor <n> Forward */
+	case ORD('a'): /* HPR -- Cursor <n> Forward */
+		if (!arg0) arg0 = 1;
+		tmoveto(trm,	curs_x(crs)+arg0,
+				curs_y(crs));
+		break;
+	case ORD('D'): /* CUB -- Cursor <n> Backward */
+		if (!arg0) arg0 = 1;
+		tmoveto(trm,	curs_x(crs)-arg0,
+				curs_y(crs));
+		break;
+	case ORD('E'): /* CNL -- Cursor <n> Down and first col */
+		if (!arg0) arg0 = 1;
+		tmoveto(trm, 0, curs_y(crs)+arg0);
+		break;
+	case ORD('F'): /* CPL -- Cursor <n> Up and first col */
+		if (!arg0) arg0 = 1;
+		tmoveto(trm, 0, curs_y(crs)-arg0);
+		break;
+	case ORD('g'): /* TBC -- Tabulation clear */
+		switch (arg0) {
+		case 0: /* clear current tab stop */
+			fld(term(trm,tabs), curs_x(crs)) = 0;
+			break;
+		case 3: /* clear all the tabs */
+			i = term(trm,col);
+			while (--i) fld(term(trm,tabs), i) = 0;
+			break;
+		default:
+			unkcsi = 1;
+		}
+		break;
+	case ORD('G'): /* CHA -- Move to <col> */
+	case ORD('`'): /* HPA */
+		if (!arg0) arg0 = 1;
+		tmoveto(trm, arg0-1, curs_y(crs));
+		break;
+	case ORD('H'): /* CUP -- Move to <row> <col> */
+	case ORD('f'): /* HVP */
+		if (!arg0) arg0 = 1;
+		if (!arg1) arg1 = 1;
+		tmoveato(trm, arg1-1, arg0-1);
+		break;
+	case ORD('I'): /* CHT -- Cursor Forward Tabulation <n> tab stops */
+		if (!arg0) arg0 = 1;
+		tputtab(trm, arg0);
+		break;
+	case ORD('J'): /* ED -- Clear screen */
+		switch (arg0) {
+		case 0: /* below */
+			tclearregion(	trm,
+					curs_x(crs),		curs_y(crs),
+					term(trm,col)-1,	curs_y(crs));
+			if (curs_y(term(trm,curs)) < term(trm,row)-1) {
+				tclearregion(	trm,
+						0, curs_y(crs)+1,
+						term(trm,col)-1,
+						term(trm,row)-1);
+			}
+			break;
+		case 1: /* above */
+			if (curs_y(term(trm,curs)) > 1)
+				tclearregion(	trm, 0, 0,
+						term(trm,col)-1,
+						curs_y(crs)-1);
+			tclearregion(trm,	0,		curs_y(crs),
+						curs_x(crs),	curs_y(crs));
+			break;
+		case 2: /* all */
+			tclearregion(	trm, 0, 0,
+					term(trm,col)-1, term(trm,row)-1);
+			break;
+		default:
+			unkcsi = 1;
+		}
+		break;
+	case ORD('K'): /* EL -- Clear line */
+		switch (arg0) {
+		case 0: /* right */
+			tclearregion(	trm,
+					curs_x(crs),		curs_y(crs),
+					term(trm,col)-1,	curs_y(crs));
+			break;
+		case 1: /* left */
+			tclearregion(	trm,
+					0,			curs_y(crs),
+					curs_x(crs),		curs_y(crs));
+			break;
+		case 2: /* all */
+			tclearregion(	trm,
+					0,			curs_y(crs),
+					term(trm,col)-1,	curs_y(crs));
+			break;
+		}
+		break;
+	case ORD('S'): /* SU -- Scroll <n> line up */
+		if (!arg0) arg0 = 1;
+		tscrollup(trm, term(trm,top), arg0);
+		break;
+	case ORD('T'): /* SD -- Scroll <n> line down */
+		if (!arg0) arg0 = 1;
+		tscrolldown(trm, term(trm,top), arg0);
+		break;
+	case ORD('L'): /* IL -- Insert <n> blank lines */
+		if (!arg0) arg0 = 1;
+		tinsertblankline(trm, arg0);
+		break;
+	case ORD('l'): /* RM -- Reset Mode */
+		tsetmode(trm, 0);
+		break;
+	case ORD('M'): /* DL -- Delete <n> lines */
+		if (!arg0) arg0 = 1;
+		tdeleteline(trm, arg0);
+		break;
+	case ORD('X'): /* ECH -- Erase <n> char */
+		if (!arg0) arg0 = 1;
+		tclearregion(	trm,
+				curs_x(crs),		curs_y(crs),
+				curs_x(crs)+arg0-1,	curs_y(crs));
+		break;
+	case ORD('P'): /* DCH -- Delete <n> char */
+		if (!arg0) arg0 = 1;
+		tdeletechar(trm, arg0);
+		break;
+	case ORD('Z'): /* CBT -- Cursor Backward Tabulation <n> tab stops */
+		if (!arg0) arg0 = 1;
+		tputtab(trm, -arg0);
+		break;
+	case ORD('d'): /* VPA -- Move to <row> */
+		if (!arg0) arg0 = 1;
+		tmoveato(trm, curs_x(crs), arg0-1);
+		break;
+	case ORD('h'): /* SM -- Set terminal mode */
+		tsetmode(trm, 1);
+		break;
+	case ORD('m'): /* SGR -- Terminal attribute (color) */
+		if (term(trm,csiescprv))
+			/* On startup, Vim likes to send "\033[?4m" when
+			   TERM=xterm256-color, and without the ? this would set
+			   the underline attribute. Ignore this here. */
+			tmlog("ignore SGR for private CSI escape");
+		else
+			tsetattr(trm);
+		break;
+	case ORD('n'): /* DSR -- Device Status Report */
+		switch (arg0) {
+		case 5:
+			if (!term(trm,noresponse))
+				ttywrite(trm, statusok(trm), -1, 0);
+			break;
+		case 6: /* Report Cursor Position (CPR) "<row>;<column>R" */
+			if (term(trm,noresponse)) break;
+			buf = deqmk();
+			buf = deqpshutf8(buf, "\033[", -1	);
+			buf = deqpshitoa(buf, curs_y(crs)+1	);
+			buf = deqpushbyt(buf, ORD(';')		);
+			buf = deqpshitoa(buf, curs_x(crs)+1	);
+			buf = deqpushbyt(buf, ORD('R')		);
+			ttywrite(trm, buf, -1, 0);
+			tmfree(buf);
+			break;
+		default:
+			unkcsi = 1;
+		}
+		break;
+	case ORD('r'): /* DECSTBM -- Set Scrolling Region */
+		if (term(trm,csiescprv)) {
+			unkcsi = 1;
+		} else {
+			if (!arg0)	arg0 = 1;
+			if (!arg1)	arg1 = term(trm,row);
+			tsetscroll(trm, arg0-1, arg1-1);
+			tmoveato(trm, 0, 0);
+		}
+		break;
+	case ORD('s'): /* DECSC -- Save cursor position (ANSI.SYS) */
+		tcursor(trm, CURSOR_SAVE);
+		break;
+	case ORD('u'): /* DECRC -- Restore cursor position (ANSI.SYS) */
+		tcursor(trm, CURSOR_LOAD);
+		break;
+	case ORD(' '):
+		switch (term(trm,csiescmd1)) {
+		case ORD('q'): /* DECSCUSR -- Set Cursor Style */
+			if (BETWEEN(arg0, 0, 6)) {
+				term(trm,cursor) = arg0;
+				break;
+			}
+		/* fallthrough */
+		default:
+			unkcsi = 1;
+		}
+		break;
+	}
+
+	if (!unkcsi)				return;
+	if (MODE_LOGBADESC & ~term(trm,mode))	return;
+
+	dm = deqmk();
+	dm = deqpshutf8(dm, "erresc: unknown csi ", -1);
+	csidump(trm, dm);
+	/* sriously(""); */
+}
+
+fn1(csireset, trm)
+{
+	deqclear(term(trm,csiescbuf));
+	deqclear(term(trm,csiescdxs));
+	term(trm,csiescmd0) = term(trm,csiescmd1) = term(trm,csiescprv) = 0;
+}
+
+fn4(osc_color_response, trm, num, index, is_osc4)
+{
+	TMint buf, c24;
+
+	if (term(trm,noresponse)) return;
+
+	if (is_osc4) index = num;
+
+	if (!BETWEEN(index, 0, PALETTESIZ-1)) {
+		tmlog(	"erresc: failed to fetch %s color %d",
+			is_osc4 ? "osc4" : "osc",
+			index);
+		return;
+	}
+	c24 = fld(term(trm,palt),index);
+
+	buf = deqmk();
+	buf = deqpshutf8(buf, "\033]"			, -1);
+	buf = deqpshutf8(buf, is_osc4 ? "4;" : ""	, -1);
+	buf = deqpshitoa(buf, num);
+	buf = deqpushbyt(buf, ORD(';'));
+	buf = deqpshhex8(buf, c24 >> 16);
+	buf = deqpshhex8(buf, c24 >> 16);
+	buf = deqpushbyt(buf, ORD('/'));
+	buf = deqpshhex8(buf, c24 >> 8);
+	buf = deqpshhex8(buf, c24 >> 8);
+	buf = deqpushbyt(buf, ORD('/'));
+	buf = deqpshhex8(buf, c24);
+	buf = deqpshhex8(buf, c24);
+	buf = deqpushbyt(buf, 007);
+
+	ttywrite(trm, buf, -1, 1);
+	tmfree(buf);
+}
+
+/* dq==0 means to use the defaultpalette value for the given palette index.
+   otherwise, uses the color name starting at byte `of` in the deq. Returns
+   0 on success. */
+fn4(updatepalt, trm, pi, dq, of)
+{
+	TMint rgb = dq	? name2rgb(dq, of, deqbytsiz(dq) - of)
+			: defaultpalette(pi);
+
+	if (rgb == -1)			return 1;
+	if (pi < 0 || pi >= PALETTESIZ)	return 1;
+
+	fld(term(trm,palt), pi) = rgb;
+	tmlog("updating palette %d to %d", pi, rgb);
+	Xsetcolor(trm, pi, rgb);
+
+	return 0;
+}
+
+fn1(strhandle, trm)
+{
+	TMint escbuf = term(trm,strescbuf);
+	TMint argdxs = term(trm,strescdxs), osci, pi = -1, j, narg, par;
+
+	term(trm,esc) &= ~(ESC_STR_END|ESC_STR);
+	strparse(trm);
+	narg = deqsiz(argdxs);
+	par = narg ? deqatoi(escbuf, 0, 0) : 0;
+
+	switch (term(trm,stresctyp)) {
+	case ORD(']'): /* OSC -- Operating System Command */
+		switch (par) {
+		case 0:
+			if (narg > 1) Xsettitle(escbuf, deqcellat(argdxs, 1));
+			if (narg > 1) Xicontitl(escbuf, deqcellat(argdxs, 1));
+			return;
+		case 1:
+			if (narg > 1) Xicontitl(escbuf, deqcellat(argdxs, 1));
+			return;
+		case 2:
+			if (narg > 1) Xsettitle(escbuf, deqcellat(argdxs, 1));
+			return;
+		case 52:
+			if (narg > 2 && term(trm,allowwindowops))
+				Xosc52copy(trm, escbuf, deqcellat(argdxs, 2));
+			return;
+		case 10:
+		case 11:
+		case 12:
+			if (narg < 2)
+				break;
+			switch (par) {
+			case 10: osci = DEFAULTFG; break;
+			case 11: osci = DEFAULTBG; break;
+			case 12: osci = DEFAULTCS; break;
+			default: osci = -1;
+			}
+			if (osci == -1) break; /* shouldn't be possible */
+
+			pi = deqcellat(argdxs, 1);
+			if (	0x3f == deqbytat(escbuf, pi,	-1) && /* "?" */
+				0x00 == deqbytat(escbuf, pi+1,	-1)
+			) {
+				osc_color_response(trm, par, osci, 0);
+			} else if (updatepalt(trm, osci, escbuf, pi)) {
+				tmlog(	"erresc: invalid %d color: %s",
+					par, deqtostring(escbuf, pi));
+			} else {
+				tfulldirt(trm);
+			}
+			return;
+		case 4: /* color set */
+			if (narg < 3)
+				break;
+			pi = deqcellat(argdxs, 2);
+			/* FALLTHROUGH */
+		case 104: /* color reset */
+			if (narg > 1)
+				j=deqatoi(	term(trm,strescbuf),
+						deqcellat(argdxs, 1),
+						0);
+			else
+				j=-1;
+
+			if (pi != -1 &&	0x3f == deqbytat(escbuf, pi,	-1) &&
+					0x00 == deqbytat(escbuf, pi+1,	-1)) {
+				osc_color_response(trm, j, 0, 1);
+			} else if (pi >= 0	? updatepalt(trm, j, escbuf, pi)
+						: updatepalt(trm, j, 0, 0)
+			) {
+				if (par == 104 && narg <= 1) {
+					/* color reset without parameter */
+					termresetpalt(trm,1);
+					return;
+				}
+				tmlog(	"erresc: invalid color j=%d, p=%s",
+					j, pi>=-1	? deqtostring(escbuf,pi)
+							: "(null)");
+			} else {
+				/*
+				 * TODO if defaultbg color is changed, borders
+				 * are dirty
+				 */
+				tfulldirt(trm);
+			}
+			return;
+		}
+		break;
+	case ORD('k'): /* old title set compatibility */
+		Xsettitle(escbuf, deqcellat(argdxs, 0));
+		return;
+	case ORD('P'): /* DCS -- Device Control String */
+	case ORD('_'): /* APC -- Application Program Command */
+	case ORD('^'): /* PM -- Privacy Message */
+		return;
+	}
+
+	if (MODE_LOGBADESC & term(trm,mode))
+		strdump(trm, deqpshutf8(deqmk(), "erresc: unknown str - ", -1));
+}
+
+fn1(strparse, trm)
+{
+	TMint c, bi = 0, eb = term(trm,strescbuf), dxs = term(trm,strescdxs);
+
+	deqclear(dxs);
+	if (!(c = deqbytat(eb, 0, -1))) return;
+
+	for (;;) {
+		dxs = deqpushtl(dxs, bi);
+
+		for (;;) {
+			c = deqbytat(eb, bi++, -1);
+			if (!c) { term(trm,strescdxs) = dxs; return; }
+			if (c == ORD(';')) break;
+		}
+		deqbytat(eb, bi-1, 0);
+	}
+}
+
+fn1(tdumpsel, trm)
+{
+	TMint selq;
+
+	if (!(selq = getsel(trm))) return;
+
+	Xprint(selq);
+	tmfree(selq);
+}
+
+fn2(tdumpline, trm, n)
+{
+	TMint bp, str = deqmk(), cels, scr = term(trm,scr);
+
+	bp = term_cellf(trm, n, 0) + GLYPH_RUNE;
+	cels = MIN(tlinelen(trm, n), term(trm,col));
+	if (cels > 1 || fld(scr, bp) != 0x20) {
+		for ( ; cels--; bp += GLYPH_ELCNT)
+			str = deqpushcop(str, fld(scr, bp));
+	}
+	str = deqpushcop(str, 0x0a);
+	Xprint(str);
+	tmfree(str);
+}
+
+fn1(tdump, trm)
+{
+	TMint i;
+
+	for (i = 0; i < term(trm,row); ++i)
+		tdumpline(trm, i);
+}
+
+fn2(tdefutf8, trm, ascii)
+{
+	if (ascii == ORD('G'))
+		term(trm,mode) |= MODE_UTF8;
+	else if (ascii == ORD('@'))
+		term(trm,mode) &= ~MODE_UTF8;
+}
+
+fn2(tdeftran, trm, ascii)
+{
+	TMint tranent;
+
+	tranent = -1;
+	switch (ascii) {
+	case ORD('0'):	tranent = CS_GRAPHIC0;	break;
+	case ORD('B'):	tranent = CS_USA; 	break;
+	default:	tmlog(	"esc unhandled charset: ESC ( 0x" HEXFMT "",
+				HEXARG(ascii));
+	}
+	if (tranent >= 0) fld(trm, term_trantbl+term(trm,icharset)) = tranent;
+
+	return 0;
+}
+
+fn2(tdectest, trm, c)
+{
+	TMint x, y;
+
+	if (c == ORD('8')) { /* DEC screen alignment test. */
+		for (x = 0; x < term(trm,col); ++x) {
+			for (y = 0; y < term(trm,row); ++y)
+				tsetchar(trm, ORD('E'), x, y);
+		}
+	}
+}
+
+fn2(tstrsequence, trm, c)
+{
+	switch (c) {
+	case 0x90:   /* DCS -- Device Control String */
+		c = ORD('P');
+		break;
+	case 0x9f:   /* APC -- Application Program Command */
+		c = ORD('_');
+		break;
+	case 0x9e:   /* PM -- Privacy Message */
+		c = ORD('^');
+		break;
+	case 0x9d:   /* OSC -- Operating System Command */
+		c = ORD(']');
+		break;
+	}
+	deqclear(term(trm,strescbuf));
+	term(trm,stresctyp) = c;
+	term(trm,esc) |= ESC_STR;
+}
+
+/*
+ * returns 1 when the sequence is finished and it hasn't to read
+ * more characters for this sequence, otherwise 0
+ */
+fn2(eschandle, trm, ascii)
+{
+	switch (ascii) {
+	case ORD('['):
+		term(trm,esc) |= ESC_CSI;
+		return 0;
+	case ORD('#'):
+		term(trm,esc) |= ESC_TEST;
+		return 0;
+	case ORD('%'):
+		term(trm,esc) |= ESC_UTF8;
+		return 0;
+	case ORD('P'): /* DCS -- Device Control String */
+	case ORD('_'): /* APC -- Application Program Command */
+	case ORD('^'): /* PM -- Privacy Message */
+	case ORD(']'): /* OSC -- Operating System Command */
+	case ORD('k'): /* old title set compatibility */
+		tstrsequence(trm, ascii);
+		return 0;
+	case ORD('n'): /* LS2 -- Locking shift 2 */
+	case ORD('o'): /* LS3 -- Locking shift 3 */
+		term(trm,charset) = 2 + (ascii - ORD('n'));
+		break;
+	case ORD('('): /* GZD4 -- set primary charset G0 */
+	case ORD(')'): /* G1D4 -- set secondary charset G1 */
+	case ORD('*'): /* G2D4 -- set tertiary charset G2 */
+	case ORD('+'): /* G3D4 -- set quaternary charset G3 */
+		term(trm,icharset) = ascii - ORD('(');
+		term(trm,esc) |= ESC_ALTCHARSET;
+		return 0;
+	case ORD('D'): /* IND -- Linefeed */
+		if (curs_y(term(trm,curs)) == term(trm,bot)) {
+			tscrollup(trm, term(trm,top), 1);
+		} else {
+			tmoveto(trm, curs_x(term(trm,curs)), curs_y(term(trm,curs))+1);
+		}
+		break;
+	case ORD('E'): /* NEL -- Next line */
+		tnewline(trm, 1); /* always go to first col */
+		break;
+	case ORD('H'): /* HTS -- Horizontal tab stop */
+		fld(term(trm,tabs), curs_x(term(trm,curs))) = 1;
+		break;
+	case ORD('M'): /* RI -- Reverse index */
+		if (curs_y(term(trm,curs)) == term(trm,top)) {
+			tscrolldown(trm, term(trm,top), 1);
+		} else {
+			tmoveto(trm, curs_x(term(trm,curs)), curs_y(term(trm,curs))-1);
+		}
+		break;
+	case ORD('Z'): /* DECID -- Identify Terminal */
+		if (!term(trm,noresponse)) ttywrite(trm, vtiden(trm), -1, 0);
+		break;
+	case ORD('c'): /* RIS -- Reset to initial state */
+		treset(trm);
+		Xsettitle(0, 0);
+		termresetpalt(trm,1);
+		setmode(trm, 0, MODE_HIDE);
+		break;
+	case ORD('='): /* DECPAM -- Application keypad */
+		setmode(trm, 1, MODE_APPKEYPAD);
+		break;
+	case ORD('>'): /* DECPNM -- Normal keypad */
+		setmode(trm, 0, MODE_APPKEYPAD);
+		break;
+	case ORD('7'): /* DECSC -- Save Cursor */
+		tcursor(trm, CURSOR_SAVE);
+		break;
+	case ORD('8'): /* DECRC -- Restore Cursor */
+		tcursor(trm, CURSOR_LOAD);
+		break;
+	case ORD('\\'): /* ST -- String Terminator */
+		if (term(trm,esc) & ESC_STR_END)
+			strhandle(trm);
+		break;
+	default:
+		tmlog("erresc: unknown sequence ESC 0x" HEXFMT "", ascii);
+		break;
+	}
+	return 1;
+}
+
+fn3(tresize, trm, col, row)
+{
+	TMint i, bp, c;
+	TMint minrow = MIN(row, term(trm,row));
+	TMint mincol = MIN(col, term(trm,col));
+
+	if (col < 1 || row < 1) {
+		tmlog("tresize: error resizing to %dx%d", col, row);
+		return;
+	}
+
+	term(trm,scr) = term_refitscreen(trm, term(trm,scr), row, col);
+	term(trm,alt) = term_refitscreen(trm, term(trm,alt), row, col);
+
+	term(trm,dirty)	= tmrealloc(term(trm,	dirty),	row);
+	term(trm,tabs)	= tmrealloc(term(trm,	tabs),	col);
+
+	if (col > term(trm,col)) {
+		bp = term(trm,col);
+
+		for (;;) {
+			if (!bp)			break;
+			if (fld(term(trm,tabs), --bp))	break;
+		}
+		for (;;) {
+			bp += term(trm,tabspaces);
+			if (bp >= col) break;
+			fld(term(trm,tabs), bp) = 1;
+		}
+	}
+	/* update terminal size */
+	term(trm,col) = col;
+	term(trm,row) = row;
+	/* reset scrolling region */
+	tsetscroll(trm, 0, row-1);
+	/* make use of the LIMIT in tmoveto */
+	tmoveto(trm, curs_x(term(trm,curs)), curs_y(term(trm,curs)));
+
+	/* Clearing both screens (it makes dirty all lines) */
+	c = curs_new();
+	curs_cp(c, term(trm,curs));
+	for (i = 0; i < 2; i++) {
+		if (mincol < col && 0 < minrow) {
+			tclearregion(trm, mincol, 0, col - 1, minrow - 1);
+		}
+		if (0 < col && minrow < row) {
+			tclearregion(trm, 0, minrow, col - 1, row - 1);
+		}
+		tswapscreen(trm);
+		tcursor(trm, CURSOR_LOAD);
+	}
+	curs_cp(term(trm,curs), c);
+
+	tmfree(c);
+}
+
+fn5(drawregion, trm, x1, y1, x2, y2)
+{
+	TMint y;
+
+	for (y = y1; y < y2; y++) {
+		if (!fld(term(trm,dirty), y))
+			continue;
+
+		fld(term(trm,dirty), y) = 0;
+		Xdrawline(trm, x1, y, x2);
+	}
+}
+
+fn3(drawcursor, trm, cx, cy)
+{
+	TMint ox	= term(trm,ocx);
+	TMint oy	= term(trm,ocy);
+	TMint scr	= term(trm,scr);
+	TMint g		= term_cellf(trm, term(trm,row), 0);
+	TMint og	= term_cellf(trm, oy, ox);
+	TMint orix, cw, ch, oriy, colr;
+
+	fldcpy(scr, g, scr, term_cellf(trm, cy, cx), GLYPH_ELCNT);
+
+	/* remove the old cursor */
+	if (selected(trm, ox, oy))
+		fld(scr, og + GLYPH_MODE) ^= ATTR_REVERSE;
+	Xdrawglyph(trm, og, ox, oy);
+
+	if (IS_SET(trm, MODE_HIDE))
+		return;
+
+	/*
+	 * Select the right color for the right mode.
+	 */
+	fld(scr, g+GLYPH_MODE) &=
+		ATTR_BOLD|ATTR_ITALIC|ATTR_UNDERLINE|ATTR_STRUCK|ATTR_WIDE;
+
+	if (IS_SET(trm, MODE_REVERSE)) {
+		fld(scr, g+GLYPH_MODE)	|= ATTR_REVERSE;
+		fld(scr, g+GLYPH_BG)	= DEFAULTFG;
+		if (selected(trm, cx, cy)) {
+			colr			= DEFAULTCS;
+			fld(scr, g+GLYPH_FG)	= DEFAULTRCS;
+		} else {
+			colr			= DEFAULTRCS;
+			fld(scr, g+GLYPH_FG)	= DEFAULTCS;
+		}
+	} else {
+		if (selected(trm, cx, cy)) {
+			fld(scr, g+GLYPH_FG) = DEFAULTFG;
+			fld(scr, g+GLYPH_BG) = DEFAULTRCS;
+		} else {
+			fld(scr, g+GLYPH_FG) = DEFAULTBG;
+			fld(scr, g+GLYPH_BG) = DEFAULTCS;
+		}
+		colr = fld(scr, g+GLYPH_BG);
+	}
+
+	cw	= term(trm,cw);
+	ch	= term(trm,ch);
+	orix	= cw * cx;
+	oriy	= ch * cy;
+
+	/* draw the new one */
+	if (IS_SET(trm, MODE_FOCUSED)) {
+		switch (term(trm,cursor)) {
+		case 0: /* Blinking Block */
+		case 1: /* Blinking Block (Default) */
+		case 2: /* Steady Block */
+			Xdrawglyph(trm, g, cx, cy);
+			break;
+		case 3: /* Blinking Underline */
+		case 4: /* Steady Underline */
+			oriy += term(trm,ch);
+			Xdrawrect(colr,	orix, oriy -	term(trm,cursthick),
+					cw,		term(trm,cursthick));
+			break;
+		case 5: /* Blinking bar */
+		case 6: /* Steady bar */
+			Xdrawrect(colr,	orix,			oriy,
+					term(trm,cursthick),	ch);
+			break;
+		}
+	} else {
+		/* outline */
+		Xdrawrect(colr, orix,		oriy,		cw-1,	1);
+		Xdrawrect(colr, orix,		oriy + ch-1,	cw,	1);
+		Xdrawrect(colr, orix,		oriy,		1,	ch-1);
+		Xdrawrect(colr, orix + cw-1,	oriy,		1,	ch-1);
+	}
+}
+
+fn1(draw, trm)
+{
+	TMint	ocx = term(trm,ocx),
+		ocy = term(trm,ocy),
+		cx = curs_x(term(trm,curs));
+
+	if (IS_SET(trm, MODE_INVISIBLE))
+		return;
+
+	/* adjust cursor position */
+	LIMIT(term(trm,ocx), 0, term(trm,col)-1);
+	LIMIT(term(trm,ocy), 0, term(trm,row)-1);
+	term(trm,ocx)	-= !!(
+		term_glyph(trm, term(trm,ocy), term(trm,ocx),	GLYPH_MODE, -1)
+		& ATTR_WDUMMY);
+
+	cx		-= !!(
+		term_glyph(trm, curs_y(term(trm,curs)),	cx,	GLYPH_MODE, -1)
+		& ATTR_WDUMMY);
+
+	drawregion(trm, 0, 0, term(trm,col), term(trm,row));
+	drawcursor(trm,	cx, curs_y(term(trm,curs)));
+	term(trm,ocx) = cx;
+	term(trm,ocy) = curs_y(term(trm,curs));
+	Xfinishdraw(trm);
+	if (ocx != term(trm,ocx) || ocy != term(trm,ocy))
+		Xximspot(trm, term(trm,ocx), term(trm,ocy));
+}
+
+fn1(redraw, trm)
+{
+	tfulldirt(trm);
+	draw(trm);
+}
+
+fn3(setmode, trm, set, flags)
+{
+	TMint mode = term(trm,mode);
+	MODBIT(term(trm,mode), set, flags);
+	if ((term(trm,mode) & MODE_REVERSE) != (mode & MODE_REVERSE))
+		redraw(trm);
+}

@@ -1,0 +1,81 @@
+fn2(timediff, ta, tb)
+{
+	TMint	up = fld(ta,0) - fld(tb,0),
+		lo = fld(ta,1) - fld(tb,1);
+
+	up |= 0;
+	if (up <= -2) return -0x80000000;
+	if (up >= +2) return +0x7fffffff;
+	if (up == +1) return lo + 0x80000000;
+	if (up == -1) return lo - 0x80000000;
+
+	return lo;
+}
+
+fn3(click2sel, t, r, c)
+{
+	TMint snap, now = term(t,tclickx);
+
+	/*
+	 * If the user clicks below predefined timeouts specific
+	 * snapping behaviour is exposed.
+	 */
+	Now(now);
+	if (		timediff(now, term(t,tclick2)) <= TRIPLECLICKTIMEOUT) {
+		snap = SNAP_LINE;
+	} else if (	timediff(now, term(t,tclick1)) <= DOUBLECLICKTIMEOUT) {
+		snap = SNAP_WORD;
+	} else {
+		snap = 0;
+	}
+	term(t,tclickx) = term(t,tclick2);
+	term(t,tclick2) = term(t,tclick1);
+	term(t,tclick1) = now;
+
+	selclear(t);
+	term(t,selmode) = SEL_EMPTY;
+	term(t,seltype) = SEL_REGULAR;
+	term(t,selalt) = IS_SET(t, MODE_ALTSCREEN);
+	term(t,selsnap) = snap;
+	term(t,seloex) = term(t,selobx) = c;
+	term(t,seloey) = term(t,seloby) = r;
+	selnormalize(t);
+
+	if (term(t,selsnap) != 0)
+		term(t,selmode) = SEL_READY;
+	tsetdirt(t, term(t,selnby), term(t,selney));
+}
+
+fn5(selextend, trm, col, row, type, done)
+{
+	TMint oldey, oldex, oldsby, oldsey, oldtype;
+
+	if (term(trm,selmode) == SEL_IDLE)
+		return 0;
+	if (done && term(trm,selmode) == SEL_EMPTY) {
+		selclear(trm);
+		return 0;
+	}
+
+	oldey = term(trm,seloey);
+	oldex = term(trm,seloex);
+	oldsby = term(trm,selnby);
+	oldsey = term(trm,selney);
+	oldtype = term(trm,seltype);
+
+	term(trm,seloex) = col;
+	term(trm,seloey) = row;
+	selnormalize(trm);
+	term(trm,seltype) = type;
+
+	if (	oldey != term(trm,seloey)
+	||	oldex != term(trm,seloex)
+	||	oldtype != term(trm,seltype)
+	||	term(trm,selmode) == SEL_EMPTY)
+		tsetdirt(trm,	MIN(term(trm,selnby), oldsby),
+				MAX(term(trm,selney), oldsey));
+
+	term(trm,selmode) = done ? SEL_IDLE : SEL_READY;
+
+	return 0;
+}

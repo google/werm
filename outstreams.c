@@ -123,19 +123,20 @@ void fdb_routs(struct fdbuf *b, const char *s, ssize_t len)
 
 void fdb_json(struct fdbuf *b, const char *s, ssize_t len)
 {
+	int c;
+
 	if (len < 0) len = strlen(s);
 
 	fdb_apnc(b, '"');
 	while (len--) {
-		if (*s < ' ' || *s == '"' || *s == '\\') {
+		c = *s++ & 0xff;
+		if (c < ' ' || c == '"' || c == '\\') {
 			fdb_apnd(b, "\\u00", -1);
-			fdb_apnc(b, hexdig(*s >> 4));
-			fdb_apnc(b, hexdig(*s));
+			fdb_apnc(b, hexdig(c >> 4));
+			fdb_apnc(b, hexdig(c));
 		}
 		else
-			fdb_apnc(b, *s);
-
-		s++;
+			fdb_apnc(b, c);
 	}
 	fdb_apnc(b, '"');
 }
@@ -263,7 +264,7 @@ void _Noreturn exit_msg(const char *flags, const char *msg, int code)
 	fdb_routs(&b, "\033[", -1);
 	if (iserr)	fdb_routs(&b, "97;48;2;200;0;0", -1);
 	else		fdb_routs(&b, "30;48;2;0;255;255", -1);
-	fdb_routs(&b, "m ", -1);
+	fdb_routs(&b, ";1m ", -1);
 
 	fdb_routs(&b, msg, -1);
 	if (code != -1) fdb_itoa(&b, code);

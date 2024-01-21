@@ -202,8 +202,7 @@ mnemonics and the long-form name used by the JS Event API.
 
  * <a name=fontmacro></a>Fonts are changed with `raF N **` where `**` is `A `
    to `J ` in roughly increasing size. E.g. press right-alt, F, N, A in sequence
-   to choose the smallest font. Ctrl-= and Ctrl-minus also work to change zoom,
-   though this will cause blur if it is not 200% or 300% zoom.
+   to choose the smallest font.
 
  * Meta (i.e. super, apple on MacOS, search on ChromeOS) key is used in place of
    Alt for the terminal process. This is to allow Alt to be used for the start
@@ -435,7 +434,7 @@ You can set the font either at page load or with a macro with:
 
 ```
 /* Use the tiniest font by default. */
-set_font(0);
+set_default_font(0);
 window.extended_macros.font_macros = [
 	/* Use a narrow font with a macro. */
 	['laN A R R O W ', function() { set_font(3); }],
@@ -446,7 +445,6 @@ Where the argument is the zero-based index corresponding to the last letter used
 to activate it with the [default macro](#fontmacro). So to set the font
 corresponding to the `raF N B ` macro, `B` is the identifying letter, so you
 would use `set_font('B'.charCodeAt(0) - 65)` or more simply `set_font(1)`.
-
 
 ## TERMINAL ID
 

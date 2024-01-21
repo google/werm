@@ -41,15 +41,10 @@ void dump_wts(void)
 	if (!f) return;
 
 	fprintf(f, "escp: %d (%c)\n", wts.escp, wts.escp);
-	fprintf(f, "linebuf: (pos=%u, sz=%us)\n", wts.linepos, wts.linesz);
-	logescaped(f, wts.linebuf, wts.linesz);
-	fprintf(f, "escbuf: (%u bytes)\n", wts.escsz);
-	logescaped(f, wts.escbuf, wts.escsz);
-	fprintf(f, "altscr:  %u\n", wts.altscren);
-	fprintf(f, "appcurs: %u\n", wts.appcursor);
 	fprintf(f, "clnttl: %u\n", wts.clnttl);
 	fprintf(f, "windim: %u:%u\n", wts.swrow, wts.swcol);
 	fprintf(f, "ttl: (sz=%u)\n", ttl_len());
+	fprintf(f, "allowtmstate: %u\n", wts.allowtmstate);
 	logescaped(f, wts.ttl, ttl_len());
 
 	fclose(f);

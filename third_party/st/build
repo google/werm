@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -x
+
+cd `dirname $0`/../..
+
+cc 	-g3					\
+	-Werror=implicit-function-declaration	\
+	-Werror=incompatible-pointer-types	\
+	-Werror=int-conversion			\
+	-Werror=unused-variable			\
+	-Wno-return-type			\
+	-D_POSIX_C_SOURCE=200809L		\
+	-D_XOPEN_SOURCE=600			\
+	-DVERSION='"0.9"'			\
+	-I/usr/X11R6/include			\
+	-I.					\
+	`pkg-config --cflags fontconfig`	\
+	`pkg-config --cflags freetype2`		\
+	-o third_party/st/st			\
+	third_party/st/x.c			\
+	third_party/st/posix.c			\
+	-L/usr/X11R6/lib			\
+	-lm -lrt -lX11 -lutil -lXft		\
+	`pkg-config --libs fontconfig`		\
+	`pkg-config --libs freetype2`

@@ -187,8 +187,6 @@ create_socket(char *name)
 	return s;
 }
 
-static struct fdbuf therout;
-
 /* Returns:
    'b' if writing would block
    'e' if unexpected error
@@ -257,7 +255,8 @@ pty_activity(Dtachctx dc, int s)
 	}
 
 	therout.len = 0;
-	process_tty_out(&therout, preprocb, preproclen);
+	if (!therout.cap) therout.cap = 1024;
+	process_tty_out(preprocb, preproclen);
 
 	do {
 		/*

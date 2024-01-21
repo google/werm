@@ -14,6 +14,8 @@ typedef struct {
 	unsigned altbufsz;
 	char winsize[8];
 
+	int t;
+
 	/* 0: reading raw characters
 	 * '1': next char is escaped
 	 * 'w': reading window size
@@ -25,12 +27,7 @@ typedef struct {
 	/* title set by client */
 	char ttl[128];
 
-	/* Buffers for content about to be written to logs */
-	unsigned char linebuf[1024], escbuf[1024];
-	unsigned linesz, linepos, escsz;
-
-	unsigned altscren	: 1;
-	unsigned appcursor	: 1;
+	unsigned allowtmstate	: 1;
 	unsigned sendsigwin	: 1;
 	unsigned writelg	: 1;
 	unsigned writerawlg	: 1;

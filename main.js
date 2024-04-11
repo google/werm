@@ -1198,28 +1198,33 @@ int renp(int xof)
 
 	if (p != 0) p = 1;
 
-	/* The 8th bit is also flipped, which allows reversing space characters
-	   that are not in the texture data. */
-	if (0 != (glymode & ATTR_REVERSE)) p ^= 1;
-
 	return p;
 }
 
 void main()
 {
+	vec3 acfg, acbg;
 	int faint = 0;
+
+	if (0 != (glymode & ATTR_REVERSE)) {
+		acfg = bgcolor;
+		acbg = fgcolor;
+	} else {
+		acbg = bgcolor;
+		acfg = fgcolor;
+	}
 
 	if (	0 != (glymode&ATTR_UNDERLINE)
 	&&	texcoor.y/texpxsz - tex0.y >= celpxsz.y - 1.05
 	) {
-		fragColor = vec4(fgcolor, 1.0);
+		fragColor = vec4(acfg, 1.0);
 		if (0 == renp(0)) faint = 1;
 	} else if (0 != renp(0)) {
-		fragColor = vec4(fgcolor, 1.0);
+		fragColor = vec4(acfg, 1.0);
 	} else if (0 != (ATTR_BOLD & glymode) && 0 != renp(-1)) {
-		fragColor = vec4(fgcolor * 0.8 + bgcolor * 0.2, 1.0);
+		fragColor = vec4(acfg * 0.8 + acbg * 0.2, 1.0);
 	} else {
-		fragColor = vec4(bgcolor, 1.0);
+		fragColor = vec4(acbg, 1.0);
 	}
 
 	faint |= glymode & ATTR_FAINT;

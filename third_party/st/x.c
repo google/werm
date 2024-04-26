@@ -969,7 +969,7 @@ bpress(TMint trm, XEvent *e)
 	if (mouseaction(trm, e, 0))
 		return;
 
-	if (btn == Button1) click2sel(trm, evrow(trm, e), evcol(trm, e));
+	if (btn == Button1) click2sel(trm, evrow(trm, e), evcol(trm, e), 1);
 }
 
 void

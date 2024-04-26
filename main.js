@@ -33,7 +33,7 @@ function Xosc52copy(trm, deq, byti)
 var	t, tel, gl, gwid, ghei, cops, ftd, ftx, vbu, shpr, dw, dh,
 	fontfgrgb,
 	fontbgrgb,
-	selecting,
+	selecting, mdownstam,
 	cli0,
 	tex0,
 	mask,
@@ -785,7 +785,7 @@ function display(s)
 function prepare_sock()
 {
 	sock = new WebSocket(
-		'ws://' + location.host + '/' + location.search);
+		location.origin.replace(/^http/, 'ws') + '/' + location.search);
 	/* signalsize implicitly sends pending sends that have
 	   accumulated while disconnected. */
 	sock.onopen = function() { signal('\\i' + endptid()); imposetsize() };
@@ -954,7 +954,7 @@ function set_default_font(ndx)
 
 function evrow(e) { return 0 | e.clientY/ghei }
 function evcol(e) { return 0 | e.clientX/gwid }
-function ecoor(e) { return `${e.clientX}:${e.clientY}` }
+function ecoor(e) { return `${evcol(e)}:${evrow(e)}` }
 
 function docopy(deq)
 {
@@ -988,8 +988,9 @@ function readywindow()
 		   selecting==1		moved mouse after mousedown
 		   selecting==ecoor(e)	did not move mouse since mousedown */
 		selecting = ecoor(e);
+		mdownstam = e.timeStamp;
 
-		click2sel(t, evrow(e), evcol(e));
+		click2sel(t, evrow(e), evcol(e), 1&e.buttons);
 		draw(t);
 	};
 	tel.onmouseup = function(e)
@@ -1022,7 +1023,8 @@ function readywindow()
 		/* If the window is gaining focus, Chromium sometimes gives a
 		   mousemove event right after mousedown, despite not actually
 		   moving the mouse. Ignore such a mousemove event. */
-		if (selecting == ecoor(e)) return;
+		if (selecting == ecoor(e) && 1500 > e.timeStamp - mdownstam)
+			return;
 		selecting = 1;
 
 		st = e.buttons & 2	? SEL_RECTANGULAR

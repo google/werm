@@ -1277,6 +1277,7 @@ void main()
 		readywindow();
 		adjust();
 		redraw(t);
+		display('');
 	};
 	fr.send(null);
 }

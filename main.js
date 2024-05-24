@@ -443,6 +443,18 @@ var menu_key_inserts = '';
 var remap_keys = [];
 // END remap_keys
 
+// BEGIN basic_git_macros
+// Whether to enable a handful basic of Git macros. Defaults to yes; set to 0
+// to disable them.
+wermcfg.basic_git_macros = 1;
+// END basic_git_macros
+
+// BEGIN basic_vim_macros
+// Whether to enable a handful basic of Vim macros. Defaults to yes; set to 0
+// to disable them.
+wermcfg.basic_vim_macros = 1;
+// END basic_vim_macros
+
 function sanit(s)
 {
 	var e = [], c, ci;
@@ -1421,30 +1433,11 @@ function dopaste()
 
 macro_map = [
 	['raW ; ', 'std::'],
-	['laI F ', 'git status -s -uno\r'],
-	['laI R V ', 'git remote -v\r'],
-	['laI lsF ', 'git status -s -uall\r'],
-	['laI D ', 'git diff '],
-	['laI C O ', 'git checkout '],
-	['laI C D ', 'git diff --cached '],
-	['raS D ', '\x1b:w\r'],
-	['raS K ', '\x1b:wq\r'],
-	['laI L ', 'git log --name-status '],
-	['laI T ', '|perl -pE\'/^([^0-9]*)(\\d{8,10})\\b(.*)/ and $_=$1.`date -d\\@$2 +"%F %T %Z"`."$3\\n" and s/\\n//\'|less \x01git log --graph --format="%ct %h %s" '],
-	['laI B R ', 'git branch '],
-	['laI C M ', 'git commit '],
-	['laI P S ', 'git push '],
-	['laI P L ', 'git pull '],
 	['lavsU ', '| grep '],
 	['raD G ', 'grep -Irn '],
-	['laI S ', 'git show '],
 	['laH T ', open_child_term],
-	['la; P ', ':e %:p:h\t'],
-	['la; [ ', ':e \x12%'],
 	['raR S E ', 'sudo shutdown -r now; exit\r'],
 	[['raF N ', set_font_key], () => set_font(font_key, 0)],
-	['ralsI ', '\x1bI'],
-	['ralsE ', '\x1bA'],
 	['raA ', '->'],
 	['raT ', '\x14'],
 	['raD U M P ', signal.bind(0, '\\d')],
@@ -1483,6 +1476,37 @@ macro_map = [
 	}],
 
 	['ra5 ra', dopaste],
+];
+
+var git_macros = [
+	['laI F ',	'git status -s -uno\r'],
+	['laI R V ',	'git remote -v\r'],
+	['laI lsF ',	'git status -s -uall\r'],
+	['laI D ',	'git diff '],
+	['laI L ',	'git log --name-status '],
+	['laI C O ',	'git checkout '],
+	['laI C D ',	'git diff --cached '],
+	['laI B R ',	'git branch '],
+	['laI C M ',	'git commit '],
+	['laI P S ',	'git push '],
+	['laI P L ',	'git pull '],
+	['laI S ',	'git show '],
+
+	/* `git log` which shows full branching history with commit rather than
+	author timestamps, in a format that doesn't require Git to do any
+	preprocessing, so it is fast even for very complex branching patterns.
+	Parent commits are shown as shortened 3-character hashes, which allows
+	locating them easily enough. */
+	['laI T ',	'|perl -pE\'/^([^0-9]*)(\\d{8,10})\\b(.*)/ and $_=$1.`date -d\\@$2 +"%F %T %Z"`."$3\\n" and s/\\n//\'|less \x01git log --graph --format="%ct %h %s" '],
+];
+
+var vim_macros = [
+	['raS D ', '\x1b:w\r'],		/* save buffer */
+	['raS K ', '\x1b:wq\r'],	/* save buffer and quit */
+	['la; P ', ':e %:p:h\t'],	/* open prepopulating path with current file's dir */
+	['la; [ ', ':e \x12%'],		/* open prepopulating path with current file */
+	['ralsI ', '\x1bI'],		/* insert mode at start of line, similar to Ctrl+O then I */
+	['ralsE ', '\x1bA'],		/* insert mode at end of line, similar to Ctrl+O then E */
 ];
 
 function winpos() { return window.screenX + 'x' + window.screenY; }
@@ -1530,9 +1554,16 @@ function process_mkey(e)
 	else if (log_macks)
 		console.log('process macro', e, matching);
 
-	if (!matching.length)
-		for (mi = 0; mi < macro_map.length; mi++)
-			matching.push(macro_map[mi].slice());
+	function poplmatching(ar)
+	{
+		ar.forEach(function(e) { matching.push(e.slice()) });
+	}
+
+	if (!matching.length) {
+		poplmatching(macro_map);
+		if (wermcfg.basic_git_macros) poplmatching(git_macros);
+		if (wermcfg.basic_vim_macros) poplmatching(vim_macros);
+	}
 
 	for (mi = 0; mi < matching.length; mi++) {
 		mac = matching[mi];

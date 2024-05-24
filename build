@@ -22,7 +22,7 @@ my $fntc;
 my @wfns = (
 	'26:230:128:8:0:third_party/oldschool-pc-fonts/ibm_ega_8x8.wermfont',
 	'26:230:128:12:0:third_party/oldschool-pc-fonts/hp_100lx_10x11.wermfont',
-	'16:250:512:14:1:third_party/shinonome/jfdot_7x14.wermfont',
+	'26:250:512:14:1:third_party/shinonome/jfdot_7x14.wermfont',
 	'26:230:128:16:0:third_party/oldschool-pc-fonts/ibm_vga_8x16.wermfont',
 	'26:230:128:16:0:third_party/oldschool-pc-fonts/ibm_vga_9x16.wermfont',
 	'26:230:128:20:0:third_party/oldschool-pc-fonts/dos_v_ibm_8x19.wermfont',

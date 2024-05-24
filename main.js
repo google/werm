@@ -1432,20 +1432,20 @@ function dopaste()
 }
 
 macro_map = [
-	['raW ; ', 'std::'],
-	['lavsU ', '| grep '],
-	['raD G ', 'grep -Irn '],
-	['laH T ', open_child_term],
-	['raR S E ', 'sudo shutdown -r now; exit\r'],
-	[['raF N ', set_font_key], () => set_font(font_key, 0)],
-	['raA ', '->'],
-	['raT ', '\x14'],
-	['raD U M P ', signal.bind(0, '\\d')],
-	['raS T ', set_locked_title.bind(0, 'c')],
-	['raS B T ', set_locked_title.bind(0, 'b')],
-	['laU T ', unlock_title],
-	['rarsA T ', function() { window.open('/attach', '_top'); }],
-	['rarsS T ', function() { window.open('/attach', '_blank'); }],
+	/* Sample macros for C++ coding and shell use. */
+	['raW ; ',	'std::'],
+	['raA ',	'->'],
+	['lavsU ',	'| grep '],
+	['raD G ',	'grep -Irn '],
+
+	['laH T ',	open_child_term],
+	[['raF N ',	set_font_key], () => set_font(font_key, 0)],
+	['raD U M P ',	signal.bind(0, '\\d')],
+	['raS T ',	set_locked_title.bind(0, 'c')],
+	['raS B T ',	set_locked_title.bind(0, 'b')],
+	['laU T ',	unlock_title],
+	['rarsA T ',	function() { window.open('/attach', '_top'); }],
+	['rarsS T ',	function() { window.open('/attach', '_blank'); }],
 
 	/* These cannot be added conditionally to macro_map, since
 	 * termid may be set later by \@appendid */

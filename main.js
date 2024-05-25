@@ -1438,6 +1438,9 @@ macro_map = [
 	['lavsU ',	'| grep '],
 	['raD G ',	'grep -Irn '],
 
+	/* Send Ctrl+T, do not open a new tab */
+	['raT ',	'\x14'],
+
 	['laH T ',	open_child_term],
 	[['raF N ',	set_font_key], () => set_font(font_key, 0)],
 	['raD U M P ',	signal.bind(0, '\\d')],

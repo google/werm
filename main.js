@@ -964,8 +964,8 @@ function set_default_font(ndx)
 	set_default_font = function() {};
 }
 
-function evrow(e) { return 0 | e.clientY/ghei }
-function evcol(e) { return 0 | e.clientX/gwid }
+function evrow(e) { return 0 | e.clientY/ghei*window.devicePixelRatio }
+function evcol(e) { return 0 | e.clientX/gwid*window.devicePixelRatio }
 function ecoor(e) { return `${evcol(e)}:${evrow(e)}` }
 
 function docopy(deq)

@@ -213,6 +213,7 @@ void http_read_req(FILE *src, Httpreq *rq, struct wrides *respout)
 		}
 		if (consumereqln("connection:")) {
 			if (hastok("upgrade")) connectionupgr = 1;
+			if (hastok("keep-alive")) rq->keepaliv = 1;
 			continue;
 		}
 		if (consumereqln("sec-websocket-version:")) {

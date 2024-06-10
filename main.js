@@ -1361,7 +1361,8 @@ function set_barrier_dig(code)
 function updatebarrdivcw()
 {
 	var cw = term(t,cw);
-	barrdiv.style.left	= `${cw * barrdiv.termcols}px`;
+	barrdiv.style.left	= `${cw	* barrdiv.termcols
+					/ window.devicePixelRatio}px`;
 	barrdiv.style.width	= `${cw}px`; 
 }
 

@@ -15,6 +15,9 @@ unset WERMSRCDIR
 unset WERMJSPATH
 unset WERMFLAGS
 unset WERMHOSTTITLE
+unset WERMRELYINGPARTY
+unset WERMPASSKEYID
+unset WERMAUTHKEYS
 
 perl <<'EOF' || exit 1
 use IPC::Open2;
@@ -339,11 +342,13 @@ if ! $CC -x c -std=c99 -I. \
 	uniqid.c				\
 	gen/*.c					\
 	third_party/dtach/*.c			\
+	third_party/st/b64.c			\
 	wts.c					\
 	-lutil					\
 	-lmd4c-html				\
 	-lssl					\
-	-lcrypto
+	-lcrypto				\
+	`pkg-config --libs  libfido2`
 then
 	echo 'Build failed - do you need to install dependencies?'	>&2
 	grep -A4 'following packages are installed' README.md		>&2
@@ -359,7 +364,8 @@ else
 					-name \*.c	-o		\
 					-name tmeng	-o		\
 					-name tmengui	-o		\
-					-name teng	\)	-print	\
+					-name teng	-o		\
+					-name tmconst	\)	-print	\
 	>/tmp/tag_files.$$
 
 	(

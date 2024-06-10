@@ -26,3 +26,24 @@ function endptid()
 	localStorage['endptid'] = id;
 	return id;
 }
+
+(function () {
+	/* Get a unique session ID. We can't use endpoint ID because that value
+	is passed to other clients to identify who is connected to a session. */
+	var sco, bar, coo;
+	if (location.protocol != 'https:')		return;
+	if (document.cookie.match(/\bwermsession=/))	return;
+
+	sco = [];
+	bar = new Uint8Array(16);
+	crypto.getRandomValues(bar);
+	bar.forEach(function (n) { sco.push(String.fromCharCode(n)) });
+	coo = btoa(sco.join(''));
+	document.cookie = 'wermsession=' + coo.replace(/==*$/, '');
+})();
+
+function wermuserid()
+{
+	return crypto.subtle.digest(
+		'SHA-256', new TextEncoder().encode(wermpasskeyid));
+}

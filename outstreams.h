@@ -45,6 +45,9 @@ void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len);
  */
 void fdb_apnc(struct fdbuf *b, int c_);
 
+/* Appends lowercase hexadecimal byte. Always appends two characters. */
+void fdb_hexb(struct fdbuf *b, int byt);
+
 /* Flushes the buffer if it is not empty and `de` is set. Then frees the
  * buffer. */
 void fdb_finsh(struct fdbuf *b);
@@ -60,12 +63,16 @@ void fdb_routs(struct fdbuf *b, const char *s, ssize_t len);
 /* Appends the given string as a JSON string. The string in |s| is a utf8
    string, and non-ASCII codepoints are not modified, so the output is also
    utf8. Where escapes are needed, \u is used rather than \x so that the results
-   can be parsed as JSON. */
+   can be parsed as JSON. Surrounding quotes are also added. */
 void fdb_json(struct fdbuf *b, const char *s, ssize_t len);
 
 /* Converts a number to a string and appends it to b. Escaping is not necessary
    if this is used for terminal output to the client. */
 void fdb_itoa(struct fdbuf *b, long long i);
+
+/* converts the data of |dat_| to a hex string and appends it.  Uses |bsz| bytes
+from |dat_|. */
+void fdb_hexs(struct fdbuf *b, void *dat_, unsigned bsz);
 
 /* Writes an entire buffer to the given file descriptor. If len is -1, prints
  * buf_ as a null-terminated string. */
@@ -83,5 +90,9 @@ void write_wbsoc_frame(const void *buf, ssize_t len);
 void _Noreturn exit_msg(const char *flags, const char *msg, int code);
 
 void test_outstreams(void);
+
+/* Returns the lowercase hex digit (0-9 or a-f) matching the lowest 4 bits of
+v. */
+char hexdig_lc(int v);
 
 #endif

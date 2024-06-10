@@ -84,7 +84,7 @@ This is not an officially supported Google product.
 
  * Verify the following packages are installed:
 
-   [Debian] libmd4c-dev libmd4c-html0-dev libssl-dev
+   [Debian] libmd4c-dev libmd4c-html0-dev libssl-dev libfido2-dev pkg-config
 
    [Arch] core/make extra/md4c
 
@@ -308,6 +308,43 @@ These and other functions are defined in `$WERMSRCDIR/util/logview`
    (e.g. `export WERMFLAGS='sblvl=rp'`) would also turn on Raw logging, which
    saves the subprocess unified stdout/stderr streams (i.e. the raw bytes sent
    to the ptty) in files named `*.raw`.
+
+## Passkey authentication
+
+Werm has preliminary passkey support, which allows exposing the Werm server to
+an insecure or public network, and authenticating with a security key or other
+passkey mechanisms, depending on platform. This also means you do not need to
+configure SSH port forwarding or use SSH at all.
+
+Werm does **not** include an HTTPS server so you will need to put the server
+behind an SSL reverse proxy with a separate tool such as Nginx. Werm client
+code (Javascript) and your browser will refuse to use this feature unless the
+server is accessed via https.
+
+### Passkey environment variables
+
+To enable this feature, set the environment variables below:
+
+#### WERMRELYINGPARTY (required)
+
+The HTTPS frontend's hostname, or a suffix thereof. If the host is accessed via
+`https://johndoe.wermfe.org:7788/` Then this can be `wermfe.org` or
+`johndoe.wermfe.org`.
+
+#### WERMPASSKEYID (optional)
+
+A hash of this string is used to identify the passkey on the client. This can be
+set to allow the user to use different passkeys for different Werm instances on
+the same HTTPS frontend. The default is `$HOSTNAME:$USER`.
+
+Note that the value of this setting, include the default, can be leaked to a
+client that is not authenticated. If this is a concern, this should be set to an
+opaque value or hash before starting the Werm server.
+
+#### WERMAUTHKEYS (optional)
+
+The path to store authorized public keys, similar to `~/.ssh/authorized_keys`.
+If this is not set, the path `$HOME/.ssh/werm_authorized_keys` is used.
 
 ## Environment variables
 

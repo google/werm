@@ -92,10 +92,16 @@ void fdb_finsh(struct fdbuf *b)
 	b->len = b->cap = 0;
 }
 
-static int hexdig(int v)
+char hexdig_lc(int v)
 {
 	v &= 0x0f;
 	return v + (v < 10 ? '0' : 'W');
+}
+
+void fdb_hexb(struct fdbuf *b, int byt)
+{
+	fdb_apnc(b, hexdig_lc(byt >> 4));
+	fdb_apnc(b, hexdig_lc(byt));
 }
 
 void fdb_routc(struct fdbuf *b, int c)
@@ -105,8 +111,8 @@ void fdb_routc(struct fdbuf *b, int c)
 	c &= 0xff;
 	if (c == '\\' || c < ' ' || c > '~') {
 		ebf[0] = '\\';
-		ebf[1] = hexdig(c >> 4);
-		ebf[2] = hexdig(c);
+		ebf[1] = hexdig_lc(c >> 4);
+		ebf[2] = hexdig_lc(c);
 		fdb_apnd(b, ebf, 3);
 	}
 	else {
@@ -132,8 +138,8 @@ void fdb_json(struct fdbuf *b, const char *s, ssize_t len)
 		c = *s++ & 0xff;
 		if (c < ' ' || c == '"' || c == '\\') {
 			fdb_apnd(b, "\\u00", -1);
-			fdb_apnc(b, hexdig(c >> 4));
-			fdb_apnc(b, hexdig(c));
+			fdb_apnc(b, hexdig_lc(c >> 4));
+			fdb_apnc(b, hexdig_lc(c));
 		}
 		else
 			fdb_apnc(b, c);
@@ -164,6 +170,13 @@ void fdb_itoa(struct fdbuf *b, long long i)
 
 	do fdb_apnc(b, *--bc);
 	while (bc != bf);
+}
+
+void fdb_hexs(struct fdbuf *b, void *dat_, unsigned bsz)
+{
+	unsigned char *d = dat_;
+
+	while (bsz--) fdb_hexb(b, *d++);
 }
 
 void full_write(struct wrides *de, const void *buf_, ssize_t sz)

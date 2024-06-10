@@ -339,25 +339,26 @@ customcap+multipleapnd[21aba121aba121ab]
 customcap+multipleapnd[a]
 TRIVIAL RESOURCE AND BLANK QUERY
 resource: /
-restrict fetch site: 0 valid ws: 0 head: 0
+restrict fetch site: 0 valid ws: 0 rqtyp: G
 INTERESTING PATH+QUERY
 resource: /asdf
 query: xyz=a%3fb%20c
-restrict fetch site: 0 valid ws: 0 head: 0
+restrict fetch site: 0 valid ws: 0 rqtyp: G
 TEST ACCEPT-KEY CALCULATION
 httpresp[HTTP/1.1 101 Switching Protocols\015\012Upgrade: websocket\015\012Connection: Upgrade\015\012Sec-WebSocket-Accept: ojY9iP807Mv1clWz9CVeYgn+5As=\015\012\015\012]
 resource: /
-restrict fetch site: 0 valid ws: 1 head: 0
+restrict fetch site: 0 valid ws: 1 rqtyp: G
 TEST ACCEPT-KEY AGAIN
 httpresp[HTTP/1.1 101 Switching Protocols\015\012Upgrade: websocket\015\012Connection: Upgrade\015\012Sec-WebSocket-Accept: mhplOAo9s3jjqLKHqblXHGYOm60=\015\012\015\012]
 resource: /
-restrict fetch site: 0 valid ws: 1 head: 0
+restrict fetch site: 0 valid ws: 1 rqtyp: G
 EXAMPLE FROM RFC-6455
 httpresp[HTTP/1.1 101 Switching Protocols\015\012Upgrade: websocket\015\012Connection: Upgrade\015\012Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\015\012\015\012]
 resource: /
-restrict fetch site: 0 valid ws: 1 head: 0
+restrict fetch site: 0 valid ws: 1 rqtyp: G
 UNSUPPORTED METHOD POST
-httpresp[HTTP/1.1 405 Method Not Allowed\015\012Connection: keep-alive\015\012Content-Type: text/plain; charset=utf-8\015\012Content-Length: 0\015\012\015\012]
+httpresp[HTTP/1.1 400 Bad Request\015\012Connection: keep-alive\015\012Content-Type: text/plain; charset=utf-8\015\012Content-Length: 44\015\012\015\012]
+httpresp[bad request\012websocket upgrade conditions: 8\012]
 rq.error is yes
 WEBSOCKET UPGRADE: KEY TOO SHORT
 httpresp[HTTP/1.1 400 Bad Request\015\012Connection: keep-alive\015\012Content-Type: text/plain; charset=utf-8\015\012Content-Length: 53\015\012\015\012]

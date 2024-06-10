@@ -1,6 +1,7 @@
 #include "tm.js"
 #include "third_party/st/tmeng"
 #include "third_party/st/tmengui"
+#include "tmconst"
 
 window["extended_macros"] = {}
 
@@ -629,6 +630,59 @@ function loadauxjs(spec)
 	}]);
 }
 
+function onnewcred(c)
+{
+	var newpublkey;
+
+	console.log(c);
+
+	if (localStorage['authnid']) {
+		/* Save the old authid so the user is not SOL if they
+		accidentally overwrite an authorized cred ID. */
+		localStorage['old_authnid'] += '|' + localStorage['authnid'];
+		localStorage['old_publkey'] += '|' + localStorage['publkey'];
+	}
+
+	newpublkey = new Uint8Array(c.response.getPublicKey());
+	newpublkey = newpublkey.slice(newpublkey.length-PUBKEY_BYTESZ);
+
+	localStorage['authnid'] = new Uint8Array(c.rawId);
+	localStorage['publkey'] = newpublkey;
+	termwrite('success creating new creds\n');
+	doauthn();
+}
+
+function newcred()
+{
+	var crarg, chal = new Uint8Array(16);
+	crypto.getRandomValues(chal);
+
+	wermuserid().then(function (wuid)
+	{
+		crarg = {
+			challenge: chal,
+			rp: {
+				name: window.relyingparty,
+				id: window.relyingparty,
+			},
+			user: {
+				id: wuid,
+				name: window.wermpasskeyid,
+				displayName: window.wermpasskeyid,
+			},
+			pubKeyCredParams: [
+				{alg: FIDOALGTYPE, type: 'public-key'}
+			],
+			authenticatorSelection: {
+				authenticatorAttachment: 'cross-platform',
+			},
+		};
+
+		console.log('new credentials:', crarg);
+		navigator.credentials.create({publicKey: crarg}).then(onnewcred);
+	});
+}
+
 function display(s)
 {
 	var next_esc, pend_i, c, pend_remain, nli, escpylo, coldex,
@@ -797,6 +851,96 @@ function display(s)
 	}, 2000);
 }
 
+function termwrite(s)
+{
+	var m = deqmk();
+	m = deqpshutf8(m, s.replaceAll('\n', '\r\n'), -1);
+	twrite(t, m, -1, 0);
+	draw(t);
+	tmfree(m);
+}
+
+function reportwebsockerr(wse)
+{
+	console.log('error connecting websocket:', wse);
+	termwrite('error connecting websocket - see JS console\r');
+}
+
+function arr64enc(arb)
+{
+	var u8a = new Uint8Array(arb), scs = [];
+	u8a.forEach(function(b) { scs.push(String.fromCharCode(b)) });
+	return btoa(scs.join(''));
+}
+
+function doauthn()
+{
+	var athreq = new XMLHttpRequest();
+	var authnid, prom, er;
+
+	athreq.open('GET', '/authent', false);
+
+	try {
+		athreq.send();
+	} catch (e) {
+		console.log('XMLHttpRequest exception: ', e);
+		er = 1;
+	}
+	if (er || athreq.status != 200) {
+		termwrite('failure checking authn status (check JS console)\n');
+		console.log('xhr object:', athreq);
+		return;
+	}
+
+	as = JSON.parse(athreq.responseText);
+	if (!as.pendauth) return;
+
+	authnid = new Uint8Array(localStorage['authnid'].split(','));
+	prom = navigator.credentials.get({
+		publicKey: {
+			challenge: new Uint8Array(as.challenge),
+			allowCredentials: [{
+				id: authnid,
+				type: 'public-key',
+				transports: ['internal', 'usb', 'ble', 'nfc'],
+			}],
+			rpId: window.relyingparty,
+			timeout: 60000
+		}
+	});
+	prom.catch(function (e)
+	{
+		termwrite('exception authenticating (check JS console)\n');
+		console.log('auth exception:', e);
+	});
+	prom.then(function (asr)
+	{
+		var r = new XMLHttpRequest(), dat = asr.response;
+		var url = ['/authent'];
+		var pubkey = new Uint8Array(localStorage.publkey.split(','));
+
+		url.push('?key=',	arr64enc(pubkey));
+		url.push('&auth=',	arr64enc(dat.authenticatorData));
+		url.push('&clidat=',	arr64enc(dat.clientDataJSON));
+		url.push('&sig=',	arr64enc(dat.signature));
+		r.open('POST', url.join(''), false);
+
+		r.onloadend = function(e)
+		{
+			if (r.status == 200) { prepare_sock(); return }
+			termwrite(	'failure authenticating: '
+					+ r.statusText + '\n'
+					+ r.responseText);
+		};
+
+		termwrite('sending authn signature to server...\r\n');
+
+		r.send();
+	});
+
+	return 1;
+}
+
 function keepali()
 {
 	if (sock && sock.readyState == WebSocket.OPEN) signal('\\!\n');
@@ -827,6 +971,16 @@ function prepare_sock()
 	{
 		var mtxt = '[lost connection to server]';
 		display(mtxt + mtxt.replaceAll(/./g, '\\08') + '\n');
+	};
+
+	sock.onerror = function(e)
+	{
+		var athreq, as;
+		if (!window.relyingparty) 	{ reportwebsockerr(e);	return }
+		if (!localStorage['authnid'])	{ newcred();		return }
+
+		/* see if we can blame the failure on missing authentication */
+		if (!doauthn())			{ reportwebsockerr(e); return }
 	};
 }
 

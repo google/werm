@@ -15,9 +15,13 @@
 #include "spawner.h"
 #include "dtachctx.h"
 #include "tm.c"
+#include "third_party/st/b64.h"
 #include "third_party/st/plat.h"
 #include "third_party/st/tmeng"
 
+#include <openssl/ec.h>
+#include <fido/es256.h>
+#include <fido.h>
 #include <sys/wait.h>
 #include <libgen.h>
 #include <sys/stat.h>
@@ -745,6 +749,42 @@ static void atchsesnlis(struct wrides *de)
 	fdb_finsh(&rb);
 
 	closedir(skd);
+}
+
+static const char *wermauthkeys(void)
+{
+	static char *p;
+
+	if (p) return p;
+	p = getenv("WERMAUTHKEYS");
+	if (p) return p=strdup(p);
+	xasprintf(&p, "%s/.ssh/werm_authorized_keys", getenv("HOME"));
+	return p;
+}
+
+static int inauthkeys(const char *pubkey)
+{
+	FILE *akf = fopen(wermauthkeys(), "r");
+	char ln[PUBKEY_BYTESZ * 2 + 1];
+	int foun = 0, bi;
+
+	if (!akf) { perror("open wermauthkeys file"); return 0; }
+
+	for (;;) {
+		if (!fgets(ln, sizeof(ln), akf)) goto cleanup;
+
+		bi=0;
+		for (;;) {
+			if (ln[bi*2 + 0] != hexdig_lc(pubkey[bi] >> 4)) break;
+			if (ln[bi*2 + 1] != hexdig_lc(pubkey[bi] >> 0)) break;
+
+			if (++bi == PUBKEY_BYTESZ) { foun = 1; goto cleanup; }
+		}
+	}
+
+cleanup:
+	fclose(akf);
+	return foun;
 }
 
 static void writetosubproccore(
@@ -1764,13 +1804,54 @@ cleanup:
 	fdb_finsh(&b);
 }
 
+static void authnstatus(struct wrides *out, Httpreq *rq)
+{
+	struct fdbuf ob = {0};
+	int i;
+
+	fdb_apnd(&ob, "{\"pendauth\":", -1);
+	fdb_apnc(&ob, rq->pendauth ? '1' : '0');
+	fdb_apnd(&ob, ", \"challenge\": [", -1);
+	for (i = 0; i < CHALLN_BYTESZ; i++) {
+		if (i) fdb_apnc(&ob, ',');
+		fdb_itoa(&ob, rq->chal[i]);
+	}
+	fdb_apnd(&ob, "]}", -1);
+
+	resp_dynamc(out, 'j', 200, ob.bf, ob.len);
+
+	fdb_finsh(&ob);
+}
+
+static const char *passkeyid(void)
+{
+	static char *val;
+	char hn[32] = {0};
+
+	if (!val) val = getenv("WERMPASSKEYID");
+	if (val) return val;
+
+	if (0>gethostname(hn, sizeof(hn)-1)) { perror("hostname"); hn[0]=0; }
+	xasprintf(&val, "%s:%s", hn, getenv("USER"));
+	return val;
+}
+
 static void servsharejs(struct wrides *out)
 {
 	struct fdbuf fou = {0};
 	const char *ttl = getenv("WERMHOSTTITLE");
+	const char *rlp = getenv("WERMRELYINGPARTY");
 
 	fdb_apnd(&fou, "window.wermhosttitle = ", -1);
 	fdb_json(&fou, ttl ? ttl : "", -1);
+	fdb_apnd(&fou, ";\n", -1);
+
+	fdb_apnd(&fou, "window.wermpasskeyid = ", -1);
+	fdb_json(&fou, passkeyid(), -1);
+	fdb_apnd(&fou, ";\n", -1);
+
+	fdb_apnd(&fou, "window.relyingparty = ", -1);
+	fdb_json(&fou, rlp ? rlp : "", -1);
 	fdb_apnd(&fou, ";\n", -1);
 
 	fdb_apnd(&fou, sharejs, SHAREJS_LEN);
@@ -1792,7 +1873,7 @@ static int svbuf(
 	return 1;
 }
 
-static void httphandlers(struct wrides *out, Httpreq *rq)
+static void httpgethandlers(struct wrides *out, Httpreq *rq)
 {
 	const char *rs = rq->resource;
 
@@ -1805,15 +1886,186 @@ static void httphandlers(struct wrides *out, Httpreq *rq)
 	if (svbuf('c',rs,"/readme.css",	readme_css,README_CSS_LEN, out)) return;
 	if (svbuf('j',rs,"/st",		mainjs_etc,MAINJS_ETC_LEN, out)) return;
 
+	if (!strcmp(rs, "/readme"))	{ servereadme(out);		return;}
 	if (!strcmp(rs, "/share"))	{ servsharejs(out);		return;}
+	if (!strcmp(rs, "/authent"))	{ authnstatus(out, rq);		return;}
+	if (rq->pendauth)		{ resp_dynamc(out, 't', 401, 0, 0);
+									return;}
 	if (!strcmp(rs, "/aux.js"))	{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/scrollback"))	{ externalcgi(out, 'h', rq);	return;}
 	if (!strcmp(rs, "/showenv"))	{ externalcgi(out, 't', rq);	return;}
 	if (!strcmp(rs, "/atchses"))	{ atchsesnlis(out);		return;}
-	if (!strcmp(rs, "/readme"))	{ servereadme(out);		return;}
 	if (!strcmp(rs, "/newsess"))	{ begnsesnlis(out);		return;}
 
 	resp_dynamc(out, 't', 404, 0, 0);
+}
+
+static int matchchaln(Httpreq *hr, const char *clid)
+{
+	#define CHALPROPNAME "\"challenge\":\""
+
+	const char *pen, *prop = strstr(clid, CHALPROPNAME);
+	char *val;
+	unsigned clen;
+	int fon = 0;
+
+	if (!prop) return 0;
+	prop += sizeof(CHALPROPNAME) - 1;
+
+	pen = strchr(prop, '"');
+	if (!pen) return 0;
+
+	val = base64dec(prop, pen, &clen);
+	if (clen != CHALLN_BYTESZ) goto cleanup;
+
+	fon = !memcmp(val, hr->chal, CHALLN_BYTESZ);
+
+cleanup:
+	free(val);
+	return fon;
+}
+
+static void authentreq(struct wrides *out, Httpreq *hr)
+{
+	const char *qc = hr->query;
+	struct {
+		char *s;
+		unsigned len;
+	}	keyv	= {0},
+		clidatv	= {0},
+		sigv	= {0},
+		authv	= {0};
+	const char *end;
+	int rstat;
+	struct fdbuf erm = {0};
+	fido_assert_t *asr = 0;
+	es256_pk_t *fpkey = 0;
+	int foi = -1, fern;
+
+	while (*qc && qc - hr->query < sizeof(hr->query)) {
+		end = strchr(qc, '&');
+		if (!end) end = qc + strlen(qc);
+
+		if	(!strncmp(qc, "key=",		4))
+			keyv.s		= base64dec(qc+	4, end, &keyv.len);
+		else if	(!strncmp(qc, "clidat=",	7))
+			clidatv.s	= base64dec(qc+	7, end, &clidatv.len);
+		else if	(!strncmp(qc, "sig=",		4))
+			sigv.s		= base64dec(qc+	4, end, &sigv.len);
+		else if	(!strncmp(qc, "auth=",		5))
+			authv.s		= base64dec(qc+	5, end, &authv.len);
+		else
+			fprintf(stderr, "invalid query arg at char %zu\n",
+				qc - hr->query);
+
+		if (!*end) break;
+		qc = end + 1;
+	}
+
+	if (!keyv	.s) goto badreq;
+	if (!clidatv	.s) goto badreq;
+	if (!sigv	.s) goto badreq;
+	if (!authv	.s) goto badreq;
+
+	fprintf(stderr, "found all keys in auth query string\n");
+	if (!hr->sescook[0]) {
+		fdb_apnd(&erm,	"attempt to authenticate without setting "
+				"'wermsession' cookie", -1);
+		goto badreq;
+	}
+
+	/* validation steps:
+	1. verify public key is in the authorized list
+	2. verify challenge in client data matches the challenge saved for the
+	   client
+	3. use fido lib to verify signature of clidat */
+
+	if (keyv.len != PUBKEY_BYTESZ) {
+		fdb_apnd(&erm, "public key has size ", -1);
+		fdb_itoa(&erm, keyv.len);
+		fdb_apnd(&erm, " but it should be ", -1);
+		fdb_itoa(&erm, PUBKEY_BYTESZ);
+		fdb_apnc(&erm, '\n');
+		goto badreq;
+	}
+	if (!inauthkeys(keyv.s)) {
+		fdb_apnd(&erm, "this key is not authorized. to authorize,", -1);
+		fdb_apnd(&erm, " on the server run:\n", -1);
+		fdb_apnd(&erm, "  echo ", -1);
+
+		fdb_hexs(&erm, keyv.s, PUBKEY_BYTESZ);
+
+		fdb_apnd(&erm, " >> ", -1);
+		fdb_apnd(&erm, wermauthkeys(), -1);
+		fdb_apnc(&erm, '\n');
+		goto badreq;
+	}
+	if (!matchchaln(hr, clidatv.s)) {
+		fdb_apnd(&erm, "challenge in clientdata does not match ", -1);
+		fdb_apnd(&erm, "what the server generated\n", -1);
+		fdb_apnd(&erm, clidatv.s, -1);
+		fdb_apnd(&erm, " vs\n", -1);
+		fdb_hexs(&erm, hr->chal, CHALLN_BYTESZ);
+		fdb_apnc(&erm, '\n');
+		goto badreq;
+	}
+
+	asr = fido_assert_new();
+	fpkey = es256_pk_new();
+	if (!fpkey || !asr) {
+		fprintf(stderr, "error making fido objs\n");
+		goto interer;
+	}
+	fern=es256_pk_from_ptr(fpkey, keyv.s, PUBKEY_BYTESZ);
+	++foi; if (fern) goto fidoer;
+
+	fern=fido_assert_set_count(asr, 1);
+	++foi; if (fern) goto fidoer;
+
+	fern=fido_assert_set_rp(asr, getenv("WERMRELYINGPARTY"));
+	++foi; if (fern) goto fidoer;
+
+	fern=fido_assert_set_clientdata(asr, (void *)clidatv.s, clidatv.len);
+	++foi; if (fern) goto fidoer;
+
+	fern=fido_assert_set_sig(asr, 0, (void *)sigv.s, sigv.len);
+	++foi; if (fern) goto badreq;
+
+	fern=fido_assert_set_authdata_raw(asr, 0, (void *)authv.s, authv.len);
+	++foi; if (fern) goto fidoer;
+
+	fern=fido_assert_set_up(asr, FIDO_OPT_TRUE);
+	++foi; if (fern) goto fidoer;
+
+	fern=fido_assert_verify(asr, 0, FIDOALGTYPE, fpkey);
+	++foi; if (fern) goto badreq;
+
+	authn_state(hr, 1);
+	rstat = 200;
+
+cleanup:
+	resp_dynamc(out, 't', rstat, erm.bf, erm.len);
+	fdb_finsh(&erm);
+
+	fido_assert_free(&asr);
+	es256_pk_free(&fpkey);
+	free(keyv	.s);
+	free(clidatv	.s);
+	free(sigv	.s);
+	free(authv	.s);
+	return;
+
+badreq:
+	rstat = 400;
+	goto cleanup;
+
+fidoer:
+	fprintf(stderr, "fido err for op #%d, msg: %s\n",
+		foi, fido_strerr(fern));
+
+interer:
+	rstat = 500;
+	goto cleanup;
 }
 
 int http_serv(void)
@@ -1839,8 +2091,12 @@ int http_serv(void)
 		resp_dynamc(&out, 't', 403, b.bf, b.len);
 		fdb_finsh(&b);
 	}
+	else if (rq.rqtype == 'G')
+		httpgethandlers(&out, &rq);
+	else if (rq.rqtype == 'P' && !strcmp(rs, "/authent"))
+		authentreq(&out, &rq);
 	else
-		httphandlers(&out, &rq);
+		resp_dynamc(&out, 't', 405, 0, 0);
 
 	return rq.keepaliv;
 }

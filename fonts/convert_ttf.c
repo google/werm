@@ -19,7 +19,7 @@ static FILE *openout(const char *bsname)
 	snprintf(dirp, sizeof(dirp),
 		 "/tmp/convert_ttf.%lld", (long long) getpid());
 	snprintf(abp, sizeof(abp), "%s/%s.wermfont", dirp, bsname);
-	fprintf(stderr, "writing font to %s...\n", abp);
+	fprintf(stderr, "writing font to %s ...\n", abp);
 
 	if (0>mkdir(dirp, 0700) && errno != EEXIST) PFAT("mkdir");
 	f = fopen(abp, "wb");
@@ -27,10 +27,10 @@ static FILE *openout(const char *bsname)
 	return f;
 }
 
-static void process(const char *dir, const char *bsname, int h)
+static void process(const char *dir, const char *bsname, int h, double yoff)
 {
 	char absrc[256];
-	SFT sf = {0, h, h, 0, 0, SFT_DOWNWARD_Y};
+	SFT sf = {0, h, h, 0, yoff, SFT_DOWNWARD_Y};
 	SFT_Image im = {pix, PIXDIM, PIXDIM};
 	unsigned char *pix;
 	long cp;
@@ -43,7 +43,7 @@ static void process(const char *dir, const char *bsname, int h)
 		 getenv("WERMSRCDIR"), dir, bsname);
 
 	sf.font = sft_loadfile(absrc);
-	if (!sf.font) {fprintf(stderr, "error loading ", absrc); goto cleanup;}
+	if (!sf.font) {fprintf(stderr, "error loading %s", absrc); goto cleanup;}
 
 	for (cp = 1; cp < 0x110000; cp++) {
 		if (0x20 == cp) continue;
@@ -69,10 +69,11 @@ static void process(const char *dir, const char *bsname, int h)
 		offy = gm.yOffset		- minyoff;
 
 		for (x=0, y=0, pix=im.pixels;;) {
+			int val;
 			if (x < offx || y < offy) {fputc('.', out); goto nextp;}
 
-			switch (pix[(y - offy)*PIXDIM + (x - offx)]) {
-			default:		goto blackwerr;
+			switch (val = pix[(y - offy)*PIXDIM + (x - offx)]) {
+			default:		fputc((val-1) * 26 / 254 + 'A', out);
 			break; case 0:		fputc('.', out);
 			break; case 255:	fputc('o', out);
 			}
@@ -92,22 +93,23 @@ cleanup:
 	return;
 
 metricerr: fprintf(stderr, "can't get metrics 0x%llx\n"	, cp); goto cleanup;
-blackwerr: fprintf(stderr, "a pixel is gray 0x%llx\n"	, cp); goto cleanup;
 }
 
 int main()
 {
 	pix = malloc(PIXDIM * PIXDIM);
-	process("oldschool-pc-fonts",	"ibm_ega_8x8",		8);
-	process("oldschool-pc-fonts",	"hp_100lx_10x11",	12);
+	process("oldschool-pc-fonts",	"ibm_ega_8x8",		8, 0.0);
+	process("oldschool-pc-fonts",	"hp_100lx_10x11",	12, 0.0);
 	fprintf(stderr, "the next one will take awhile\n");
-	process("shinonome",		"jfdot_7x14",		14);
-	process("oldschool-pc-fonts",	"ibm_vga_8x16",		16);
-	process("oldschool-pc-fonts",	"ibm_vga_9x16",		16);
-	process("oldschool-pc-fonts",	"dos_v_ibm_8x19",	20);
-	process("oldschool-pc-fonts",	"cl_stringray_8x19",	20);
-	process("oldschool-pc-fonts",	"ibm_xga_ai_12x20",	20);
-	process("oldschool-pc-fonts",	"ibm_xga_ai_12x23",	24);
-	process("oldschool-pc-fonts",	"dos_v_re_12x30",	32);
+	process("shinonome",		"jfdot_7x14",		14, 0.0);
+	process("oldschool-pc-fonts",	"ibm_vga_8x16",		16, 0.0);
+	process("oldschool-pc-fonts",	"ibm_vga_9x16",		16, 0.0);
+	/* This font has a lot of gray pixels. Fix with tr after conversion. */
+	process("ayu",			"jfdot_10x20",		20, -0.1950);
+	process("oldschool-pc-fonts",	"dos_v_ibm_8x19",	20, 0.0);
+	process("oldschool-pc-fonts",	"cl_stringray_8x19",	20, 0.0);
+	process("oldschool-pc-fonts",	"ibm_xga_ai_12x20",	20, 0.0);
+	process("oldschool-pc-fonts",	"ibm_xga_ai_12x23",	24, 0.0);
+	process("oldschool-pc-fonts",	"dos_v_re_12x30",	32, 0.0);
 	free(pix);
 }

@@ -27,6 +27,7 @@ my @wfns = (
 	'26:230:128:16:0:third_party/oldschool-pc-fonts/ibm_vga_9x16.wermfont',
 	'26:230:128:20:0:third_party/oldschool-pc-fonts/dos_v_ibm_8x19.wermfont',
 	'26:230:128:20:0:third_party/oldschool-pc-fonts/cl_stringray_8x19.wermfont',
+	'26:250:1024:20:0:third_party/ayu/jfdot_10x20.wermfont',
 	'26:245:128:20:0:third_party/oldschool-pc-fonts/ibm_xga_ai_12x20.wermfont',
 	'26:230:128:24:0:third_party/oldschool-pc-fonts/ibm_xga_ai_12x23.wermfont',
 	'26:230:128:32:0:third_party/oldschool-pc-fonts/dos_v_re_12x30.wermfont',

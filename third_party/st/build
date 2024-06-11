@@ -18,6 +18,7 @@ cc 	-g3					\
 	`pkg-config --cflags fontconfig`	\
 	`pkg-config --cflags freetype2`		\
 	-o third_party/st/st			\
+	third_party/st/b64.c			\
 	third_party/st/x.c			\
 	third_party/st/posix.c			\
 	-L/usr/X11R6/lib			\

@@ -532,8 +532,8 @@ function updaterepboxs(sz, newpo, o, st, en)
 
 		if (!newpo && !sz) return;
 
-		cw =		term(t,cw);
-		ch =		term(t,ch);
+		cw =		term(t,cw) / window.devicePixelRatio;
+		ch =		term(t,ch) / window.devicePixelRatio;
 		cx = curs_x(	term(t,curs));
 		cy = curs_y(	term(t,curs));
 
@@ -1360,9 +1360,8 @@ function set_barrier_dig(code)
 
 function updatebarrdivcw()
 {
-	var cw = term(t,cw);
-	barrdiv.style.left	= `${cw	* barrdiv.termcols
-					/ window.devicePixelRatio}px`;
+	var cw = term(t,cw) / window.devicePixelRatio;
+	barrdiv.style.left	= `${cw	* barrdiv.termcols}px`;
 	barrdiv.style.width	= `${cw}px`; 
 }
 

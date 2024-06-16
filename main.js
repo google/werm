@@ -1663,7 +1663,11 @@ window.onload = function()
 {
 	term_canv();
 
-	host = location.host.replace(/^localhost:/, ':');
+	if (window.wermhosttitle)
+		host = window.wermhosttitle;
+	else
+		host = location.host.replace(/^localhost:/, ':');
+
 	prepare_sock();
 	params = new URLSearchParams(window.location.search);
 	termid = params.get('termid');

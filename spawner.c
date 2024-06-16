@@ -181,6 +181,10 @@ static void handlreq(Ports ps, struct sock *s)
 	if (0 > dup2(fd, 0))		{ perror("dup2 stdin"	); goto er; }
 	if (0 > dup2(fd, 1))		{ perror("dup2 stdout"	); goto er; }
 
+	/* This is needed to prevent Werm (Werm master) procs from keeping the
+	port open. */
+	close(fd);
+
 	while (http_serv()) {}
 	delaystreamclose();
 

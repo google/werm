@@ -101,8 +101,10 @@ function imposetsize()
 
 function adjust()
 {
-	dw = 0 | window.devicePixelRatio*tel.clientWidth;
-	dh = 0 | window.devicePixelRatio*tel.clientHeight;
+	var rat = window.devicePixelRatio;
+	var tst = getComputedStyle(tel);
+	dw = Math.round(rat * parseFloat(tst.width));
+	dh = Math.round(rat * parseFloat(tst.height));
 
 	clipixw		= 2/dw	;
 	clipixh		= 2/dh	;

@@ -190,7 +190,11 @@ void full_write(struct wrides *de, const void *buf_, ssize_t sz)
 		}
 		else {
 			perror("full_write");
-			if (errno != EINTR) return;
+			if (	errno != EINTR
+			&&	errno != EAGAIN
+			&&	errno != EWOULDBLOCK
+			)
+				return;
 		}
 	} while (sz);
 }

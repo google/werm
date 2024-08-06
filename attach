@@ -90,6 +90,7 @@ a.ttl-link {
 </tr>
 
 </table>
+<script src="share"></script>
 <script src=endptid.js></script>
 <script>
 var nsreq = new XMLHttpRequest();
@@ -183,8 +184,7 @@ atreq.onload = function ()
 };
 atreq.send();
 
-host = location.host.replace(/^localhost:/, ':');
-document.title += '[' + host + ']';
+document.title += '[' + window.wermhosttitle + ']';
 
 </script>
 </body>

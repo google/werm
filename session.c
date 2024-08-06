@@ -1794,6 +1794,7 @@ static void httphandlers(struct wrides *out, Httpreq *rq)
 	if (!strcmp(rs, "/attach"))	{ resp_static(out, 'h', rs);	return;}
 	if (!strcmp(rs, "/common.css"))	{ resp_static(out, 'c', rs);	return;}
 	if (!strcmp(rs, "/readme.css"))	{ resp_static(out, 'c', rs);	return;}
+	if (!strcmp(rs, "/share"))	{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/endptid.js"))	{ resp_static(out, 'j', rs);	return;}
 	if (!strcmp(rs, "/aux.js"))	{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/scrollback"))	{ externalcgi(out, 'h', rq);	return;}

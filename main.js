@@ -54,7 +54,7 @@ var	t, tel, gl, gwid, ghei, cops, ftd, ftx, vbu, shpr, dw, dh,
 	pend_send = [],
 	pend_display = [],
 	pend_escape = '', termid,
-	params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl, host,
+	params, dead_key_hist, keep_row_ttl, row_ttl, locked_ttl,
 	repeat_cnt, repsignal, repeat_boxes = [], macro_map,
 	barrier_dig = [], barrdiv, font_key,
 	got_key_up = false, matching = [], macro_winpos, notitout;
@@ -603,7 +603,7 @@ function set_title()
 	if (!locked_ttl) row_ttl = currowtext() || row_ttl;
 
 	if (row_ttl) compons.push(row_ttl);
-	compons.push(host);
+	compons.push(window.wermhosttitle);
 
 	document.title = compons.join(' | ');
 }
@@ -1664,11 +1664,6 @@ function sporkeyup(e)
 window.onload = function()
 {
 	term_canv();
-
-	if (window.wermhosttitle)
-		host = window.wermhosttitle;
-	else
-		host = location.host.replace(/^localhost:/, ':');
 
 	prepare_sock();
 	params = new URLSearchParams(window.location.search);

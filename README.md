@@ -336,6 +336,12 @@ starting the server, and the following values are supported:
 | `dtachlog=` | set to anything to enable detailed logging for the dtach component to `/tmp/dtachlog.<pid>` files |
 | `sblvl=`    | see [SCROLLBACK FEATURES](#scrollback-features)            |
 
+### WERMHOSTTITLE
+
+A string used to identify the server which is included in each page name,
+including terminals and `/attach`. By default, this is the `host:port` piece of
+the URL, with `localhost` removed if it is present.
+
 <a name=profiles></a>
 ## PROFILES
 

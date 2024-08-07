@@ -818,15 +818,18 @@ static void writetosubproccore(
 				profinfo4cli(clioutde);
 				break;
 
-			case 'A':	atchstatejson(dc, clioutde); break;
+			case 'A': atchstatejson(dc, clioutde);		break;
 
 			/* directions, home, end */
-			case '^':	cursmvbyte = 'A'; break;
-			case 'v':	cursmvbyte = 'B'; break;
-			case '>':	cursmvbyte = 'C'; break;
-			case '<':	cursmvbyte = 'D'; break;
-			case 'e':	cursmvbyte = 'F'; break;
-			case 'h':	cursmvbyte = 'H'; break;
+			case '^': cursmvbyte = 'A';			break;
+			case 'v': cursmvbyte = 'B';			break;
+			case '>': cursmvbyte = 'C';			break;
+			case '<': cursmvbyte = 'D';			break;
+			case 'e': cursmvbyte = 'F';			break;
+			case 'h': cursmvbyte = 'H';			break;
+
+			/* keep-alive */
+			case '!': full_write(clioutde, "\\!\n", -1);	break;
 
 			default:
 				warnx("unknown escape: %d\n", byte);

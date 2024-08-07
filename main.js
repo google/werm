@@ -720,6 +720,8 @@ function display(s)
 			history.replaceState(
 				{}, '', '/?termid=' + termid);
 		}
+		else if (s.startsWith('\\!'))
+			console.debug('received keepalive response');
 		else
 			pend_display.push(hex_val(1) * 16 + hex_val(2));
 
@@ -795,6 +797,17 @@ function display(s)
 		set_title();
 	}, 2000);
 }
+
+function keepali()
+{
+	if (sock && sock.readyState == WebSocket.OPEN) signal('\\!\n');
+	/* Re-send every 60-80 seconds. This uses non-determinism to avoid every
+	browser window sending the heartbeat at the same time in the case of
+	a restored session (or something that opens several terminal tabs at
+	once). */
+	window.setTimeout(keepali, 60000 + Math.random() * 20000);
+}
+keepali();
 
 function prepare_sock()
 {

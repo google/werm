@@ -91,7 +91,6 @@ a.ttl-link {
 
 </table>
 <script src="share"></script>
-<script src=endptid.js></script>
 <script>
 var nsreq = new XMLHttpRequest();
 nsreq.open('GET', '/newsess', true);

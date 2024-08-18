@@ -299,6 +299,7 @@ sub filetocstr {
 filetocstr 'test_jumptocol_in'	, 'test/raw/jumptocol_in';
 filetocstr 'test_lineed_in'	, 'test/raw/lineed_in';
 filetocstr 'test_lineednar_in'	, 'test/raw/lineednar_in';
+filetocstr 'sharejs'		, 'share.js';
 
 open my $dahdr, '>', 'gen/data.h';
 for my $dalin (@datahdr) { print $dahdr $dalin }

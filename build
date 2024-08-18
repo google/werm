@@ -301,6 +301,10 @@ filetocstr 'test_lineed_in'	, 'test/raw/lineed_in';
 filetocstr 'test_lineednar_in'	, 'test/raw/lineednar_in';
 filetocstr 'sharejs'		, 'share.js';
 filetocstr 'readme_md'		, 'README.md';
+filetocstr 'index_html'		, 'index.html';
+filetocstr 'attch_html'		, 'attach';
+filetocstr 'common_css'		, 'common.css';
+filetocstr 'readme_css'		, 'readme.css';
 
 open my $dahdr, '>', 'gen/data.h';
 for my $dalin (@datahdr) { print $dahdr $dalin }

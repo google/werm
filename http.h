@@ -34,10 +34,7 @@ typedef struct {
    respout - where HTTP errors and websocket upgrade responses are printed */
 void http_read_req(FILE *src, Httpreq *rq, struct wrides *errresp);
 
-/* resp_static sends a full http response to the given fd. path is relative to
-   WERMSRCDIR.
-
-   resp_dynamc writes an http response to fd from a block of memory with the
+/* resp_dynamc writes an http response to fd from a block of memory with the
    given status code.
 
    Types of headers (hdr):
@@ -46,7 +43,6 @@ void http_read_req(FILE *src, Httpreq *rq, struct wrides *errresp);
 	c - css
 	j - js
 	f - ttf */
-void resp_static(struct wrides *de, char hdr, const char *path);
 void resp_dynamc(struct wrides *de, char hdr, int code, void *b, size_t sz);
 
 /* Exercises http functionality and writes test output to stdout, to be compared

@@ -283,7 +283,7 @@ static void resettmpfile(FILE **f)
 	*f = tmpfile();
 }
 
-static void resphdr(struct wrides *de, int code, char hdr, size_t contlength)
+void resp_dynamc(struct wrides *de, char hdr, int code, void *p, size_t sz)
 {
 	struct fdbuf b = {de, 512};
 	const char *codest, *contype;
@@ -319,62 +319,11 @@ static void resphdr(struct wrides *de, int code, char hdr, size_t contlength)
 	if (utf8) fdb_apnd(&b, "; charset=utf-8", -1);
 	fdb_apnd(&b, "\r\n", -1);
 	fdb_apnd(&b, "Content-Length: ", -1);
-	fdb_itoa(&b, contlength);
+	fdb_itoa(&b, sz);
 	fdb_apnd(&b, "\r\n\r\n", -1);
 
 	fdb_finsh(&b);
-}
-
-void resp_static(struct wrides *de, char hdr, const char *path)
-{
-	int sfd, ern, redn;
-	char *fullp=0, buf[4096];
-	const char *eop;
-	struct stat sb;
-	struct fdbuf erb = {0};
-
-	/* We are not checking for "/../" in path because path should be part of
-	   a hard-coded whitelist, and if not, it will not be able to access any
-	   file not already accessible with `cat <path>` in a shell. */
-	xasprintf(&fullp, "%s/%s", getenv("WERMSRCDIR"), path);
-
-	sfd = open(fullp, O_RDONLY);
-	if (0>sfd)		{ eop = "op: open\n"; goto dumperr; }
-	if (0>fstat(sfd, &sb))	{ eop = "op: stat\n"; goto dumperr; }
-
-	resphdr(de, 200, hdr, sb.st_size);
-
-	for (;;) {
-		redn = read(sfd, buf, sizeof(buf));
-
-		if (!redn)	goto cleanup;
-		if (0<redn)	full_write(de, buf, redn);
-		if (0>redn && errno!=EINTR) { perror("read static"); exit(1); }
-	}
-
-dumperr:
-	ern = errno;
-
-	fdb_apnd(&erb, eop, -1);
-	fdb_apnd(&erb, "errno: ", -1);
-	fdb_itoa(&erb, ern);
-	fdb_apnc(&erb, '\n');
-	fdb_apnd(&erb, "fullp: ", -1);
-	fdb_apnd(&erb, fullp, -1);
-	fdb_apnc(&erb, '\n');
-
-	resp_dynamc(de, 't', 500, erb.bf, erb.len);
-
-	fdb_finsh(&erb);
-
-cleanup:
-	if (sfd >= 0) close(sfd);
-}
-
-void resp_dynamc(struct wrides *de, char hdr, int code, void *b, size_t sz)
-{
-	resphdr(de, code, hdr, sz);
-	full_write(de, b, sz);
+	full_write(de, p, sz);
 }
 
 void test_http(void)

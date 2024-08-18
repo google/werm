@@ -1784,6 +1784,19 @@ static void servsharejs(struct wrides *out)
 	fdb_finsh(&fou);
 }
 
+static int svbuf(
+	char hd,
+	const char *paa,
+	const char *pab,
+	void *cont, unsigned long len,
+	struct wrides *o)
+{
+	if (strcmp(paa, pab)) return 0;
+
+	resp_dynamc(o, hd, 200, cont, len);
+	return 1;
+}
+
 static void httphandlers(struct wrides *out, Httpreq *rq)
 {
 	const char *rs = rq->resource;
@@ -1791,11 +1804,11 @@ static void httphandlers(struct wrides *out, Httpreq *rq)
 	fprintf(stderr, "serving: %s\n", rs);
 	if (maybeservefont(out, rs))	return;
 
-	if (!strcmp(rs, "/"))		{ resp_static(out, 'h', "/index.html");
-									return;}
-	if (!strcmp(rs, "/attach"))	{ resp_static(out, 'h', rs);	return;}
-	if (!strcmp(rs, "/common.css"))	{ resp_static(out, 'c', rs);	return;}
-	if (!strcmp(rs, "/readme.css"))	{ resp_static(out, 'c', rs);	return;}
+	if (svbuf('h',rs,"/",		index_html,INDEX_HTML_LEN, out)) return;
+	if (svbuf('h',rs,"/attach",	attch_html,ATTCH_HTML_LEN, out)) return;
+	if (svbuf('c',rs,"/common.css",	common_css,COMMON_CSS_LEN, out)) return;
+	if (svbuf('c',rs,"/readme.css",	readme_css,README_CSS_LEN, out)) return;
+
 	if (!strcmp(rs, "/share"))	{ servsharejs(out);		return;}
 	if (!strcmp(rs, "/aux.js"))	{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/scrollback"))	{ externalcgi(out, 'h', rq);	return;}

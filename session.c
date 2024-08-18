@@ -1664,33 +1664,12 @@ static void m4hout(const MD_CHAR *buf, MD_SIZE sz, void *ud)
 static void servereadme(struct wrides *de)
 {
 	struct fdbuf d = {0};
-	char *path, *mdsrc, *mdc, *mdend;
-	struct stat sb;
-	int sfd;
-	ssize_t redn;
-
-	xasprintf(&path, "%s/README.md", getenv("WERMSRCDIR"));
-	sfd = open(path, O_RDONLY);
-	if (0 > sfd)			{ perror("open md"); exit(1); }
-	if (0 > fstat(sfd, &sb))	{ perror("fstat md"); exit(1); }
-	free(path);
-
-	mdc = mdsrc = malloc(sb.st_size);
-	mdend = mdsrc + sb.st_size;
-
-	while (mdc != mdend) {
-		redn = read(sfd, mdc, mdend - mdc);
-		if (0 > redn && errno == EINTR) continue;
-		if (0 > redn) { perror("read md"); exit(1); }
-
-		mdc += redn;
-	}
 
 	fdb_apnd(&d, "<html><head><title>README.md</title>", -1);
 	fdb_apnd(&d, "<link rel=stylesheet href=common.css>", -1);
 	fdb_apnd(&d, "<link rel=stylesheet href=readme.css>", -1);
 	fdb_apnd(&d, "</head><body>", -1);
-	md_html(mdsrc, sb.st_size, m4hout, &d, MD_FLAG_TABLES, 0);
+	md_html(readme_md, README_MD_LEN, m4hout, &d, MD_FLAG_TABLES, 0);
 	fdb_apnd(&d, "</body></html>", -1);
 
 	resp_dynamc(de, 'h', 200, d.bf, d.len);

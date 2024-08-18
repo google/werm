@@ -1764,11 +1764,6 @@ cleanup:
 	fdb_finsh(&b);
 }
 
-static void mainjsscrip(struct wrides *out)
-{
-	resp_dynamc(out, 'j', 200, mainjs, MAINJS_LEN);
-}
-
 static void servsharejs(struct wrides *out)
 {
 	struct fdbuf fou = {0};
@@ -1808,12 +1803,12 @@ static void httphandlers(struct wrides *out, Httpreq *rq)
 	if (svbuf('h',rs,"/attach",	attch_html,ATTCH_HTML_LEN, out)) return;
 	if (svbuf('c',rs,"/common.css",	common_css,COMMON_CSS_LEN, out)) return;
 	if (svbuf('c',rs,"/readme.css",	readme_css,README_CSS_LEN, out)) return;
+	if (svbuf('j',rs,"/st",		mainjs_etc,MAINJS_ETC_LEN, out)) return;
 
 	if (!strcmp(rs, "/share"))	{ servsharejs(out);		return;}
 	if (!strcmp(rs, "/aux.js"))	{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/scrollback"))	{ externalcgi(out, 'h', rq);	return;}
 	if (!strcmp(rs, "/showenv"))	{ externalcgi(out, 't', rq);	return;}
-	if (!strcmp(rs, "/st"))		{ mainjsscrip(out);		return;}
 	if (!strcmp(rs, "/atchses"))	{ atchsesnlis(out);		return;}
 	if (!strcmp(rs, "/readme"))	{ servereadme(out);		return;}
 	if (!strcmp(rs, "/newsess"))	{ begnsesnlis(out);		return;}

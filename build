@@ -260,19 +260,19 @@ sub escape_cstr {
 }
 
 {
-	open my $mjs, '>', 'gen/mainjs.c';
+	open my $mjs, '>', 'gen/mainjs_etc.c';
 	my $cppproc = open2(my $ppou, my $ppin, 'cpp', '-P', '-I.');
 
 	print $ppin qq[#include "main.js"\n];
 	close $ppin;
 
 	print $mjs qq[#include "gen/data.h"\n];
-	print $mjs qq[char mainjs[] =\n];
+	print $mjs qq[char mainjs_etc[] =\n];
 	my $mjssz = escape_cstr($mjs, $ppou);
 	print $mjs qq[;\n];
 
-	push @datahdr, "extern char mainjs[];\n";
-	push @datahdr, "#define MAINJS_LEN $mjssz\n";
+	push @datahdr, "extern char mainjs_etc[];\n";
+	push @datahdr, "#define MAINJS_ETC_LEN $mjssz\n";
 
 	waitpid($cppproc, 0);
 	my $ex = $? >> 8;

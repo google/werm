@@ -4,10 +4,9 @@
 # license that can be found in the LICENSE file or at
 # https://developers.google.com/open-source/licenses/bsd
 
-/charwi
 /run
 /compile_commands.json
 /tags
 /var
 /fonts/convert_ttf
-/font.c
+/gen

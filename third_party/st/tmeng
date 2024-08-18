@@ -964,7 +964,7 @@ fn2(tcontrolcode, trm, ascii)
 	term(trm,esc) &= ~(ESC_STR_END|ESC_STR);
 }
 
-#include "charwi"
+#include "gen/charwi"
 
 fn2(tputc, trm, u)
 {

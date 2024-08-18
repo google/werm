@@ -8,7 +8,7 @@
 #include "shared.h"
 #include "font.h"
 #include "outstreams.h"
-#include "test/raw/data.h"
+#include "gen/data.h"
 #include <md4c-html.h>
 #include "wts.h"
 #include "http.h"
@@ -1549,7 +1549,7 @@ static void _Noreturn testmain(void)
 	tstdesc("move to col");
 	testreset();
 	writelgon();
-	process_tty_out(test_jumptocol_in, test_jumptocol_in_size);
+	process_tty_out(test_jumptocol_in, TEST_JUMPTOCOL_IN_LEN);
 
 	tstdesc("move to col 2");
 	testreset();
@@ -1785,6 +1785,11 @@ cleanup:
 	fdb_finsh(&b);
 }
 
+static void mainjsscrip(struct wrides *out)
+{
+	resp_dynamc(out, 'j', 200, mainjs, MAINJS_LEN);
+}
+
 static void httphandlers(struct wrides *out, Httpreq *rq)
 {
 	const char *rs = rq->resource;
@@ -1801,8 +1806,8 @@ static void httphandlers(struct wrides *out, Httpreq *rq)
 	if (!strcmp(rs, "/endptid.js"))	{ resp_static(out, 'j', rs);	return;}
 	if (!strcmp(rs, "/aux.js"))	{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/scrollback"))	{ externalcgi(out, 'h', rq);	return;}
-	if (!strcmp(rs, "/st"))		{ externalcgi(out, 'j', rq);	return;}
 	if (!strcmp(rs, "/showenv"))	{ externalcgi(out, 't', rq);	return;}
+	if (!strcmp(rs, "/st"))		{ mainjsscrip(out);		return;}
 	if (!strcmp(rs, "/atchses"))	{ atchsesnlis(out);		return;}
 	if (!strcmp(rs, "/readme"))	{ servereadme(out);		return;}
 	if (!strcmp(rs, "/newsess"))	{ begnsesnlis(out);		return;}

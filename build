@@ -16,7 +16,9 @@ unset WERMJSPATH
 unset WERMFLAGS
 unset WERMHOSTTITLE
 
-perl <<'EOF'
+perl <<'EOF' || exit 1
+use IPC::Open2;
+
 my $fontcnt = 0;
 my $fntc;
 
@@ -178,7 +180,7 @@ sub procfnt {
 	push @wls,	"1}\n",
 			"0}\n";
 
-	open(my $whn, '>', 'charwi') or die "open charwi: $!";
+	open(my $whn, '>', 'gen/charwi') or die "open gen/charwi: $!";
 	for my $lin (@wls) {
 		chomp $lin;
 		my ($in, $st) = $lin =~ /^(.)(.*)$/;
@@ -197,7 +199,7 @@ sub mtime {
 }
 
 my $fntime = 0x7fffffff;
-for $f (qw[charwi font.c]) {
+for $f (qw[gen/charwi gen/font.c]) {
 	my $mt = mtime $f;
 	$mt < $fntime and $fntime = $mt;
 }
@@ -211,7 +213,7 @@ for $w (@wfns) {
 
 if ($wftime > $fntime) {
 	print STDERR "generating font.c\n";
-	open($fntc, '>', 'font.c') or die "open font.c: $!";
+	open($fntc, '>', 'gen/font.c') or die "open font.c: $!";
 
 	print $fntc qq[#include "font.h"\n];
 	print $fntc qq[#include "http.h"\n];
@@ -236,47 +238,73 @@ if ($wftime > $fntime) {
 	print		$fntc qq[}\n];
 }
 
+my @datahdr;
+
+sub escape_cstr {
+	my ($out, $in) = @_;
+	my $len = 0;
+	while (my $ln = <$in>) {
+		print $out q["];
+		while ($ln =~ /[^"\000-\037\\]+|./gs) {
+			if ($& =~ /["\000-\037\\]/) {
+				printf $out q[\\%03o], ord($&);
+			}
+			else {
+				print $out $&;
+			}
+		}
+		$len += length $ln;
+		print $out qq["\n];
+	}
+	return $len;
+}
+
+{
+	open my $mjs, '>', 'gen/mainjs.c';
+	my $cppproc = open2(my $ppou, my $ppin, 'cpp', '-P', '-I.');
+
+	print $ppin qq[#include "main.js"\n];
+	close $ppin;
+
+	print $mjs qq[#include "gen/data.h"\n];
+	print $mjs qq[char mainjs[] =\n];
+	my $mjssz = escape_cstr($mjs, $ppou);
+	print $mjs qq[;\n];
+
+	push @datahdr, "extern char mainjs[];\n";
+	push @datahdr, "#define MAINJS_LEN $mjssz\n";
+
+	waitpid($cppproc, 0);
+	my $ex = $? >> 8;
+	if ($ex) {
+		print STDERR "C preprocessor failed on main.js\n";
+		exit $ex;
+	}
+}
+
+sub filetocstr {
+	my ($id, $src) = @_;
+
+	open my $shn, '<', $src;
+	open my $dhn, '>', "gen/$id.c";
+	print $dhn qq[#include "gen/data.h"\n];
+	print $dhn qq[char ${id}[] =\n];
+	my $sz = escape_cstr($dhn, $shn);
+	print $dhn qq[;\n];
+
+	push @datahdr, "extern char ${id}[];\n";
+	push @datahdr, "#define " . uc($id) . "_LEN $sz\n";
+}
+
+filetocstr 'test_jumptocol_in'	, 'test/raw/jumptocol_in';
+filetocstr 'test_lineed_in'	, 'test/raw/lineed_in';
+filetocstr 'test_lineednar_in'	, 'test/raw/lineednar_in';
+
+open my $dahdr, '>', 'gen/data.h';
+for my $dalin (@datahdr) { print $dahdr $dalin }
+close $dahdr;
+
 EOF
-
-(
-	cd test/raw || exit 1
-
-	echo '#include <unistd.h>' >| data.h
-
-	find . -type f \
-		-not \( -name '*.c' -o -name '*.h' -o -name .gitignore \) |
-	while read fn
-	do
-		fnb=`basename $fn`
-
-		printf 'extern char test_%s[];\n' "$fnb" >> data.h
-		printf 'extern const size_t test_%s_size;\n' "$fnb" >> data.h
-
-		printf '#include "test/raw/data.h"\n' >| $fn.c
-		printf 'const size_t test_%s_size = %d;\n' "$fnb"  `wc -c <"$fn"` >> "$fn.c"
-		printf 'char test_%s[] = ' "$fnb" >> "$fn.c"
-
-		touch /tmp/line.$$
-		while :; do
-			rm /tmp/line.$$
-			dd status=none bs=80 count=1 of=/tmp/line.$$
-			test -s /tmp/line.$$ || break
-			printf '"' >> "$fn.c"
-			sed '
-s/\\/\\\\/g
-s/\x00/\\000/g
-s/\x07/\\007/g
-s/\x1b/\\033/g
-s/\x0d/\\015/g
-s/"/\\042/g
-s/\x08/\\010/g
-$!s/$/\\012/
-			' /tmp/line.$$ | tr -d '\n' >> "$fn.c"
-			printf '"\n' >> "$fn.c"
-		done < "$fn" 
-		printf ';\n' >> "$fn.c"
-	done
-)
 
 if test -z "${CC}"; then
 	CC=cc
@@ -297,14 +325,13 @@ if ! $CC -x c -std=c99 -I. \
 	$WERMCCFLAGS				\
 	-o run					\
 	session.c				\
-	font.c					\
 	http.c					\
 	inbound.c				\
 	outstreams.c				\
 	shared.c				\
 	spawner.c				\
 	uniqid.c				\
-	test/raw/*.c				\
+	gen/*.c					\
 	third_party/dtach/*.c			\
 	wts.c					\
 	-lutil					\

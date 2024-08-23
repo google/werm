@@ -74,11 +74,8 @@ static int hastok(const char *tk)
 }
 
 #define CHALLKEYLEN 16
-#define SHA1SZ 20
 
-/* Length is the expected length of base64-encoding the raw bytes of a
-   sha1 hash, including '=' padding, plus a null terminator. */
-static char acceptkey[29];
+static char acceptwskey[1 + B64LEN(SHA1SZ)];
 
 static int procwskeyhdr(const char *wskeyhdr, struct wrides *errout)
 {
@@ -126,12 +123,12 @@ static int procwskeyhdr(const char *wskeyhdr, struct wrides *errout)
 
 	if (!BIO_write_ex(b64, binhasho, binhashl, &writn)) goto dumperr;
 	if (writn != binhashl || 1 > BIO_flush(b64)) goto dumperr;
-	if (!BIO_read_ex(bmem, acceptkey, sizeof(acceptkey), &redn))
+	if (!BIO_read_ex(bmem, acceptwskey, sizeof(acceptwskey), &redn))
 		goto dumperr;
-	if (redn != sizeof(acceptkey)) goto dumperr;
+	if (redn != sizeof(acceptwskey)) goto dumperr;
 
 	/* Replace b64's guaranteed newline with null terminator */
-	acceptkey[sizeof(acceptkey)-1] = 0;
+	acceptwskey[sizeof(acceptwskey)-1] = 0;
 
 	goto cleanup;
 
@@ -229,7 +226,7 @@ void http_read_req(FILE *src, Httpreq *rq, struct wrides *respout)
 	wsconds = (upgradews		? 1 : 0)
 		| (connectionupgr	? 2 : 0)
 		| (goodwsver		? 4 : 0)
-		| (*acceptkey		? 8 : 0);
+		| (*acceptwskey		? 8 : 0);
 
 	if (!wsconds)		goto cleanup;
 	if (wsconds != 15)	goto badreq;
@@ -241,7 +238,7 @@ void http_read_req(FILE *src, Httpreq *rq, struct wrides *respout)
 				"Connection: Upgrade\r\n"
 				"Sec-WebSocket-Accept: ", -1);
 
-	fdb_apnd(&respbuf, acceptkey, -1);
+	fdb_apnd(&respbuf, acceptwskey, -1);
 	fdb_apnd(&respbuf, "\r\n\r\n", -1);
 	full_write(respout, respbuf.bf, respbuf.len);
 	goto cleanup;

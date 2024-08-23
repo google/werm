@@ -8,6 +8,10 @@
 
 #include <stdio.h>
 
+/* Base64-length encoding of given number of |byts|, including '=' padding. */
+#define B64LEN(byts) (((byts) + 2) / 3 * 4)
+#define SHA1SZ 20
+
 typedef struct {
 	char resource[32];
 	char query[512];

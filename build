@@ -244,19 +244,30 @@ if ($wftime > $fntime) {
 my @datahdr;
 
 sub escape_cstr {
-	my ($out, $in) = @_;
+	my ($tesc, $out, $in) = @_;
 	my $len = 0;
 	while (my $ln = <$in>) {
 		print $out q["];
 		while ($ln =~ /[^"\000-\037\\]+|./gs) {
-			if ($& =~ /["\000-\037\\]/) {
+			if ($& !~ /["\000-\037\\]/) {
+				print $out $&;
+				$len += length $&;
+				next;
+			}
+
+			if (!$tesc) {
 				printf $out q[\\%03o], ord($&);
+				$len += 1;
+			}
+			elsif ($& eq "\n") {
+				print $out q[\\\\0a\\\\0d];
+				$len += 6;
 			}
 			else {
-				print $out $&;
+				printf $out q[\\\\%02x], ord($&);
+				$len += 3;
 			}
 		}
-		$len += length $ln;
 		print $out qq["\n];
 	}
 	return $len;
@@ -271,7 +282,7 @@ sub escape_cstr {
 
 	print $mjs qq[#include "gen/data.h"\n];
 	print $mjs qq[char mainjs_etc[] =\n];
-	my $mjssz = escape_cstr($mjs, $ppou);
+	my $mjssz = escape_cstr(0, $mjs, $ppou);
 	print $mjs qq[;\n];
 
 	push @datahdr, "extern char mainjs_etc[];\n";
@@ -286,28 +297,29 @@ sub escape_cstr {
 }
 
 sub filetocstr {
-	my ($id, $src) = @_;
+	my ($tesc, $id, $src) = @_;
 
 	open my $shn, '<', $src;
 	open my $dhn, '>', "gen/$id.c";
 	print $dhn qq[#include "gen/data.h"\n];
 	print $dhn qq[char ${id}[] =\n];
-	my $sz = escape_cstr($dhn, $shn);
+	my $sz = escape_cstr($tesc, $dhn, $shn);
 	print $dhn qq[;\n];
 
 	push @datahdr, "extern char ${id}[];\n";
 	push @datahdr, "#define " . uc($id) . "_LEN $sz\n";
 }
 
-filetocstr 'test_jumptocol_in'	, 'test/raw/jumptocol_in';
-filetocstr 'test_lineed_in'	, 'test/raw/lineed_in';
-filetocstr 'test_lineednar_in'	, 'test/raw/lineednar_in';
-filetocstr 'sharejs'		, 'share.js';
-filetocstr 'readme_md'		, 'README.md';
-filetocstr 'index_html'		, 'index.html';
-filetocstr 'attch_html'		, 'attach';
-filetocstr 'common_css'		, 'common.css';
-filetocstr 'readme_css'		, 'readme.css';
+filetocstr 0, 'test_jumptocol_in'	, 'test/raw/jumptocol_in';
+filetocstr 0, 'test_lineed_in'	, 'test/raw/lineed_in';
+filetocstr 0, 'test_lineednar_in'	, 'test/raw/lineednar_in';
+filetocstr 0, 'sharejs'		, 'share.js';
+filetocstr 0, 'readme_md'		, 'README.md';
+filetocstr 0, 'index_html'		, 'index.html';
+filetocstr 0, 'attch_html'		, 'attach';
+filetocstr 0, 'common_css'		, 'common.css';
+filetocstr 0, 'readme_css'		, 'readme.css';
+filetocstr 1, 'ephemeral_hello'		, 'ephemeral_hello.txt';
 
 open my $dahdr, '>', 'gen/data.h';
 for my $dalin (@datahdr) { print $dahdr $dalin }

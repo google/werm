@@ -1,0 +1,11 @@
+This is Werm! If the text is too small, press <right-alt, F, N, K> to get the
+largest font available. Replace K with an earlier letter for smaller fonts. You
+can change the default font with the magic of profiles.
+
+Open /readme on this server for documentation, which includes help for profiles
+and macros.
+
+This is an ephemeral shell, so it will terminate as soon as you close the tab or
+lose connectivity with the server. Press <right-alt, H, T> to open a persistent
+session. These survive disconnects, including your client going to sleep.
+

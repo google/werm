@@ -318,6 +318,8 @@ static Dtachctx prepfordtach(void)
 
 	dc->isephem = !termid;
 
+	if (!termid) write_wbsoc_frame(ephemeral_hello, EPHEMERAL_HELLO_LEN);
+
 	if (!dtachlog) return dc;
 
 	ok = 0;

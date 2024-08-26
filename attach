@@ -68,6 +68,12 @@ a.ttl-link {
 	padding: 0.5em;
 	font-size: 0.7em;
 }
+a.doclink {
+	font-size: 0.7em;
+	color: white;
+	display: block;
+	margin-top: 1em;
+}
 </style>
 </head>
 <body>
@@ -76,10 +82,14 @@ a.ttl-link {
 <tr>
 <td nowrap class=column style="vertical-align:top">
 	<h1>New</h1>
+
 	<div	id=newsesnlinks>	</div>
+	<a	class=doclink href="/readme#profiles">adding profiles?</a>
 <td nowrap class=column style="vertical-align:top">
 	<h1>Existing</h1>
+
 	<table	id=atchsesnlist>	</table>
+	<a	class=doclink href="/readme#attach-page">attaching?</a>
 	<div	id=ephemeral-sessions>	</div>
 </tr>
 

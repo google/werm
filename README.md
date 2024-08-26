@@ -204,11 +204,7 @@ mnemonics and the long-form name used by the JS Event API.
    to `J ` in roughly increasing size. E.g. press right-alt, F, N, A in sequence
    to choose the smallest font.
 
- * Meta (i.e. super, apple on MacOS, search on ChromeOS) key is used in place of
-   Alt for the terminal process. This is to allow Alt to be used for the start
-   of macros. Note that on ChromeOS and e.g. Windows, meta pressed alone cannot
-   be intercepted by Javascript, so meta is not used for macros.
-
+<a name=key-mappings></a>
 ### Unconventional key mappings
 
 Some common terminal key sequences are bound to browser operations, so alternate
@@ -220,12 +216,22 @@ mappings are used to send the sequence to the terminal:
 
  * Shift+Enter to send Ctrl+N<br>*Ctrl+N creates a new browser window*
 
+ * Meta (i.e. super, apple on MacOS, search on ChromeOS) key is used in place of
+   Alt for the terminal process. So Meta+B would send Alt+B go backwards one
+   word in Emacs. If `Meta+<key>` is intercepted by your OS or windowing
+   environment, try instead `Meta+Shift+<key>` or `Esc, <key>`; or create a
+   macro to send the key sequence.
+
+   This swap is to allow Alt to be used for the start of macros. Note that on
+   ChromeOS and e.g. Windows, meta pressed alone cannot be intercepted by
+   Javascript, so meta is not used for macros.
+
 <a name=attach-page></a>
 ## ATTACH PAGE
 
 Open the attach page by going to `http://localhost:8090/attach`, or using the
 `rarsS T ` or `rarsA T ` macros from within a terminal (see [How to read macro
-shortcuts](#macro-shortcuts). The former shortcut uses a new tab
+shortcuts](#macro-shortcuts)). The former shortcut uses a new tab
 (Separate) while the latter replaces the current tab.
 
 From the attach page you can create or reconnect to persistent sessions.

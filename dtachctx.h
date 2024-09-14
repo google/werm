@@ -27,6 +27,9 @@ typedef struct dtach_ctx {
 	/* Indicates the controlled process should be killed as soon as the
 	   connection is terminated. */
 	unsigned isephem	: 1;
+
+	/* Indicates preamble has already been sent. */
+	unsigned sentpre	: 1;
 } *Dtachctx;
 
 /* Prints attached client information as a Javascript value. It is an array of

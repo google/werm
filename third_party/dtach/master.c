@@ -437,12 +437,12 @@ masterprocess(Dtachctx dc, int s)
 		** When first_attach is unset, wait until the client attaches
 		** before trying to read from the pty.
 		*/
-		if (!dc->firstatch && dc->cls && dc->cls->cls.wantsoutput) {
-			dc->firstatch = 1;
-			send_pream(dc->the_pty.fd);
-		}
+		if (dc->cls && dc->cls->cls.wantsoutput) dc->firstatch = 1;
 
 		if (dc->firstatch) {
+			if (!dc->sentpre) send_pream(dc->the_pty.fd);
+			dc->sentpre = 1;
+
 			FD_SET(dc->the_pty.fd, &readfds);
 			if (dc->the_pty.fd > highest_fd)
 				highest_fd = dc->the_pty.fd;

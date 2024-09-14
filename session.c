@@ -2128,6 +2128,7 @@ er:
 int main(int argc, char **argv)
 {
 	Dtachctx dc;
+	int mode;
 
 	errno = 0;
 	if (setvbuf(stdout, 0, _IONBF, 0))
@@ -2151,39 +2152,45 @@ int main(int argc, char **argv)
 
 	wts.allowtmstate = 1;
 
-	if (argc >= 1 && !strcmp(*argv, "spawner")) {
-		processquerystr(getenv("WERMFLAGS"));
-		iterprofs(profpath(), &((struct iterprofspec){ .diaglog = 1 }));
+	mode = 0;
+	if (argc == 2 && !strcmp(*argv, "newsess")) mode = 'n';
+	if (argc >= 2 && !strcmp(*argv, "spawner")) mode = 's';
 
-		termid = strdup("~spawner");
-		appendunqid(0);
-		dc = prepfordtach();
+	if (!mode) { fprintf(stderr, "unrecognized arguments\n"); exit(1); }
+
+	processquerystr(getenv("WERMFLAGS"));
+	iterprofs(profpath(), &((struct iterprofspec){ .diaglog = 1 }));
+
+	if (mode == 's') termid = strdup("~spawner");
+	if (mode == 'n') termid = strdup(argv[1]);
+
+	appendunqid(0);
+	dc = prepfordtach();
+
+	if (mode == 's') {
 		dc->spargs = parse_spawner_ports(argv + 1);
 
 		fprintf(stderr,
-"--- WARNING ---\n"
-"Saving scrollback logs under: %s\n"
-"Clean this directory periodically to avoid overloading your filesystem.\n"
-"All persistent sessions are saved here until you remove them. Be aware of\n"
-"what you save here and how fast it grows.\n"
-"\n"
-"This inconvenience will eventually be automated.\n"
-"\n"
-"--- STARTING DAEMONIZED SPAWNER PROCESS ---\n"
-"Access http://<host>/attach to get started\n"
-"\n",
+	"--- WARNING ---\n"
+	"Saving scrollback logs under: %s\n"
+	"Clean this directory periodically to avoid overloading your filesystem.\n"
+	"All persistent sessions are saved here until you remove them. Be aware of\n"
+	"what you save here and how fast it grows.\n"
+	"\n"
+	"This inconvenience will eventually be automated.\n"
+	"\n"
+	"--- STARTING DAEMONIZED SPAWNER PROCESS ---\n"
+	"Access http://<host>/attach to get started\n"
+	"\n",
 			state_dir());
-
-		cdhome();
-
-		/* Start reading from process immediately. Otherwise the server
-		 * may timeout, as stdout/stderr will block indefinitely.
-		 * A side-effect of setting this is that pream will be ignored,
-		 * so if we decide to set it this must be refactored. */
-		dc->firstatch = 1;
-		exit(dtach_master(dc));
 	}
 
-	fprintf(stderr, "unrecognized arguments\n");
-	exit(1);
+	cdhome();
+
+	/* Start reading from process immediately. Otherwise the server
+	 * may timeout, as stdout/stderr will block indefinitely.
+	 * A side-effect of setting this is that pream will be ignored,
+	 * so if we decide to set it this must be refactored. */
+	dc->firstatch = 1;
+	if (dtach_master(dc)) exit(1);
 }

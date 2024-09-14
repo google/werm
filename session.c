@@ -1675,18 +1675,22 @@ void set_argv0(Dtachctx dc, char role)
 	free(bname);
 }
 
-static void appendunqid(void)
+static void appendunqid(int outsig)
 {
 	char *sfix;
 	struct fdbuf buf = {0};
 
 	sfix = next_uniqid();
-	fdb_apnd(&buf, "\\@appendid:.", -1);
-	fdb_apnd(&buf, sfix, -1);
-	fdb_apnc(&buf, '\n');
-	write_wbsoc_frame(buf.bf, buf.len);
 
-	buf.len = 0;
+	if (outsig) {
+		fdb_apnd(&buf, "\\@appendid:.", -1);
+		fdb_apnd(&buf, sfix, -1);
+		fdb_apnc(&buf, '\n');
+		write_wbsoc_frame(buf.bf, buf.len);
+
+		buf.len = 0;
+	}
+
 	fdb_apnd(&buf, termid, -1);
 	fdb_apnc(&buf, '.');
 	fdb_apnd(&buf, sfix, 1 + strlen(sfix));
@@ -1742,7 +1746,7 @@ static _Noreturn void becomewebsocket(const char *quer)
 	processquerystr(quer);
 	if (termid) {
 		checktid();
-		if (!strchr(termid, '.')) appendunqid();
+		if (!strchr(termid, '.')) appendunqid(1);
 	}
 
 	dtach_main(prepfordtach());
@@ -2152,7 +2156,7 @@ int main(int argc, char **argv)
 		iterprofs(profpath(), &((struct iterprofspec){ .diaglog = 1 }));
 
 		termid = strdup("~spawner");
-		appendunqid();
+		appendunqid(0);
 		dc = prepfordtach();
 		dc->spargs = parse_spawner_ports(argv + 1);
 

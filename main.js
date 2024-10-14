@@ -651,8 +651,8 @@ function onnewcred(c)
 	newpublkey = new Uint8Array(c.response.getPublicKey());
 	newpublkey = newpublkey.slice(newpublkey.length-PUBKEY_BYTESZ);
 
-	localStorage['authnid'] = new Uint8Array(c.rawId);
-	localStorage['publkey'] = newpublkey;
+	localStorage['authnid'] = arr64enc(c.rawId);
+	localStorage['publkey'] = arr64enc(newpublkey);
 	termwrite('success creating new creds\n');
 	doauthn();
 }
@@ -888,13 +888,6 @@ function reportwebsockerr(wse)
 	termwrite('error connecting websocket - see JS console\r');
 }
 
-function arr64enc(arb)
-{
-	var u8a = new Uint8Array(arb), scs = [];
-	u8a.forEach(function(b) { scs.push(String.fromCharCode(b)) });
-	return btoa(scs.join(''));
-}
-
 function doauthn()
 {
 	var athreq = new XMLHttpRequest();
@@ -917,12 +910,21 @@ function doauthn()
 	as = JSON.parse(athreq.responseText);
 	if (!as.pendauth) return;
 
-	authnid = new Uint8Array(localStorage['authnid'].split(','));
+	authnid = localStorage['authnid'].split(',');
+	if (authnid.length == 1)
+		authnid = atob(authnid[0]).split('').map(function(c)
+		{
+			return c.charCodeAt(0);
+		});
+	else
+		localStorage['authnid']
+			= btoa(String.fromCharCode.apply(String, authnid));
+
 	prom = navigator.credentials.get({
 		publicKey: {
 			challenge: new Uint8Array(as.challenge),
 			allowCredentials: [{
-				id: authnid,
+				id: new Uint8Array(authnid),
 				type: 'public-key',
 				transports: ['internal', 'usb', 'ble', 'nfc'],
 			}],
@@ -939,9 +941,12 @@ function doauthn()
 	{
 		var r = new XMLHttpRequest(), dat = asr.response;
 		var url = ['/authent'];
-		var pubkey = new Uint8Array(localStorage.publkey.split(','));
+		var pubkey = localStorage.publkey.split(',');
+		pubkey = (pubkey.length > 1)
+			? (localStorage['publkey']=arr64enc(pubkey))
+			: pubkey[0];
 
-		url.push('?key=',	arr64enc(pubkey));
+		url.push('?key=',	pubkey);
 		url.push('&auth=',	arr64enc(dat.authenticatorData));
 		url.push('&clidat=',	arr64enc(dat.clientDataJSON));
 		url.push('&sig=',	arr64enc(dat.signature));

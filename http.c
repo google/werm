@@ -8,6 +8,7 @@
 #include "outstreams.h"
 #include "shared.h"
 
+#include <dirent.h>
 #include <time.h>
 #include <utime.h>
 #include <sys/stat.h>
@@ -171,6 +172,8 @@ static int fixedread(int fh, unsigned bytes, unsigned char *dest)
 	}
 }
 
+#define AUTH_PREF "auth."
+
 void authn_state(Httpreq *rq, int doallow)
 {
 	struct fdbuf normpat = {0};
@@ -183,7 +186,7 @@ void authn_state(Httpreq *rq, int doallow)
 
 	fdb_apnd(&normpat, state_dir(), -1);
 	fdb_apnc(&normpat, '/');
-	fdb_apnd(&normpat, "auth.", -1);
+	fdb_apnd(&normpat, AUTH_PREF, -1);
 
 	for (;;) {
 		fdb_apnc(&normpat, *sccr == '/' ? '_' : *sccr);
@@ -204,7 +207,7 @@ void authn_state(Httpreq *rq, int doallow)
 		}
 	}
 	else
-		rq->pendauth = now - stb.st_mtime > 24 * 60 * 60;
+		rq->pendauth = now - stb.st_mtime > AUTH_EXPIRE_SECONDS;
 
 	if (!rq->pendauth && !doallow) goto cleanup;
 
@@ -216,7 +219,8 @@ void authn_state(Httpreq *rq, int doallow)
 	normpat.len--;
 	fdb_apnd(&normpat, ".chal", -1);
 
-	fprintf(stderr, "challenge file: %s\n", cstr(&normpat));
+	fprintf(stderr, "challenge file: %s allow? %d\n",
+		cstr(&normpat), doallow);
 	if (doallow) {
 		/* Challenge has already been used, so delete it so we make a
 		new one later. */
@@ -456,6 +460,65 @@ void resp_dynamc(struct wrides *de, char hdr, int code, void *p, size_t sz)
 
 	fdb_finsh(&b);
 	full_write(de, p, sz);
+}
+
+void auth_maint(void)
+{
+	static int inter;
+	struct fdbuf flpa = {0};
+	DIR *d = 0;
+	struct dirent *e;
+	struct stat sb;
+	time_t now;
+
+	if (inter++ & 0x1ff) return;
+
+	if (0 > time(&now)) {
+		perror("get current time");
+		goto cleanup;
+	}
+
+	d = opendir(state_dir());
+	if (!d) {
+		perror("cannot open state_dir for auth file maintenance");
+		return;
+	}
+
+	for (;;) {
+		errno = 0;
+		e = readdir(d);
+		if (!e) break;
+
+		if (strncmp(AUTH_PREF, e->d_name, sizeof(AUTH_PREF) - 1))
+			continue;
+
+		flpa.len = 0;
+		fdb_apnd(&flpa, state_dir(), -1);
+		fdb_apnc(&flpa, '/');
+		fdb_apnd(&flpa, e->d_name, -1);
+
+		if (0 > stat(cstr(&flpa), &sb)) {
+			perror("stat an auth file");
+			goto ferr;
+			continue;
+		}
+		if (now - sb.st_mtime <= AUTH_EXPIRE_SECONDS) continue;
+
+		if (0 > unlink(cstr(&flpa))) {
+			perror("unlink stale auth file");
+			goto ferr;
+		}
+
+		continue;
+
+	ferr:	fprintf(stderr, "\tpath: %s\n", cstr(&flpa));
+	}
+
+	if (errno) perror("readdir on state_dir");
+
+cleanup:
+	fdb_finsh(&flpa);
+	if (0 > closedir(d)) perror("close state_dir");
 }
 
 void test_http(void)

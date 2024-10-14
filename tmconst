@@ -13,4 +13,6 @@
 
 #define FIDOALGTYPE (-7)
 
+#define AUTH_EXPIRE_SECONDS (60 * 60 * 24)
+
 #endif  /* TMCONST_HDR */

@@ -7,7 +7,19 @@
 /* This file is for code shared between, or potentially shared between, main.js
 and attach. */
 
+#include "tmconst"
+
 window.wermhosttitle ||= location.host.replace(/^localhost:/, ':');
+
+/* Encodes a regular array or Uint8Array of byte values, or an ArrayBuffer, to
+base64 */
+function arr64enc(arb)
+{
+	if (!arb.map) arb = new Uint8Array(arb);
+	return btoa(new Array(...arb)
+		.map(function (b) { return String.fromCharCode(b) })
+		.join(''));
+}
 
 function endptid()
 {
@@ -30,16 +42,20 @@ function endptid()
 (function () {
 	/* Get a unique session ID. We can't use endpoint ID because that value
 	is passed to other clients to identify who is connected to a session. */
-	var sco, bar, coo;
+	var bar, coo, exd;
 	if (location.protocol != 'https:')		return;
 	if (document.cookie.match(/\bwermsession=/))	return;
 
-	sco = [];
 	bar = new Uint8Array(16);
 	crypto.getRandomValues(bar);
-	bar.forEach(function (n) { sco.push(String.fromCharCode(n)) });
-	coo = btoa(sco.join(''));
-	document.cookie = 'wermsession=' + coo.replace(/==*$/, '');
+	coo = arr64enc(bar);
+
+	/* Expire the cookie when the server will make it expire. Just in case
+	make it expire a few seconds earlier so there is no chance of us sending
+	a session ID that has already expired authorization in the server. */
+	exd = new Date(new Date().getTime() + 1000 * (AUTH_EXPIRE_SECONDS - 3));
+	document.cookie = 'wermsession=' + coo.replace(/==*$/, '') +
+		'; expires=' + exd.toGMTString();
 })();
 
 function wermuserid()

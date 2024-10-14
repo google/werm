@@ -4,6 +4,7 @@
  * license that can be found in the LICENSE file or at
  * https://developers.google.com/open-source/licenses/bsd */
 
+#include "http.h"
 #include "spawner.h"
 #include "shared.h"
 
@@ -253,5 +254,5 @@ void _Noreturn spawner(Ports ps)
 		if (prepsock(sk) && ps->maxsfd < sk->fd) ps->maxsfd = sk->fd;
 	}
 
-	for (;;) acceptnext(ps);
+	for (;;) { auth_maint(); acceptnext(ps); }
 }

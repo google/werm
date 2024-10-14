@@ -66,3 +66,7 @@ int require_auth(void);
 of the session ID'd by rq->sesshdr. If doallow is true, then it clears
 rq->pendauth and rq->chal, if they are set, and updates authn state. */
 void authn_state(Httpreq *rq, int doallow);
+
+/* Removes old authentication files. Should be called periodically to delete
+accumulating auth files. */
+void auth_maint(void);

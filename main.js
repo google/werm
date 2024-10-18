@@ -1681,9 +1681,20 @@ var vim_macros = [
 ];
 
 function winpos() { return window.screenX + 'x' + window.screenY; }
+
+function procmac(mch)
+{
+	if (typeof mch === 'string')	{ signal(sanit(mch))	; return }
+	if (typeof mch === 'function')	{ mch()			; return }
+	if (mch.forEach)		{ mch.forEach(procmac)	; return }
+
+	console.error('unknown mapping type:');
+	console.log(mch);
+}
+
 function process_mkey(e)
 {
-	var mi, mch, mac, save, is_alt;
+	var mi, mac, save, is_alt;
 
 	is_alt = (e.mn == 'la' || e.mn == 'ra');
 
@@ -1745,15 +1756,7 @@ function process_mkey(e)
 			if (mi < matching.length) matching[mi--] = save;
 			break;
 		case 'm':
-			mch = mac[1];
-			if (typeof mch === 'string')
-				signal(sanit(mch));
-			else if (typeof mch === 'function')
-				mch();
-			else {
-				console.error('unknown mapping type:');
-				console.log(mch);
-			}
+			procmac(mac[1]);
 			matching.length = 0;
 			return true;
 		}

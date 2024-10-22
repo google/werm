@@ -154,7 +154,7 @@ fn2(deqpushcop, dq, cop)
 		dq = deqpushbyt(dq, 0x80 | cop >> 6);	cop &= 0x0003f;
 		dq = deqpushbyt(dq, 0x80 | cop);
 	} else if	(cop < 0x110000) {
-		dq = deqpushbyt(dq, 0xf0 | cop >> 18);	cop &= 0x2ffff;
+		dq = deqpushbyt(dq, 0xf0 | cop >> 18);	cop &= 0x3ffff;
 		dq = deqpushbyt(dq, 0x80 | cop >> 12);	cop &= 0x00fff;
 		dq = deqpushbyt(dq, 0x80 | cop >> 6);	cop &= 0x0003f;
 		dq = deqpushbyt(dq, 0x80 | cop);

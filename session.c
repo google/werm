@@ -1861,7 +1861,7 @@ static void servsharejs(struct wrides *out)
 	fdb_json(&fou, rlp ? rlp : "", -1);
 	fdb_apnd(&fou, ";\n", -1);
 
-	fdb_apnd(&fou, sharejs, SHAREJS_LEN);
+	fdb_apnd(&fou, sharejs_etc, SHAREJS_ETC_LEN);
 
 	resp_dynamc(out, 'j', 200, fou.bf, fou.len);
 	fdb_finsh(&fou);

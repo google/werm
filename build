@@ -273,28 +273,33 @@ sub escape_cstr {
 	return $len;
 }
 
-{
-	open my $mjs, '>', 'gen/mainjs_etc.c';
+sub ppjs {
+	my ($name) = @_;
+	open my $jsstr, '>', "gen/${name}js_etc.c";
 	my $cppproc = open2(my $ppou, my $ppin, 'cpp', '-P', '-I.');
 
-	print $ppin qq[#include "main.js"\n];
+	print $ppin qq[#include "$name.js"\n];
 	close $ppin;
 
-	print $mjs qq[#include "gen/data.h"\n];
-	print $mjs qq[char mainjs_etc[] =\n];
-	my $mjssz = escape_cstr(0, $mjs, $ppou);
-	print $mjs qq[;\n];
+	print $jsstr qq[#include "gen/data.h"\n];
+	print $jsstr qq[char ${name}js_etc[] =\n];
+	my $rawsz = escape_cstr(0, $jsstr, $ppou);
+	print $jsstr qq[;\n];
 
-	push @datahdr, "extern char mainjs_etc[];\n";
-	push @datahdr, "#define MAINJS_ETC_LEN $mjssz\n";
+	push @datahdr, "extern char ${name}js_etc[];\n";
+	my $namecap = uc($name);
+	push @datahdr, "#define ${namecap}JS_ETC_LEN $rawsz\n";
 
 	waitpid($cppproc, 0);
 	my $ex = $? >> 8;
 	if ($ex) {
-		print STDERR "C preprocessor failed on main.js\n";
+		print STDERR "C preprocessor failed on $name.js\n";
 		exit $ex;
 	}
 }
+
+ppjs "main";
+ppjs "share";
 
 sub filetocstr {
 	my ($tesc, $id, $src) = @_;
@@ -311,9 +316,8 @@ sub filetocstr {
 }
 
 filetocstr 0, 'test_jumptocol_in'	, 'test/raw/jumptocol_in';
-filetocstr 0, 'test_lineed_in'	, 'test/raw/lineed_in';
+filetocstr 0, 'test_lineed_in'		, 'test/raw/lineed_in';
 filetocstr 0, 'test_lineednar_in'	, 'test/raw/lineednar_in';
-filetocstr 0, 'sharejs'		, 'share.js';
 filetocstr 0, 'readme_md'		, 'README.md';
 filetocstr 0, 'index_html'		, 'index.html';
 filetocstr 0, 'attch_html'		, 'attach';

@@ -180,7 +180,12 @@ function unpackclr(c, rv)
 
 var unkcops = new Map();
 
-function Xdrawglyph(trm, scri, c, r)
+/* selrev is always absent when called from tmeng. This is true when this
+function must check selected state, and apply ATTR_REVERSE inside this
+function. It is used because original st liked to have Xdrawline take care of
+this, but it's simpler and faster in Javascript rendering if Xdrawglyph makes
+the change. */
+function Xdrawglyph(trm, scri, c, r, selrev)
 {
 	var cel, copd, wide, xoff, yoff, rv, eglymod,
 		scr = term(trm,scr),
@@ -210,7 +215,7 @@ function Xdrawglyph(trm, scri, c, r)
 	rv = term(trm,mode) & MODE_REVERSE;
 
 	eglymod = fld(scr,scri+GLYPH_MODE);
-	if (selected(trm, c, r)) eglymod ^= ATTR_REVERSE;
+	if (selrev && selected(trm, c, r)) eglymod ^= ATTR_REVERSE;
 
 	gl.uniform1i	(mask,		maskval);
 	gl.uniform1i	(glymode,	eglymod);
@@ -231,7 +236,7 @@ function Xdrawline(trm, x1, y1, x2)
 	var celi = term_cellf(trm, y1, x1), x;
 
 	for (x = x1; x < x2; x++, celi += GLYPH_ELCNT)
-		Xdrawglyph(trm, celi, x, y1);
+		Xdrawglyph(trm, celi, x, y1, 1);
 }
 
 function Xdrawrect(col, x, y, w, h)

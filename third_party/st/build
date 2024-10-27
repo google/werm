@@ -24,4 +24,5 @@ cc 	-g3					\
 	-L/usr/X11R6/lib			\
 	-lm -lrt -lX11 -lutil -lXft		\
 	`pkg-config --libs fontconfig`		\
-	`pkg-config --libs freetype2`
+	`pkg-config --libs freetype2`		\
+|| : NOTE required Debian packages: libx11-dev libfontconfig-dev libxft-dev

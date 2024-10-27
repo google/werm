@@ -45,6 +45,14 @@ void fdb_apnd(struct fdbuf *b, const void *buf_, ssize_t len);
  */
 void fdb_apnc(struct fdbuf *b, int c_);
 
+/* Converts the buffer to a C string, first verifying that it ends with a null
+byte. */
+static inline char *cstr(struct fdbuf *b)
+{
+	if (b->bf[b->len-1]) fdb_apnc(b, 0);
+	return (char *)b->bf;
+}
+
 /* Appends lowercase hexadecimal byte. Always appends two characters. */
 void fdb_hexb(struct fdbuf *b, int byt);
 

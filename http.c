@@ -197,7 +197,7 @@ void authn_state(Httpreq *rq, int doallow)
 		goto cleanup;
 	}
 
-	if (0 > stat((char *)normpat.bf, &stb)) {
+	if (0 > stat(cstr(&normpat), &stb)) {
 		if (errno != ENOENT) {
 			perror("stat authn file");
 			goto cleanup;
@@ -209,24 +209,23 @@ void authn_state(Httpreq *rq, int doallow)
 	if (!rq->pendauth && !doallow) goto cleanup;
 
 	if (doallow) {
-		mknod((char *)normpat.bf, S_IFREG | 0600, 0);
-		utime((char *)normpat.bf, &(struct utimbuf){ now, now });
+		mknod(cstr(&normpat), S_IFREG | 0600, 0);
+		utime(cstr(&normpat), &(struct utimbuf){ now, now });
 	}
 
 	normpat.len--;
 	fdb_apnd(&normpat, ".chal", -1);
-	fdb_apnc(&normpat, 0);
 
-	fprintf(stderr, "challenge file: %s\n", (char *)normpat.bf);
+	fprintf(stderr, "challenge file: %s\n", cstr(&normpat));
 	if (doallow) {
 		/* Challenge has already been used, so delete it so we make a
 		new one later. */
-		unlink((const char *)normpat.bf);
+		unlink(cstr(&normpat));
 		rq->pendauth = 0;
 		goto cleanup;
 	}
 
-	chalh = open((char *)normpat.bf, O_RDONLY);
+	chalh = open(cstr(&normpat), O_RDONLY);
 	if (chalh >= 0) {
 		if (fixedread(chalh, CHALLN_BYTESZ, rq->chal)) {
 			haschal = 1;
@@ -235,7 +234,7 @@ void authn_state(Httpreq *rq, int doallow)
 		close(chalh);
 	}
 
-	chalh = open((char *)normpat.bf, O_TRUNC | O_WRONLY | O_CREAT, 0600);
+	chalh = open(cstr(&normpat), O_TRUNC | O_WRONLY | O_CREAT, 0600);
 	if (chalh < 0) { perror("open chal file for writing"); goto cleanup; }
 	randh = open("/dev/random", O_RDONLY);
 

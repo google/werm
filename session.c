@@ -310,9 +310,8 @@ static Dtachctx prepfordtach(void)
 	fdb_apnd(&sp, socksdir(), -1);
 	if (termid)	{fdb_apnd(&sp, "/prs%", -1); fdb_apnd(&sp, termid, -1);}
 	else		{fdb_apnd(&sp, "/eph%", -1); fdb_itoa(&sp, getpid());}
-	fdb_apnc(&sp, 0);
 
-	dc->sockpath = (char *) sp.bf;
+	dc->sockpath = cstr(&sp);
 	sp.bf = 0;
 	fdb_finsh(&sp);
 
@@ -1694,11 +1693,11 @@ static void appendunqid(int outsig)
 
 	fdb_apnd(&buf, termid, -1);
 	fdb_apnc(&buf, '.');
-	fdb_apnd(&buf, sfix, 1 + strlen(sfix));
+	fdb_apnd(&buf, sfix, strlen(sfix));
 
 	/* Free old termid and take ownership of buffer. */
 	free(termid);
-	termid = (char *)buf.bf;
+	termid = cstr(&buf);
 
 	free(sfix);
 }

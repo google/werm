@@ -753,17 +753,34 @@ function display(s)
 		} else esclen = 3;
 
 		if (s.startsWith('\\@state:')) {
+			console.log(	'got new term state from server;',
+					'JSON size: ', escpylo.length);
 			escpylo		= JSON.parse(escpylo);
 			bufsa		= escpylo.bs;
 			bufsfreehead	= escpylo.fh;
 			t		= escpylo.t;
 			term4cli();
 			topr		= deqmk();
+			escpylo.oc = 0;
+			escpylo.os = 0;
 			bufsa.forEach(function(a, ai)
 			{
-				if (typeof a == 'object')
+				if (typeof a == 'object') {
 					bufsa[ai] = new Int32Array(a);
+					escpylo.os += bufsa[ai].length;
+					escpylo.oc += 1;
+				}
 			});
+			console.log(	'no. objects:',	escpylo.oc,
+					'no. words:',	escpylo.os);
+
+			/* When re-establishing a connection, we need to set
+			terminal size AFTER receiving a new state. Before the
+			server receives \i{endptid}, it will not send subproc
+			activity to the client, so I believe sending the
+			terminal size too soon after \i{endptid} will cause the
+			terminal redraw to never be sent. */
+			imposetsize();
 		}
 		else if (s.startsWith('\\@title:')) {
 			row_ttl = escpylo;
@@ -963,7 +980,7 @@ function prepare_sock()
 		location.origin.replace(/^http/, 'ws') + '/' + location.search);
 	/* signalsize implicitly sends pending sends that have
 	   accumulated while disconnected. */
-	sock.onopen = function() { signal('\\i' + endptid()); imposetsize() };
+	sock.onopen = function() { signal('\\i' + endptid()) };
 
 	sock.onmessage = function(e) {
 		if (log_packin)

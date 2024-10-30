@@ -163,6 +163,7 @@ sub procfnt {
 			"0{",
 			"1u &= 0x7fffffff;",
 			"1if (u <= 0x7f) return 1;",
+			"1if (0xa0 <= u && u <= 0x1bf) return 1;",
 			"1switch (u) {",
 			"1default: return 2;",
 	);
@@ -202,17 +203,21 @@ sub mtime {
 }
 
 my $fntime = 0x7fffffff;
+my @fnsrcmt;
+
 for $f (qw[gen/charwi gen/font.c]) {
 	my $mt = mtime $f;
 	$mt < $fntime and $fntime = $mt;
 }
-my $wftime = -1;
+
 for $w (@wfns) {
 	my @fs = split(':', $w);
 	my $f = $fs[5];
-	my $mt = mtime $f;
-	$mt > $wftime and $wftime = $mt;
+	push @fnsrcmt, mtime($f);
 }
+
+push @fnsrcmt, mtime('build');
+my $wftime = (sort { $a <=> $b } @fnsrcmt)[-1];
 
 if ($wftime > $fntime) {
 	print STDERR "generating font.c\n";
